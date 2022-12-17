@@ -319,11 +319,11 @@ pub struct IType {
 
 impl IType {
     pub fn set_imm(&mut self, value: i16) -> Result<(), Error> {
-        if (value > 2047) || (value < -2047) {
+        if !(-2047..=2047).contains(&value) {
             return Err(Error::ImmediateValueOutOfRange(value));
         }
 
-        let mut imm_value: u16 = value.abs() as u16;
+        let mut imm_value = value.unsigned_abs();
 
         if value < 0 {
             // set sign on bit 12

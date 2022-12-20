@@ -248,6 +248,7 @@ impl CPU {
         match instruction {
             RV32I::ADD(i) => self.rv32i_add(i),
             RV32I::ADDI(i) => self.rv32i_addi(i),
+            RV32I::SLTI(i) => self.rv32i_slti(i),
             RV32I::NOP => self.rv32i_nop(),
             e => Err(Error::NotImplemented(e)),
         }
@@ -267,26 +268,31 @@ impl CPU {
     }
 
     fn rv32i_addi(&mut self, instruction: IType) -> Result<(), Error> {
-        // the immediate value is a 12-bit sign extended value. here be dragons.
-        let immediate = instruction.imm;
-
-        // determine if negative
-        let sign_mask: u16 = 1 << 11;
-        let is_negative = (immediate & sign_mask) != 0;
-
-        // clear the top bits, including the signing bit
-        let value_mask: u16 = 0b0000_0111_1111_1111;
-        let immediate_value = (value_mask & immediate) as u32;
-
+        let abs_immediate_value = instruction.signed_imm_as_abs_u32();
         let current_value = self.get_register(instruction.rs1);
 
-        let new_value = if is_negative {
-            current_value.wrapping_sub(immediate_value)
+        let new_value = if instruction.imm_is_negative() {
+            current_value.wrapping_sub(abs_immediate_value)
         } else {
-            current_value.wrapping_add(immediate_value)
+            current_value.wrapping_add(abs_immediate_value)
         };
 
         self.set_register(instruction.rd, new_value);
+        self.pc += RV32I::LENGTH;
+        Ok(())
+    }
+
+    fn rv32i_slti(&mut self, instruction: IType) -> Result<(), Error> {
+        // rs1 and the immediate value are treated as signed
+        let signed_rs1 = self.get_register(instruction.rs1) as i32;
+        let signed_imm = instruction.signed_imm_as_i32();
+
+        if signed_rs1 < signed_imm {
+            self.set_register(instruction.rd, 1);
+        } else {
+            self.set_register(instruction.rd, 0);
+        }
+
         self.pc += RV32I::LENGTH;
         Ok(())
     }
@@ -318,6 +324,26 @@ pub struct IType {
 }
 
 impl IType {
+    // examine the 12th bit to determine if the imm value is negative
+    pub fn imm_is_negative(&self) -> bool {
+        let sign_mask: u16 = 1 << 11;
+        (self.imm & sign_mask) != 0
+    }
+
+    // converts the 12 bit signed to it's absolute value u32 for easier math against registers.
+    pub fn signed_imm_as_abs_u32(&self) -> u32 {
+        let value_mask: u16 = 0b0000_0111_1111_1111;
+        (value_mask & self.imm) as u32
+    }
+
+    pub fn signed_imm_as_i32(&self) -> i32 {
+        if self.imm_is_negative() {
+            0 - (self.signed_imm_as_abs_u32() as i32)
+        } else {
+            self.signed_imm_as_abs_u32() as i32
+        }
+    }
+
     pub fn set_imm(&mut self, value: i16) -> Result<(), Error> {
         if !(-2047..=2047).contains(&value) {
             return Err(Error::ImmediateValueOutOfRange(value));
@@ -504,5 +530,39 @@ mod tests {
         let result = cpu.execute(addi);
         assert!(result.is_ok());
         assert_eq!(cpu.x1, 2);
+    }
+
+    #[test]
+    fn rv321_slti() {
+        let mut cpu = CPU::new();
+        let mut inst = IType::default();
+
+        inst.rd = Register::X1;
+        inst.rs1 = Register::X2;
+        inst.imm = 0;
+
+        let slti = RV32I::SLTI(inst);
+
+        // zero / equal value
+        let result = cpu.execute(slti);
+        assert!(result.is_ok());
+        assert_eq!(cpu.x1, 0);
+        assert_eq!(cpu.pc, RV32I::LENGTH);
+
+        // greater than value
+        inst.set_imm(1).unwrap();
+        let slti = RV32I::SLTI(inst);
+        let result = cpu.execute(slti);
+        assert!(result.is_ok());
+        assert_eq!(cpu.x1, 1);
+        assert_eq!(cpu.pc, RV32I::LENGTH * 2);
+
+        // less than value (negative, just for kicks)
+        inst.set_imm(-1).unwrap();
+        let slti = RV32I::SLTI(inst);
+        let result = cpu.execute(slti);
+        assert!(result.is_ok());
+        assert_eq!(cpu.x1, 0);
+        assert_eq!(cpu.pc, RV32I::LENGTH * 3);
     }
 }

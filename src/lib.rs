@@ -249,6 +249,7 @@ impl CPU {
             RV32I::ADD(i) => self.rv32i_add(i),
             RV32I::ADDI(i) => self.rv32i_addi(i),
             RV32I::SLTI(i) => self.rv32i_slti(i),
+            RV32I::SLTIU(i) => self.rv32i_sltiu(i),
             RV32I::NOP => self.rv32i_nop(),
             e => Err(Error::NotImplemented(e)),
         }
@@ -296,12 +297,28 @@ impl CPU {
         self.pc += RV32I::LENGTH;
         Ok(())
     }
+
+    fn rv32i_sltiu(&mut self, instruction: IType) -> Result<(), Error> {
+        // rs1 and the immediate value are treated as signed
+        let rs1 = self.get_register(instruction.rs1);
+        let imm = instruction.unsigned_imm_as_u32();
+
+        if rs1 < imm {
+            self.set_register(instruction.rd, 1);
+        } else {
+            self.set_register(instruction.rd, 0);
+        }
+
+        self.pc += RV32I::LENGTH;
+        Ok(())
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
 pub enum Error {
     NotImplemented(RV32I),
-    ImmediateValueOutOfRange(i16),
+    SignedImmediateOutOfRange(i16),
+    ImmediateOutOfRange(u16),
 }
 
 #[derive(Debug, Copy, Clone, Default)]
@@ -344,9 +361,9 @@ impl IType {
         }
     }
 
-    pub fn set_imm(&mut self, value: i16) -> Result<(), Error> {
+    pub fn set_signed_imm(&mut self, value: i16) -> Result<(), Error> {
         if !(-2047..=2047).contains(&value) {
-            return Err(Error::ImmediateValueOutOfRange(value));
+            return Err(Error::SignedImmediateOutOfRange(value));
         }
 
         let mut imm_value = value.unsigned_abs();
@@ -357,6 +374,19 @@ impl IType {
         }
 
         self.imm = imm_value;
+        Ok(())
+    }
+
+    pub fn unsigned_imm_as_u32(&self) -> u32 {
+        self.imm as u32
+    }
+
+    pub fn set_unsigned_imm(&mut self, value: u16) -> Result<(), Error> {
+        if value > 4095 {
+            return Err(Error::ImmediateOutOfRange(value));
+        }
+
+        self.imm = value;
         Ok(())
     }
 }
@@ -524,7 +554,7 @@ mod tests {
         assert_eq!(cpu.x1, 5);
 
         // negative values
-        let result = inst.set_imm(-3);
+        let result = inst.set_signed_imm(-3);
         assert!(result.is_ok());
         let addi = RV32I::ADDI(inst);
         let result = cpu.execute(addi);
@@ -533,7 +563,7 @@ mod tests {
     }
 
     #[test]
-    fn rv321_slti() {
+    fn rv32i_slti() {
         let mut cpu = CPU::new();
         let mut inst = IType::default();
 
@@ -550,7 +580,7 @@ mod tests {
         assert_eq!(cpu.pc, RV32I::LENGTH);
 
         // greater than value
-        inst.set_imm(1).unwrap();
+        inst.set_signed_imm(1).unwrap();
         let slti = RV32I::SLTI(inst);
         let result = cpu.execute(slti);
         assert!(result.is_ok());
@@ -558,9 +588,44 @@ mod tests {
         assert_eq!(cpu.pc, RV32I::LENGTH * 2);
 
         // less than value (negative, just for kicks)
-        inst.set_imm(-1).unwrap();
+        inst.set_signed_imm(-1).unwrap();
         let slti = RV32I::SLTI(inst);
         let result = cpu.execute(slti);
+        assert!(result.is_ok());
+        assert_eq!(cpu.x1, 0);
+        assert_eq!(cpu.pc, RV32I::LENGTH * 3);
+    }
+
+    #[test]
+    fn rv32i_sltiu() {
+        let mut cpu = CPU::new();
+        let mut inst = IType::default();
+
+        cpu.x2 = 255; // initial value to compare against
+
+        inst.rd = Register::X1;
+        inst.rs1 = Register::X2;
+
+        // equal value
+        inst.set_unsigned_imm(255).unwrap();
+        let sltiu = RV32I::SLTIU(inst);
+        let result = cpu.execute(sltiu);
+        assert!(result.is_ok());
+        assert_eq!(cpu.x1, 0);
+        assert_eq!(cpu.pc, RV32I::LENGTH);
+
+        // greater than value
+        inst.set_unsigned_imm(256).unwrap();
+        let sltiu = RV32I::SLTIU(inst);
+        let result = cpu.execute(sltiu);
+        assert!(result.is_ok());
+        assert_eq!(cpu.x1, 1);
+        assert_eq!(cpu.pc, RV32I::LENGTH * 2);
+
+        // less than value
+        inst.set_unsigned_imm(254).unwrap();
+        let sltiu = RV32I::SLTIU(inst);
+        let result = cpu.execute(sltiu);
         assert!(result.is_ok());
         assert_eq!(cpu.x1, 0);
         assert_eq!(cpu.pc, RV32I::LENGTH * 3);

@@ -254,6 +254,7 @@ impl CPU {
             RV32I::ORI(i) => self.rv32i_ori(i),
             RV32I::XORI(i) => self.rv32i_xori(i),
             RV32I::LUI(i) => self.rv32i_lui(i),
+            RV32I::AUIPC(i) => self.rv32i_auipc(i),
             RV32I::NOP => self.rv32i_nop(),
             e => Err(Error::NotImplemented(e)),
         }?;
@@ -330,7 +331,6 @@ impl CPU {
         let value = imm & rs1;
 
         self.set_register(instruction.rd, value);
-
         Ok(())
     }
 
@@ -341,7 +341,6 @@ impl CPU {
         let value = imm | rs1;
 
         self.set_register(instruction.rd, value);
-
         Ok(())
     }
 
@@ -352,7 +351,6 @@ impl CPU {
         let value = imm ^ rs1;
 
         self.set_register(instruction.rd, value);
-
         Ok(())
     }
 
@@ -364,6 +362,16 @@ impl CPU {
         imm = imm << 12;
 
         self.set_register(instruction.rd, imm);
+        Ok(())
+    }
+
+    fn rv32i_auipc(&mut self, instruction: UType) -> Result<(), Error> {
+        let mut imm = instruction.imm;
+        imm = imm << 12;
+        let pc = self.pc;
+        let value = imm + pc;
+
+        self.set_register(instruction.rd, value);
         Ok(())
     }
 }
@@ -813,5 +821,26 @@ mod tests {
         let result = cpu.execute(lui);
         assert!(result.is_ok());
         assert_eq!(cpu.x1, 0b0000_0000_0000_0000_0001_0000_0000_0000);
+    }
+
+    #[test]
+    fn rv32i_auipc() {
+        let mut cpu = CPU::new();
+        let mut inst = UType::default();
+
+        inst.rd = Register::X1;
+        let result = inst.set_unsigned_imm(1);
+        assert!(result.is_ok());
+
+        // from PC 0
+        let auipc = RV32I::AUIPC(inst);
+        let result = cpu.execute(auipc);
+        assert!(result.is_ok());
+        assert_eq!(cpu.x1, 0b0000_0000_0000_0000_0001_0000_0000_0000);
+
+        // from 0 + RV32I::LENGTH
+        let result = cpu.execute(auipc);
+        assert!(result.is_ok());
+        assert_eq!(cpu.x1, 0b0000_0000_0000_0000_0001_0000_0000_0100);
     }
 }

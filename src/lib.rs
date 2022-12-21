@@ -250,6 +250,7 @@ impl CPU {
             RV32I::ADDI(i) => self.rv32i_addi(i),
             RV32I::SLTI(i) => self.rv32i_slti(i),
             RV32I::SLTIU(i) => self.rv32i_sltiu(i),
+            RV32I::ANDI(i) => self.rv32i_andi(i),
             RV32I::NOP => self.rv32i_nop(),
             e => Err(Error::NotImplemented(e)),
         }
@@ -268,6 +269,9 @@ impl CPU {
         Ok(())
     }
 
+    /// ADDI adds the sign-extended 12-bit immediate to register rs1. Arithmetic overflow is ignored and
+    /// the result is simply the low XLEN bits of the result. ADDI rd, rs1, 0 is used to implement the MV
+    /// rd, rs1 assembler pseudo-instruction.
     fn rv32i_addi(&mut self, instruction: IType) -> Result<(), Error> {
         let abs_immediate_value = instruction.signed_imm_as_abs_u32();
         let current_value = self.get_register(instruction.rs1);
@@ -283,6 +287,8 @@ impl CPU {
         Ok(())
     }
 
+    /// SLTI (set less than immediate) places the value 1 in register rd if register rs1 is less than the
+    /// sign-extended immediate when both are treated as signed numbers, else 0 is written to rd.
     fn rv32i_slti(&mut self, instruction: IType) -> Result<(), Error> {
         // rs1 and the immediate value are treated as signed
         let signed_rs1 = self.get_register(instruction.rs1) as i32;
@@ -298,6 +304,9 @@ impl CPU {
         Ok(())
     }
 
+    /// SLTIU is similar but compares the values as unsigned numbers (i.e., the immediate is first
+    /// sign-extended to XLEN bits then treated as an unsigned number). Note, SLTIU rd, rs1, 1 sets
+    /// rd to 1 if rs1 equals zero, otherwise sets rd to 0 (assembler pseudo-op SEQZ rd, rs).
     fn rv32i_sltiu(&mut self, instruction: IType) -> Result<(), Error> {
         // rs1 and the immediate value are treated as signed
         let rs1 = self.get_register(instruction.rs1);
@@ -308,6 +317,22 @@ impl CPU {
         } else {
             self.set_register(instruction.rd, 0);
         }
+
+        self.pc += RV32I::LENGTH;
+        Ok(())
+    }
+
+    /// ANDI, ORI, XORI are logical operations that perform bitwise AND, OR, and XOR on register
+    /// rs1 and the sign-extended 12-bit immediate and place the result in rd. Note, XORI rd,
+    /// rs1, -1 performs a bitwise logical inversion of register rs1 (assembler pseudo-instruction
+    /// NOT rd, rs).
+    fn rv32i_andi(&mut self, instruction: IType) -> Result<(), Error> {
+        let rs1 = self.get_register(instruction.rs1);
+        let imm = instruction.unsigned_imm_as_u32();
+
+        let value = imm & rs1;
+
+        self.set_register(instruction.rd, value);
 
         self.pc += RV32I::LENGTH;
         Ok(())
@@ -341,6 +366,10 @@ pub struct IType {
 }
 
 impl IType {
+    const UNSIGNED_IMM_MAX: u16 = 0b0000_1111_1111_1111;
+    const SIGNED_IMM_MAX: i16 = 2047;
+    const SIGNED_IMM_MIN: i16 = -2048;
+
     // examine the 12th bit to determine if the imm value is negative
     pub fn imm_is_negative(&self) -> bool {
         let sign_mask: u16 = 1 << 11;
@@ -362,7 +391,15 @@ impl IType {
     }
 
     pub fn set_signed_imm(&mut self, value: i16) -> Result<(), Error> {
-        if !(-2047..=2047).contains(&value) {
+        if !(Self::SIGNED_IMM_MIN..=Self::SIGNED_IMM_MAX).contains(&value) {
+            println!(
+                "Uh oh! value: {:#b},  min: {:#b} {}, max: {:#b}, {}",
+                value,
+                Self::SIGNED_IMM_MIN,
+                Self::SIGNED_IMM_MIN,
+                Self::SIGNED_IMM_MAX,
+                Self::SIGNED_IMM_MAX
+            );
             return Err(Error::SignedImmediateOutOfRange(value));
         }
 
@@ -382,7 +419,7 @@ impl IType {
     }
 
     pub fn set_unsigned_imm(&mut self, value: u16) -> Result<(), Error> {
-        if value > 4095 {
+        if value > Self::UNSIGNED_IMM_MAX {
             return Err(Error::ImmediateOutOfRange(value));
         }
 
@@ -629,5 +666,32 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(cpu.x1, 0);
         assert_eq!(cpu.pc, RV32I::LENGTH * 3);
+    }
+
+    #[test]
+    fn rv32i_andi() {
+        let mut cpu = CPU::new();
+        let mut inst = IType::default();
+
+        inst.rd = Register::X1;
+        inst.rs1 = Register::X2;
+
+        // all 1s across the register and imm
+        let result = inst.set_unsigned_imm(IType::UNSIGNED_IMM_MAX);
+        assert!(result.is_ok());
+        cpu.x2 = u32::MAX;
+        let andi = RV32I::ANDI(inst);
+        let result = cpu.execute(andi);
+        assert!(result.is_ok());
+        assert_eq!(cpu.x1, 0b0000_0000_0000_0000_0000_1111_1111_1111);
+
+        // all 0s in imm
+        let result = inst.set_unsigned_imm(0);
+        assert!(result.is_ok());
+        cpu.x2 = u32::MAX;
+        let andi = RV32I::ANDI(inst);
+        let result = cpu.execute(andi);
+        assert!(result.is_ok());
+        assert_eq!(cpu.x1, 0);
     }
 }

@@ -253,13 +253,16 @@ impl CPU {
             RV32I::ANDI(i) => self.rv32i_andi(i),
             RV32I::ORI(i) => self.rv32i_ori(i),
             RV32I::XORI(i) => self.rv32i_xori(i),
+            RV32I::LUI(i) => self.rv32i_lui(i),
             RV32I::NOP => self.rv32i_nop(),
             e => Err(Error::NotImplemented(e)),
-        }
+        }?;
+
+        self.pc += RV32I::LENGTH;
+        Ok(())
     }
 
     fn rv32i_nop(&mut self) -> Result<(), Error> {
-        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
@@ -267,7 +270,6 @@ impl CPU {
         let a = self.get_register(instruction.rs1);
         let b = self.get_register(instruction.rs2);
         self.set_register(instruction.rd, a.wrapping_add(b));
-        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
@@ -281,7 +283,6 @@ impl CPU {
         let new_value = rs1.wrapping_add(imm);
 
         self.set_register(instruction.rd, new_value);
-        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
@@ -298,7 +299,6 @@ impl CPU {
             self.set_register(instruction.rd, 0);
         }
 
-        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
@@ -316,7 +316,6 @@ impl CPU {
             self.set_register(instruction.rd, 0);
         }
 
-        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
@@ -332,7 +331,6 @@ impl CPU {
 
         self.set_register(instruction.rd, value);
 
-        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
@@ -344,7 +342,6 @@ impl CPU {
 
         self.set_register(instruction.rd, value);
 
-        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
@@ -356,16 +353,47 @@ impl CPU {
 
         self.set_register(instruction.rd, value);
 
-        self.pc += RV32I::LENGTH;
+        Ok(())
+    }
+
+    /// LUI (load upper immediate) is used to build 32-bit constants and uses the U-type format. LUI
+    /// places the U-immediate value in the top 20 bits of the destination register rd, filling in the
+    /// lowest 12 bits with zeros.
+    fn rv32i_lui(&mut self, instruction: UType) -> Result<(), Error> {
+        let mut imm = instruction.imm;
+        imm = imm << 12;
+
+        self.set_register(instruction.rd, imm);
         Ok(())
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub enum Error {
     NotImplemented(RV32I),
-    SignedImmediateOutOfRange(i16),
-    ImmediateOutOfRange(u16),
+    ImmediateOutOfRange(String),
+}
+
+impl Error {
+    pub fn i16_out_of_range(value: i16) -> Error {
+        let message = format!("Value {} ({:#b}) out of range", value, value);
+        Self::ImmediateOutOfRange(message)
+    }
+
+    pub fn u16_out_of_range(value: u16) -> Error {
+        let message = format!("Value {} ({:#b}) out of range", value, value);
+        Self::ImmediateOutOfRange(message)
+    }
+
+    pub fn i32_out_of_range(value: i32) -> Error {
+        let message = format!("Value {} ({:#b}) out of range", value, value);
+        Self::ImmediateOutOfRange(message)
+    }
+
+    pub fn u32_out_of_range(value: u32) -> Error {
+        let message = format!("Value {} ({:#b}) out of range", value, value);
+        Self::ImmediateOutOfRange(message)
+    }
 }
 
 #[derive(Debug, Copy, Clone, Default)]
@@ -388,9 +416,9 @@ pub struct IType {
 }
 
 impl IType {
-    const UNSIGNED_IMM_MAX: u16 = 0b0000_1111_1111_1111;
-    const SIGNED_IMM_MAX: i16 = 2047;
-    const SIGNED_IMM_MIN: i16 = -2048;
+    const UNSIGNED_IMM_MAX: u16 = 2u16.pow(12) - 1;
+    const SIGNED_IMM_MAX: i16 = 2i16.pow(11) - 1;
+    const SIGNED_IMM_MIN: i16 = 0 - 2i16.pow(11);
 
     // examine the 12th bit to determine if the imm value is negative
     fn imm_is_negative(&self) -> bool {
@@ -400,7 +428,7 @@ impl IType {
 
     pub fn set_signed_imm(&mut self, value: i16) -> Result<(), Error> {
         if !(Self::SIGNED_IMM_MIN..=Self::SIGNED_IMM_MAX).contains(&value) {
-            return Err(Error::SignedImmediateOutOfRange(value));
+            return Err(Error::i16_out_of_range(value));
         }
 
         let mut imm_value = value.unsigned_abs();
@@ -416,7 +444,7 @@ impl IType {
 
     pub fn set_unsigned_imm(&mut self, value: u16) -> Result<(), Error> {
         if value > Self::UNSIGNED_IMM_MAX {
-            return Err(Error::ImmediateOutOfRange(value));
+            return Err(Error::u16_out_of_range(value));
         }
 
         self.imm = value;
@@ -453,11 +481,59 @@ pub struct BType {
     pub rs2: Register,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Default)]
 pub struct UType {
     pub opcode: u8,
     pub rd: Register,
     pub imm: u32,
+}
+
+impl UType {
+    const UNSIGNED_IMM_MAX: u32 = 2u32.pow(20) - 1;
+    const SIGNED_IMM_MAX: i32 = 2i32.pow(19) - 1;
+    const SIGNED_IMM_MIN: i32 = 0 - 2i32.pow(19);
+
+    // examine the 12th bit to determine if the imm value is negative
+    fn imm_is_negative(&self) -> bool {
+        let sign_mask: u32 = 1 << 19;
+        (self.imm & sign_mask) != 0
+    }
+
+    pub fn set_signed_imm(&mut self, value: i32) -> Result<(), Error> {
+        if !(Self::SIGNED_IMM_MIN..=Self::SIGNED_IMM_MAX).contains(&value) {
+            return Err(Error::i32_out_of_range(value));
+        }
+
+        let mut imm_value = value.unsigned_abs();
+
+        if value < 0 {
+            // set sign on bit 20
+            imm_value += 1 << 19;
+        }
+
+        self.imm = imm_value;
+        Ok(())
+    }
+
+    pub fn set_unsigned_imm(&mut self, value: u32) -> Result<(), Error> {
+        if value > Self::UNSIGNED_IMM_MAX {
+            return Err(Error::u32_out_of_range(value));
+        }
+
+        self.imm = value;
+        Ok(())
+    }
+
+    pub fn sign_extended_imm(&self) -> u32 {
+        let negative_extension: u32 = 0b1111_1111_1111_1000_0000_0000_0000_0000;
+        let value = self.imm as u32;
+
+        if self.imm_is_negative() {
+            negative_extension | value
+        } else {
+            value
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -703,7 +779,6 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(cpu.x1, 0);
 
-
         // all 0s in imm
         let result = inst.set_unsigned_imm(0);
         assert!(result.is_ok());
@@ -723,6 +798,20 @@ mod tests {
         let result = cpu.execute(xori);
         assert!(result.is_ok());
         assert_eq!(cpu.x1, u32::MAX);
+    }
 
+    #[test]
+    fn rv32i_lui() {
+        let mut cpu = CPU::new();
+        let mut inst = UType::default();
+
+        inst.rd = Register::X1;
+        let result = inst.set_unsigned_imm(1);
+        assert!(result.is_ok());
+
+        let lui = RV32I::LUI(inst);
+        let result = cpu.execute(lui);
+        assert!(result.is_ok());
+        assert_eq!(cpu.x1, 0b0000_0000_0000_0000_0001_0000_0000_0000);
     }
 }

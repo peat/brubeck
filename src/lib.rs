@@ -265,14 +265,15 @@ impl CPU {
             RV32I::SLL(i) => self.rv32i_sll(i),
             RV32I::SRL(i) => self.rv32i_srl(i),
             RV32I::SRA(i) => self.rv32i_sra(i),
+            RV32I::JAL(i) => self.rv32i_jal(i),
             e => Err(Error::NotImplemented(e)),
         }?;
 
-        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
     fn rv32i_nop(&mut self) -> Result<(), Error> {
+        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
@@ -283,6 +284,7 @@ impl CPU {
         let a = self.get_register(instruction.rs1);
         let b = self.get_register(instruction.rs2);
         self.set_register(instruction.rd, a.wrapping_add(b));
+        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
@@ -290,6 +292,7 @@ impl CPU {
         let a = self.get_register(instruction.rs1);
         let b = self.get_register(instruction.rs2);
         self.set_register(instruction.rd, a.wrapping_sub(b));
+        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
@@ -304,6 +307,7 @@ impl CPU {
         let new_value = rs1.wrapping_add(imm);
 
         self.set_register(instruction.rd, new_value);
+        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
@@ -321,6 +325,7 @@ impl CPU {
             self.set_register(instruction.rd, 0);
         }
 
+        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
@@ -339,6 +344,7 @@ impl CPU {
             self.set_register(instruction.rd, 0);
         }
 
+        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
@@ -351,8 +357,9 @@ impl CPU {
         let imm = instruction.sign_extended_imm();
 
         let value = imm & rs1;
-
         self.set_register(instruction.rd, value);
+
+        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
@@ -361,8 +368,9 @@ impl CPU {
         let imm = instruction.sign_extended_imm();
 
         let value = imm | rs1;
-
         self.set_register(instruction.rd, value);
+
+        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
@@ -371,8 +379,9 @@ impl CPU {
         let imm = instruction.sign_extended_imm();
 
         let value = imm ^ rs1;
-
         self.set_register(instruction.rd, value);
+
+        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
@@ -383,8 +392,9 @@ impl CPU {
     fn rv32i_lui(&mut self, instruction: UType) -> Result<(), Error> {
         let mut imm = instruction.imm;
         imm <<= 12;
-
         self.set_register(instruction.rd, imm);
+
+        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
@@ -397,8 +407,9 @@ impl CPU {
         imm <<= 12;
         let pc = self.pc;
         let value = imm + pc;
-
         self.set_register(instruction.rd, value);
+
+        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
@@ -416,6 +427,7 @@ impl CPU {
             self.set_register(instruction.rd, 0);
         }
 
+        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
@@ -439,6 +451,7 @@ impl CPU {
             }
         }
 
+        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
@@ -450,6 +463,7 @@ impl CPU {
         let value = rs1 & rs2;
         self.set_register(instruction.rd, value);
 
+        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
@@ -460,6 +474,7 @@ impl CPU {
         let value = rs1 | rs2;
         self.set_register(instruction.rd, value);
 
+        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
@@ -470,6 +485,7 @@ impl CPU {
         let value = rs1 ^ rs2;
         self.set_register(instruction.rd, value);
 
+        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
@@ -486,6 +502,7 @@ impl CPU {
         let value = rs1 << shift_amount;
         self.set_register(instruction.rd, value);
 
+        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
@@ -500,6 +517,7 @@ impl CPU {
         let value = rs1 >> shift_amount;
         self.set_register(instruction.rd, value);
 
+        self.pc += RV32I::LENGTH;
         Ok(())
     }
 
@@ -515,6 +533,39 @@ impl CPU {
         let value = (rs1 as i32) >> shift_amount;
         self.set_register(instruction.rd, value as u32);
 
+        self.pc += RV32I::LENGTH;
+        Ok(())
+    }
+
+    /// The jump and link (JAL) instruction uses the J-type format, where the
+    /// J-immediate encodes a signed offset in multiples of 2 bytes. The offset
+    /// is sign-extended and added to the pc to form the jump target address.
+    /// Jumps can therefore target a ±1 MiB range. JAL stores the address of
+    /// the instruction following the jump (pc+4) into register rd. The
+    /// standard software calling convention uses x1 as the return
+    /// address register and x5 as an alternate link register.
+    /// Plain unconditional jumps (assembler pseudo-op J) are encoded as a JAL
+    /// with rd=x0.
+    fn rv32i_jal(&mut self, instruction: JType) -> Result<(), Error> {
+        let mut offset = instruction.sign_extended_imm();
+
+        // shift left one bit; multiply by 2
+        offset <<= 1;
+
+        // create the offset address
+        let offset_address = self.pc.wrapping_add(offset);
+
+        // validate the offset address is 32-bit aligned
+        if offset_address % 4 != 0 {
+            return Err(Error::MisalignedJump(offset_address));
+        }
+
+        // set the return address
+        let return_address = self.pc.wrapping_add(RV32I::LENGTH);
+
+        self.set_register(Register::PC, offset_address);
+        self.set_register(instruction.rd, return_address);
+
         Ok(())
     }
 }
@@ -523,6 +574,7 @@ impl CPU {
 pub enum Error {
     NotImplemented(RV32I),
     ImmediateOutOfRange(String),
+    MisalignedJump(u32),
 }
 
 impl Error {
@@ -687,11 +739,60 @@ impl UType {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Default)]
 pub struct JType {
     pub opcode: u8,
     pub rd: Register,
+    /// 20 bits available
     pub imm: u32,
+}
+
+impl JType {
+    const UNSIGNED_IMM_MAX: u32 = 2u32.pow(20) - 1;
+    const SIGNED_IMM_MAX: i32 = 2i32.pow(19) - 1;
+    const SIGNED_IMM_MIN: i32 = 0 - 2i32.pow(19);
+
+    // examine the 20th bit to determine if the imm value is negative
+    fn imm_is_negative(&self) -> bool {
+        let sign_mask: u32 = 1 << 19;
+        (self.imm & sign_mask) != 0
+    }
+
+    pub fn set_signed_imm(&mut self, value: i32) -> Result<(), Error> {
+        if !(Self::SIGNED_IMM_MIN..=Self::SIGNED_IMM_MAX).contains(&value) {
+            return Err(Error::i32_out_of_range(value));
+        }
+
+        let mut imm_value = value.unsigned_abs();
+
+        if value < 0 {
+            // set sign on bit 20
+            imm_value += 1 << 19;
+        }
+
+        self.imm = imm_value;
+        Ok(())
+    }
+
+    pub fn set_unsigned_imm(&mut self, value: u32) -> Result<(), Error> {
+        if value > Self::UNSIGNED_IMM_MAX {
+            return Err(Error::u32_out_of_range(value));
+        }
+
+        self.imm = value;
+        Ok(())
+    }
+
+    pub fn sign_extended_imm(&self) -> u32 {
+        let negative_extension: u32 = 0b1111_1111_1111_1000_0000_0000_0000_0000;
+        let value = self.imm;
+
+        if self.imm_is_negative() {
+            negative_extension | value
+        } else {
+            value
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -996,5 +1097,28 @@ mod tests {
         let result = cpu.execute(auipc);
         assert!(result.is_ok());
         assert_eq!(cpu.x1, 0b0000_0000_0000_0000_0001_0000_0000_0100);
+    }
+
+    #[test]
+    fn rv32i_jal() {
+        let mut cpu = CPU::new();
+        let mut inst = JType::default();
+
+        inst.rd = Register::X1;
+        let result = inst.set_unsigned_imm(4);
+        assert!(result.is_ok());
+
+        let jal = RV32I::JAL(inst);
+        let result = cpu.execute(jal);
+        assert!(result.is_ok());
+        assert_eq!(cpu.pc, 8); // current pc (0) + (4 * 2)
+        assert_eq!(cpu.x1, 4); // current pc (0) + RV32I::LENGTH
+
+        // misalignment check!
+        let result = inst.set_unsigned_imm(1);
+        assert!(result.is_ok());
+        let jal = RV32I::JAL(inst);
+        let result = cpu.execute(jal);
+        assert!(result.is_err());
     }
 }

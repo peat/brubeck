@@ -1,4 +1,4 @@
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Register {
     X0,
     X1,
@@ -257,6 +257,14 @@ impl CPU {
             RV32I::AUIPC(i) => self.rv32i_auipc(i),
             RV32I::ADD(i) => self.rv32i_add(i),
             RV32I::SUB(i) => self.rv32i_sub(i),
+            RV32I::SLT(i) => self.rv32i_slt(i),
+            RV32I::SLTU(i) => self.rv32i_sltu(i),
+            RV32I::AND(i) => self.rv32i_and(i),
+            RV32I::OR(i) => self.rv32i_or(i),
+            RV32I::XOR(i) => self.rv32i_xor(i),
+            RV32I::SLL(i) => self.rv32i_sll(i),
+            RV32I::SRL(i) => self.rv32i_srl(i),
+            RV32I::SRA(i) => self.rv32i_sra(i),
             e => Err(Error::NotImplemented(e)),
         }?;
 
@@ -374,7 +382,7 @@ impl CPU {
     /// zeros.
     fn rv32i_lui(&mut self, instruction: UType) -> Result<(), Error> {
         let mut imm = instruction.imm;
-        imm = imm << 12;
+        imm <<= 12;
 
         self.set_register(instruction.rd, imm);
         Ok(())
@@ -386,11 +394,127 @@ impl CPU {
     /// this offset to the pc, then places the result in register rd.
     fn rv32i_auipc(&mut self, instruction: UType) -> Result<(), Error> {
         let mut imm = instruction.imm;
-        imm = imm << 12;
+        imm <<= 12;
         let pc = self.pc;
         let value = imm + pc;
 
         self.set_register(instruction.rd, value);
+        Ok(())
+    }
+
+    /// SLT and SLTU perform signed and unsigned compares respectively, writing
+    /// 1 to rd if rs1 < rs2, 0 otherwise. Note, SLTU rd, x0, rs2 sets rd to 1
+    /// if rs2 is not equal to zero, otherwise sets rd to zero (assembler
+    /// pseudo-op SNEZ rd, rs)
+    fn rv32i_slt(&mut self, instruction: RType) -> Result<(), Error> {
+        let rs1 = self.get_register(instruction.rs1) as i32;
+        let rs2 = self.get_register(instruction.rs2) as i32;
+
+        if rs1 < rs2 {
+            self.set_register(instruction.rd, 1);
+        } else {
+            self.set_register(instruction.rd, 0);
+        }
+
+        Ok(())
+    }
+
+    fn rv32i_sltu(&mut self, instruction: RType) -> Result<(), Error> {
+        let rs1 = self.get_register(instruction.rs1);
+        let rs2 = self.get_register(instruction.rs2);
+
+        if instruction.rs1 == Register::X0 {
+            // exception for rs1 being x0
+            if rs2 != 0 {
+                self.set_register(instruction.rd, 1);
+            } else {
+                self.set_register(instruction.rd, 0);
+            }
+        } else {
+            // normal case for comparison
+            if rs1 < rs2 {
+                self.set_register(instruction.rd, 1);
+            } else {
+                self.set_register(instruction.rd, 0);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// AND, OR, and XOR perform bitwise logical operations
+    fn rv32i_and(&mut self, instruction: RType) -> Result<(), Error> {
+        let rs1 = self.get_register(instruction.rs1);
+        let rs2 = self.get_register(instruction.rs2);
+
+        let value = rs1 & rs2;
+        self.set_register(instruction.rd, value);
+
+        Ok(())
+    }
+
+    fn rv32i_or(&mut self, instruction: RType) -> Result<(), Error> {
+        let rs1 = self.get_register(instruction.rs1);
+        let rs2 = self.get_register(instruction.rs2);
+
+        let value = rs1 | rs2;
+        self.set_register(instruction.rd, value);
+
+        Ok(())
+    }
+
+    fn rv32i_xor(&mut self, instruction: RType) -> Result<(), Error> {
+        let rs1 = self.get_register(instruction.rs1);
+        let rs2 = self.get_register(instruction.rs2);
+
+        let value = rs1 ^ rs2;
+        self.set_register(instruction.rd, value);
+
+        Ok(())
+    }
+
+    /// SLL, SRL, and SRA perform logical left, logical right, and arithmetic
+    /// right shifts on the value in register rs1 by the shift amount held in
+    /// the lower 5 bits of register rs2.
+    fn rv32i_sll(&mut self, instruction: RType) -> Result<(), Error> {
+        let rs1 = self.get_register(instruction.rs1);
+        let rs2 = self.get_register(instruction.rs2);
+
+        // lower 5 bit register mask
+        let mask = 0b0000_0000_0000_0000_0000_0000_0001_1111;
+        let shift_amount = rs2 & mask;
+        let value = rs1 << shift_amount;
+        self.set_register(instruction.rd, value);
+
+        Ok(())
+    }
+
+    fn rv32i_srl(&mut self, instruction: RType) -> Result<(), Error> {
+        let rs1 = self.get_register(instruction.rs1);
+        let rs2 = self.get_register(instruction.rs2);
+
+        // lower 5 bit register mask
+        let mask = 0b0000_0000_0000_0000_0000_0000_0001_1111;
+        let shift_amount = rs2 & mask;
+
+        let value = rs1 >> shift_amount;
+        self.set_register(instruction.rd, value);
+
+        Ok(())
+    }
+
+    fn rv32i_sra(&mut self, instruction: RType) -> Result<(), Error> {
+        let rs1 = self.get_register(instruction.rs1);
+        let rs2 = self.get_register(instruction.rs2);
+
+        // lower 5 bit register mask
+        let mask = 0b0000_0000_0000_0000_0000_0000_0001_1111;
+        let shift_amount = rs2 & mask;
+
+        // Rust uses arithmetic right shifts on signed values!
+        let value = (rs1 as i32) >> shift_amount;
+        self.set_register(instruction.rd, value as u32);
+
         Ok(())
     }
 }
@@ -553,7 +677,7 @@ impl UType {
 
     pub fn sign_extended_imm(&self) -> u32 {
         let negative_extension: u32 = 0b1111_1111_1111_1000_0000_0000_0000_0000;
-        let value = self.imm as u32;
+        let value = self.imm;
 
         if self.imm_is_negative() {
             negative_extension | value

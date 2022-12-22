@@ -246,7 +246,7 @@ impl CPU {
 
     pub fn execute(&mut self, instruction: RV32I) -> Result<(), Error> {
         match instruction {
-            RV32I::ADD(i) => self.rv32i_add(i),
+            RV32I::NOP => self.rv32i_nop(),
             RV32I::ADDI(i) => self.rv32i_addi(i),
             RV32I::SLTI(i) => self.rv32i_slti(i),
             RV32I::SLTIU(i) => self.rv32i_sltiu(i),
@@ -255,7 +255,8 @@ impl CPU {
             RV32I::XORI(i) => self.rv32i_xori(i),
             RV32I::LUI(i) => self.rv32i_lui(i),
             RV32I::AUIPC(i) => self.rv32i_auipc(i),
-            RV32I::NOP => self.rv32i_nop(),
+            RV32I::ADD(i) => self.rv32i_add(i),
+            RV32I::SUB(i) => self.rv32i_sub(i),
             e => Err(Error::NotImplemented(e)),
         }?;
 
@@ -267,6 +268,9 @@ impl CPU {
         Ok(())
     }
 
+    /// ADD and SUB perform addition and subtraction respectively. Overflows
+    /// are ignored and the low XLEN bits of results are written to the
+    /// destination.
     fn rv32i_add(&mut self, instruction: RType) -> Result<(), Error> {
         let a = self.get_register(instruction.rs1);
         let b = self.get_register(instruction.rs2);
@@ -274,9 +278,17 @@ impl CPU {
         Ok(())
     }
 
-    /// ADDI adds the sign-extended 12-bit immediate to register rs1. Arithmetic overflow is ignored and
-    /// the result is simply the low XLEN bits of the result. ADDI rd, rs1, 0 is used to implement the MV
-    /// rd, rs1 assembler pseudo-instruction.
+    fn rv32i_sub(&mut self, instruction: RType) -> Result<(), Error> {
+        let a = self.get_register(instruction.rs1);
+        let b = self.get_register(instruction.rs2);
+        self.set_register(instruction.rd, a.wrapping_sub(b));
+        Ok(())
+    }
+
+    /// ADDI adds the sign-extended 12-bit immediate to register rs1. Arithmetic
+    /// overflow is ignored and the result is simply the low XLEN bits of the
+    /// result. ADDI rd, rs1, 0 is used to implement the MV rd, rs1 assembler
+    /// pseudo-instruction.
     fn rv32i_addi(&mut self, instruction: IType) -> Result<(), Error> {
         let rs1 = self.get_register(instruction.rs1);
         let imm = instruction.sign_extended_imm();
@@ -287,8 +299,9 @@ impl CPU {
         Ok(())
     }
 
-    /// SLTI (set less than immediate) places the value 1 in register rd if register rs1 is less than the
-    /// sign-extended immediate when both are treated as signed numbers, else 0 is written to rd.
+    /// SLTI (set less than immediate) places the value 1 in register rd if
+    /// register rs1 is less than the sign-extended immediate when both are
+    /// treated as signed numbers, else 0 is written to rd.
     fn rv32i_slti(&mut self, instruction: IType) -> Result<(), Error> {
         // rs1 and the immediate value are treated as signed
         let signed_rs1 = self.get_register(instruction.rs1) as i32;
@@ -303,9 +316,10 @@ impl CPU {
         Ok(())
     }
 
-    /// SLTIU is similar but compares the values as unsigned numbers (i.e., the immediate is first
-    /// sign-extended to XLEN bits then treated as an unsigned number). Note, SLTIU rd, rs1, 1 sets
-    /// rd to 1 if rs1 equals zero, otherwise sets rd to 0 (assembler pseudo-op SEQZ rd, rs).
+    /// SLTIU is similar but compares the values as unsigned numbers (i.e., the
+    /// immediate is first sign-extended to XLEN bits then treated as an
+    /// unsigned number). Note, SLTIU rd, rs1, 1 sets rd to 1 if rs1 equals
+    /// zero, otherwise sets rd to 0 (assembler pseudo-op SEQZ rd, rs).
     fn rv32i_sltiu(&mut self, instruction: IType) -> Result<(), Error> {
         // rs1 and the immediate value are treated as signed
         let rs1 = self.get_register(instruction.rs1);
@@ -320,10 +334,10 @@ impl CPU {
         Ok(())
     }
 
-    /// ANDI, ORI, XORI are logical operations that perform bitwise AND, OR, and XOR on register
-    /// rs1 and the sign-extended 12-bit immediate and place the result in rd. Note, XORI rd,
-    /// rs1, -1 performs a bitwise logical inversion of register rs1 (assembler pseudo-instruction
-    /// NOT rd, rs).
+    /// ANDI, ORI, XORI are logical operations that perform bitwise AND, OR,
+    /// and XOR on register rs1 and the sign-extended 12-bit immediate and place
+    /// the result in rd. Note, XORI rd, rs1, -1 performs a bitwise logical
+    /// inversion of register rs1 (assembler pseudo-instruction NOT rd, rs).
     fn rv32i_andi(&mut self, instruction: IType) -> Result<(), Error> {
         let rs1 = self.get_register(instruction.rs1);
         let imm = instruction.sign_extended_imm();
@@ -354,9 +368,10 @@ impl CPU {
         Ok(())
     }
 
-    /// LUI (load upper immediate) is used to build 32-bit constants and uses the U-type format. LUI
-    /// places the U-immediate value in the top 20 bits of the destination register rd, filling in the
-    /// lowest 12 bits with zeros.
+    /// LUI (load upper immediate) is used to build 32-bit constants and uses
+    /// the U-type format. LUI places the U-immediate value in the top 20 bits
+    /// of the destination register rd, filling in the lowest 12 bits with
+    /// zeros.
     fn rv32i_lui(&mut self, instruction: UType) -> Result<(), Error> {
         let mut imm = instruction.imm;
         imm = imm << 12;
@@ -365,6 +380,10 @@ impl CPU {
         Ok(())
     }
 
+    /// AUIPC (add upper immediate to pc) is used to build pc-relative
+    /// addresses and uses the U-type format. AUIPC forms a 32-bit offset from
+    /// the 20-bit U-immediate, filling in the lowest 12 bits with zeros, adds
+    /// this offset to the pc, then places the result in register rd.
     fn rv32i_auipc(&mut self, instruction: UType) -> Result<(), Error> {
         let mut imm = instruction.imm;
         imm = imm << 12;
@@ -628,7 +647,7 @@ mod tests {
     }
 
     #[test]
-    fn rv32i_add() {
+    fn rv32i_add_sub() {
         let mut cpu = CPU::new();
         let mut inst = RType::default();
 
@@ -637,25 +656,36 @@ mod tests {
         inst.rs2 = Register::X3;
 
         let add = RV32I::ADD(inst);
+        let sub = RV32I::SUB(inst);
 
         // zero values
         let result = cpu.execute(add);
         assert!(result.is_ok());
         assert_eq!(cpu.x1, 0);
 
-        // non-overflowing addition
-        cpu.set_register(Register::X2, 4);
-        cpu.set_register(Register::X3, 8);
+        // non-overflowing add and sub
+        cpu.set_register(Register::X2, 8);
+        cpu.set_register(Register::X3, 4);
+
         let result = cpu.execute(add);
         assert!(result.is_ok());
         assert_eq!(cpu.x1, 12);
 
+        let result = cpu.execute(sub);
+        assert!(result.is_ok());
+        assert_eq!(cpu.x1, 4);
+
         // overflowing addition
-        cpu.set_register(Register::X2, u32::MAX - 1);
-        cpu.set_register(Register::X3, 3);
+        cpu.set_register(Register::X2, 3);
+        cpu.set_register(Register::X3, u32::MAX - 1);
+
         let result = cpu.execute(add);
         assert!(result.is_ok());
         assert_eq!(cpu.x1, 1);
+
+        let result = cpu.execute(sub);
+        assert!(result.is_ok());
+        assert_eq!(cpu.x1, 5);
     }
 
     #[test]

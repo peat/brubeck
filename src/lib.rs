@@ -1,3 +1,6 @@
+mod immediate;
+use immediate::Immediate;
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Register {
     X0,
@@ -266,6 +269,7 @@ impl CPU {
             RV32I::SRL(i) => self.rv32i_srl(i),
             RV32I::SRA(i) => self.rv32i_sra(i),
             RV32I::JAL(i) => self.rv32i_jal(i),
+            RV32I::JALR(i) => self.rv32i_jalr(i),
             e => Err(Error::NotImplemented(e)),
         }?;
 
@@ -302,7 +306,7 @@ impl CPU {
     /// pseudo-instruction.
     fn rv32i_addi(&mut self, instruction: IType) -> Result<(), Error> {
         let rs1 = self.get_register(instruction.rs1);
-        let imm = instruction.sign_extended_imm();
+        let imm = instruction.imm.as_u32();
 
         let new_value = rs1.wrapping_add(imm);
 
@@ -317,7 +321,7 @@ impl CPU {
     fn rv32i_slti(&mut self, instruction: IType) -> Result<(), Error> {
         // rs1 and the immediate value are treated as signed
         let signed_rs1 = self.get_register(instruction.rs1) as i32;
-        let signed_imm = instruction.sign_extended_imm() as i32;
+        let signed_imm = instruction.imm.as_i32();
 
         if signed_rs1 < signed_imm {
             self.set_register(instruction.rd, 1);
@@ -334,9 +338,8 @@ impl CPU {
     /// unsigned number). Note, SLTIU rd, rs1, 1 sets rd to 1 if rs1 equals
     /// zero, otherwise sets rd to 0 (assembler pseudo-op SEQZ rd, rs).
     fn rv32i_sltiu(&mut self, instruction: IType) -> Result<(), Error> {
-        // rs1 and the immediate value are treated as signed
         let rs1 = self.get_register(instruction.rs1);
-        let imm = instruction.sign_extended_imm();
+        let imm = instruction.imm.as_u32();
 
         if rs1 < imm {
             self.set_register(instruction.rd, 1);
@@ -354,7 +357,7 @@ impl CPU {
     /// inversion of register rs1 (assembler pseudo-instruction NOT rd, rs).
     fn rv32i_andi(&mut self, instruction: IType) -> Result<(), Error> {
         let rs1 = self.get_register(instruction.rs1);
-        let imm = instruction.sign_extended_imm();
+        let imm = instruction.imm.as_u32();
 
         let value = imm & rs1;
         self.set_register(instruction.rd, value);
@@ -365,7 +368,7 @@ impl CPU {
 
     fn rv32i_ori(&mut self, instruction: IType) -> Result<(), Error> {
         let rs1 = self.get_register(instruction.rs1);
-        let imm = instruction.sign_extended_imm();
+        let imm = instruction.imm.as_u32();
 
         let value = imm | rs1;
         self.set_register(instruction.rd, value);
@@ -376,7 +379,7 @@ impl CPU {
 
     fn rv32i_xori(&mut self, instruction: IType) -> Result<(), Error> {
         let rs1 = self.get_register(instruction.rs1);
-        let imm = instruction.sign_extended_imm();
+        let imm = instruction.imm.as_u32();
 
         let value = imm ^ rs1;
         self.set_register(instruction.rd, value);
@@ -390,7 +393,7 @@ impl CPU {
     /// of the destination register rd, filling in the lowest 12 bits with
     /// zeros.
     fn rv32i_lui(&mut self, instruction: UType) -> Result<(), Error> {
-        let mut imm = instruction.imm;
+        let mut imm = instruction.imm.as_u32();
         imm <<= 12;
         self.set_register(instruction.rd, imm);
 
@@ -403,7 +406,7 @@ impl CPU {
     /// the 20-bit U-immediate, filling in the lowest 12 bits with zeros, adds
     /// this offset to the pc, then places the result in register rd.
     fn rv32i_auipc(&mut self, instruction: UType) -> Result<(), Error> {
-        let mut imm = instruction.imm;
+        let mut imm = instruction.imm.as_u32();
         imm <<= 12;
         let pc = self.pc;
         let value = imm + pc;
@@ -547,7 +550,7 @@ impl CPU {
     /// Plain unconditional jumps (assembler pseudo-op J) are encoded as a JAL
     /// with rd=x0.
     fn rv32i_jal(&mut self, instruction: JType) -> Result<(), Error> {
-        let mut offset = instruction.sign_extended_imm();
+        let mut offset = instruction.imm.as_u32();
 
         // shift left one bit; multiply by 2
         offset <<= 1;
@@ -568,35 +571,42 @@ impl CPU {
 
         Ok(())
     }
+
+    /// The indirect jump instruction JALR (jump and link register) uses the
+    /// I-type encoding. The target address is obtained by adding the 12-bit
+    /// signed I-immediate to the register rs1, then setting the
+    /// least-significant bit of the result to zero. The address of the
+    /// instruction following the jump (pc+4) is written to register rd.
+    /// Register x0 can be used as the destination if the result is not
+    /// required.
+    fn rv32i_jalr(&mut self, instruction: IType) -> Result<(), Error> {
+        let offset = instruction.imm.as_u32();
+        let rs1 = self.get_register(instruction.rs1);
+
+        let mut offset_address = rs1.wrapping_add(offset);
+
+        // I'm sure there's a better way to zero the LSB
+        offset_address >>= 1;
+        offset_address <<= 1;
+
+        // validate the offset address is 32-bit aligned
+        if offset_address % 4 != 0 {
+            return Err(Error::MisalignedJump(offset_address));
+        }
+
+        let return_address = self.pc.wrapping_add(RV32I::LENGTH);
+
+        self.set_register(Register::PC, offset_address);
+        self.set_register(instruction.rd, return_address);
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone)]
 pub enum Error {
     NotImplemented(RV32I),
-    ImmediateOutOfRange(String),
     MisalignedJump(u32),
-}
-
-impl Error {
-    pub fn i16_out_of_range(value: i16) -> Error {
-        let message = format!("Value {} ({:#b}) out of range", value, value);
-        Self::ImmediateOutOfRange(message)
-    }
-
-    pub fn u16_out_of_range(value: u16) -> Error {
-        let message = format!("Value {} ({:#b}) out of range", value, value);
-        Self::ImmediateOutOfRange(message)
-    }
-
-    pub fn i32_out_of_range(value: i32) -> Error {
-        let message = format!("Value {} ({:#b}) out of range", value, value);
-        Self::ImmediateOutOfRange(message)
-    }
-
-    pub fn u32_out_of_range(value: u32) -> Error {
-        let message = format!("Value {} ({:#b}) out of range", value, value);
-        Self::ImmediateOutOfRange(message)
-    }
 }
 
 #[derive(Debug, Copy, Clone, Default)]
@@ -609,59 +619,31 @@ pub struct RType {
     pub funct7: u8,
 }
 
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone)]
 pub struct IType {
     pub opcode: u8,
     pub rd: Register,
     pub funct3: u8,
     pub rs1: Register,
-    pub imm: u16,
+    pub imm: Immediate,
+}
+
+impl Default for IType {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl IType {
-    const UNSIGNED_IMM_MAX: u16 = 2u16.pow(12) - 1;
-    const SIGNED_IMM_MAX: i16 = 2i16.pow(11) - 1;
-    const SIGNED_IMM_MIN: i16 = 0 - 2i16.pow(11);
+    const IMM_BITS: u8 = 12;
 
-    // examine the 12th bit to determine if the imm value is negative
-    fn imm_is_negative(&self) -> bool {
-        let sign_mask: u16 = 1 << 11;
-        (self.imm & sign_mask) != 0
-    }
-
-    pub fn set_signed_imm(&mut self, value: i16) -> Result<(), Error> {
-        if !(Self::SIGNED_IMM_MIN..=Self::SIGNED_IMM_MAX).contains(&value) {
-            return Err(Error::i16_out_of_range(value));
-        }
-
-        let mut imm_value = value.unsigned_abs();
-
-        if value < 0 {
-            // set sign on bit 12
-            imm_value += 1 << 11;
-        }
-
-        self.imm = imm_value;
-        Ok(())
-    }
-
-    pub fn set_unsigned_imm(&mut self, value: u16) -> Result<(), Error> {
-        if value > Self::UNSIGNED_IMM_MAX {
-            return Err(Error::u16_out_of_range(value));
-        }
-
-        self.imm = value;
-        Ok(())
-    }
-
-    pub fn sign_extended_imm(&self) -> u32 {
-        let negative_extension: u32 = 0b1111_1111_1111_1111_1111_1000_0000_0000;
-        let value = self.imm as u32;
-
-        if self.imm_is_negative() {
-            negative_extension | value
-        } else {
-            value
+    pub fn new() -> Self {
+        Self {
+            opcode: 0, // TODO
+            rd: Register::default(),
+            funct3: 0, // TODO
+            rs1: Register::default(),
+            imm: Immediate::new(Self::IMM_BITS),
         }
     }
 }
@@ -684,113 +666,52 @@ pub struct BType {
     pub rs2: Register,
 }
 
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone)]
 pub struct UType {
     pub opcode: u8,
     pub rd: Register,
-    pub imm: u32,
+    pub imm: Immediate,
+}
+
+impl Default for UType {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl UType {
-    const UNSIGNED_IMM_MAX: u32 = 2u32.pow(20) - 1;
-    const SIGNED_IMM_MAX: i32 = 2i32.pow(19) - 1;
-    const SIGNED_IMM_MIN: i32 = 0 - 2i32.pow(19);
+    const IMM_BITS: u8 = 20;
 
-    // examine the 12th bit to determine if the imm value is negative
-    fn imm_is_negative(&self) -> bool {
-        let sign_mask: u32 = 1 << 19;
-        (self.imm & sign_mask) != 0
-    }
-
-    pub fn set_signed_imm(&mut self, value: i32) -> Result<(), Error> {
-        if !(Self::SIGNED_IMM_MIN..=Self::SIGNED_IMM_MAX).contains(&value) {
-            return Err(Error::i32_out_of_range(value));
-        }
-
-        let mut imm_value = value.unsigned_abs();
-
-        if value < 0 {
-            // set sign on bit 20
-            imm_value += 1 << 19;
-        }
-
-        self.imm = imm_value;
-        Ok(())
-    }
-
-    pub fn set_unsigned_imm(&mut self, value: u32) -> Result<(), Error> {
-        if value > Self::UNSIGNED_IMM_MAX {
-            return Err(Error::u32_out_of_range(value));
-        }
-
-        self.imm = value;
-        Ok(())
-    }
-
-    pub fn sign_extended_imm(&self) -> u32 {
-        let negative_extension: u32 = 0b1111_1111_1111_1000_0000_0000_0000_0000;
-        let value = self.imm;
-
-        if self.imm_is_negative() {
-            negative_extension | value
-        } else {
-            value
+    pub fn new() -> Self {
+        Self {
+            opcode: 0, // TODO
+            rd: Register::default(),
+            imm: Immediate::new(Self::IMM_BITS),
         }
     }
 }
 
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone)]
 pub struct JType {
     pub opcode: u8,
     pub rd: Register,
-    /// 20 bits available
-    pub imm: u32,
+    pub imm: Immediate,
+}
+
+impl Default for JType {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl JType {
-    const UNSIGNED_IMM_MAX: u32 = 2u32.pow(20) - 1;
-    const SIGNED_IMM_MAX: i32 = 2i32.pow(19) - 1;
-    const SIGNED_IMM_MIN: i32 = 0 - 2i32.pow(19);
+    const IMM_BITS: u8 = 20;
 
-    // examine the 20th bit to determine if the imm value is negative
-    fn imm_is_negative(&self) -> bool {
-        let sign_mask: u32 = 1 << 19;
-        (self.imm & sign_mask) != 0
-    }
-
-    pub fn set_signed_imm(&mut self, value: i32) -> Result<(), Error> {
-        if !(Self::SIGNED_IMM_MIN..=Self::SIGNED_IMM_MAX).contains(&value) {
-            return Err(Error::i32_out_of_range(value));
-        }
-
-        let mut imm_value = value.unsigned_abs();
-
-        if value < 0 {
-            // set sign on bit 20
-            imm_value += 1 << 19;
-        }
-
-        self.imm = imm_value;
-        Ok(())
-    }
-
-    pub fn set_unsigned_imm(&mut self, value: u32) -> Result<(), Error> {
-        if value > Self::UNSIGNED_IMM_MAX {
-            return Err(Error::u32_out_of_range(value));
-        }
-
-        self.imm = value;
-        Ok(())
-    }
-
-    pub fn sign_extended_imm(&self) -> u32 {
-        let negative_extension: u32 = 0b1111_1111_1111_1000_0000_0000_0000_0000;
-        let value = self.imm;
-
-        if self.imm_is_negative() {
-            negative_extension | value
-        } else {
-            value
+    pub fn new() -> Self {
+        Self {
+            opcode: 0, // TODO
+            rd: Register::default(),
+            imm: Immediate::new(Self::IMM_BITS),
         }
     }
 }
@@ -916,11 +837,11 @@ mod tests {
     #[test]
     fn rv32i_addi() {
         let mut cpu = CPU::new();
-        let mut inst = IType::default();
+        let mut inst = IType::new();
 
         inst.rd = Register::X1;
         inst.rs1 = Register::X1;
-        inst.imm = 0;
+        inst.imm.set_unsigned(0).unwrap();
 
         let addi = RV32I::ADDI(inst);
 
@@ -930,19 +851,19 @@ mod tests {
         assert_eq!(cpu.x1, 0);
 
         // positive values
-        inst.imm = 5;
+        inst.imm.set_unsigned(5).unwrap();
         let addi = RV32I::ADDI(inst);
         let result = cpu.execute(addi);
         assert!(result.is_ok());
         assert_eq!(cpu.x1, 5);
 
         // negative values; this is a mess!
-        let result = inst.set_signed_imm(-3);
+        let result = inst.imm.set_signed(-3);
         assert!(result.is_ok());
         let addi = RV32I::ADDI(inst);
         let result = cpu.execute(addi);
         assert!(result.is_ok());
-        assert_eq!(cpu.x1, 4294965256);
+        assert_eq!(cpu.x1, 2);
     }
 
     #[test]
@@ -952,7 +873,7 @@ mod tests {
 
         inst.rd = Register::X1;
         inst.rs1 = Register::X2;
-        inst.imm = 0;
+        inst.imm.set_unsigned(0).unwrap();
 
         let slti = RV32I::SLTI(inst);
 
@@ -963,7 +884,7 @@ mod tests {
         assert_eq!(cpu.pc, RV32I::LENGTH);
 
         // greater than value
-        inst.set_signed_imm(1).unwrap();
+        inst.imm.set_signed(1).unwrap();
         let slti = RV32I::SLTI(inst);
         let result = cpu.execute(slti);
         assert!(result.is_ok());
@@ -971,7 +892,7 @@ mod tests {
         assert_eq!(cpu.pc, RV32I::LENGTH * 2);
 
         // less than value (negative, just for kicks)
-        inst.set_signed_imm(-1).unwrap();
+        inst.imm.set_signed(-1).unwrap();
         let slti = RV32I::SLTI(inst);
         let result = cpu.execute(slti);
         assert!(result.is_ok());
@@ -990,7 +911,7 @@ mod tests {
         inst.rs1 = Register::X2;
 
         // equal value
-        inst.set_unsigned_imm(255).unwrap();
+        inst.imm.set_unsigned(255).unwrap();
         let sltiu = RV32I::SLTIU(inst);
         let result = cpu.execute(sltiu);
         assert!(result.is_ok());
@@ -998,7 +919,7 @@ mod tests {
         assert_eq!(cpu.pc, RV32I::LENGTH);
 
         // greater than value
-        inst.set_unsigned_imm(256).unwrap();
+        inst.imm.set_unsigned(256).unwrap();
         let sltiu = RV32I::SLTIU(inst);
         let result = cpu.execute(sltiu);
         assert!(result.is_ok());
@@ -1006,7 +927,7 @@ mod tests {
         assert_eq!(cpu.pc, RV32I::LENGTH * 2);
 
         // less than value
-        inst.set_unsigned_imm(254).unwrap();
+        inst.imm.set_unsigned(254).unwrap();
         let sltiu = RV32I::SLTIU(inst);
         let result = cpu.execute(sltiu);
         assert!(result.is_ok());
@@ -1023,7 +944,8 @@ mod tests {
         inst.rs1 = Register::X2;
 
         // all 1s across the register and imm
-        let result = inst.set_unsigned_imm(IType::UNSIGNED_IMM_MAX);
+        let result = inst.imm.set_unsigned(inst.imm.unsigned_max());
+        println!("rv32i_andi_ori_xori: inst.imm {} {:#b}", inst.imm.as_u32(), inst.imm.as_u32());
         assert!(result.is_ok());
         cpu.x2 = u32::MAX;
 
@@ -1043,7 +965,7 @@ mod tests {
         assert_eq!(cpu.x1, 0);
 
         // all 0s in imm
-        let result = inst.set_unsigned_imm(0);
+        let result = inst.imm.set_unsigned(0);
         assert!(result.is_ok());
         cpu.x2 = u32::MAX;
 
@@ -1069,7 +991,7 @@ mod tests {
         let mut inst = UType::default();
 
         inst.rd = Register::X1;
-        let result = inst.set_unsigned_imm(1);
+        let result = inst.imm.set_unsigned(1);
         assert!(result.is_ok());
 
         let lui = RV32I::LUI(inst);
@@ -1084,7 +1006,7 @@ mod tests {
         let mut inst = UType::default();
 
         inst.rd = Register::X1;
-        let result = inst.set_unsigned_imm(1);
+        let result = inst.imm.set_unsigned(1);
         assert!(result.is_ok());
 
         // from PC 0
@@ -1105,7 +1027,8 @@ mod tests {
         let mut inst = JType::default();
 
         inst.rd = Register::X1;
-        let result = inst.set_unsigned_imm(4);
+        println!("inst: {:?}", inst);
+        let result = inst.imm.set_unsigned(4);
         assert!(result.is_ok());
 
         let jal = RV32I::JAL(inst);
@@ -1115,10 +1038,38 @@ mod tests {
         assert_eq!(cpu.x1, 4); // current pc (0) + RV32I::LENGTH
 
         // misalignment check!
-        let result = inst.set_unsigned_imm(1);
+        let result = inst.imm.set_unsigned(1);
         assert!(result.is_ok());
         let jal = RV32I::JAL(inst);
         let result = cpu.execute(jal);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn rv32i_jalr() {
+        let mut cpu = CPU::new();
+        let mut inst = IType::default();
+
+        inst.rs1 = Register::X2;
+        inst.rd = Register::X1;
+        let result = inst.imm.set_unsigned(12);
+        assert!(result.is_ok());
+
+        let jalr = RV32I::JALR(inst);
+        let result = cpu.execute(jalr);
+        assert!(result.is_ok());
+        assert_eq!(cpu.pc, 12);
+        assert_eq!(cpu.x1, 4);
+
+        cpu.pc = 0;
+        cpu.x2 = 24;
+        let result = inst.imm.set_signed(-12);
+        assert!(result.is_ok());
+
+        let jalr = RV32I::JALR(inst);
+        let result = cpu.execute(jalr);
+        assert!(result.is_ok());
+        assert_eq!(cpu.pc, 12);
+        assert_eq!(cpu.x1, 4);
     }
 }

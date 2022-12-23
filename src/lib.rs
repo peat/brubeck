@@ -270,6 +270,8 @@ impl CPU {
             RV32I::SRA(i) => self.rv32i_sra(i),
             RV32I::JAL(i) => self.rv32i_jal(i),
             RV32I::JALR(i) => self.rv32i_jalr(i),
+            RV32I::BEQ(i) => self.rv32i_beq(i),
+            RV32I::BNE(i) => self.rv32i_bne(i),
             e => Err(Error::NotImplemented(e)),
         }?;
 
@@ -601,6 +603,43 @@ impl CPU {
 
         Ok(())
     }
+
+    /// All branch instructions use the B-type instruction format. The 12-bit
+    /// B-immediate encodes signed offsets in multiples of 2, and is added to
+    /// the current pc to give the target address. The conditional branch range
+    /// is ±4 KiB
+    ///
+    /// BEQ and BNE take the branch if registers rs1 and rs2 are equal or
+    /// unequal respectively.
+    fn rv32i_beq(&mut self, instruction: BType) -> Result<(), Error> {
+        let rs1 = self.get_register(instruction.rs1);
+        let rs2 = self.get_register(instruction.rs2);
+
+        if rs1 == rs2 {
+            let mut offset = instruction.imm.as_u32();
+            offset <<= 1; // multiple of 2
+            self.pc = self.pc.wrapping_add(offset);
+        } else {
+            self.pc += RV32I::LENGTH;
+        }
+
+        Ok(())
+    }
+
+    fn rv32i_bne(&mut self, instruction: BType) -> Result<(), Error> {
+        let rs1 = self.get_register(instruction.rs1);
+        let rs2 = self.get_register(instruction.rs2);
+
+        if rs1 != rs2 {
+            let mut offset = instruction.imm.as_u32();
+            offset <<= 1; // multiple of 2
+            self.pc = self.pc.wrapping_add(offset);
+        } else {
+            self.pc += RV32I::LENGTH;
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -660,10 +699,30 @@ pub struct SType {
 #[derive(Debug, Copy, Clone)]
 pub struct BType {
     pub opcode: u8,
-    pub imm: u16,
+    pub imm: Immediate,
     pub funct3: u8,
     pub rs1: Register,
     pub rs2: Register,
+}
+
+impl BType {
+    const IMM_BITS: u8 = 12;
+
+    pub fn new() -> Self {
+        Self {
+            opcode: 0,
+            imm: Immediate::new(Self::IMM_BITS),
+            funct3: 0,
+            rs1: Register::default(),
+            rs2: Register::default(),
+        }
+    }
+}
+
+impl Default for BType {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -1069,5 +1128,73 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(cpu.pc, 12);
         assert_eq!(cpu.x1, 4);
+    }
+
+    #[test]
+    fn rv32i_beq() {
+        let mut cpu = CPU::new();
+        let mut inst = BType::default();
+
+        cpu.x1 = 24;
+        cpu.x2 = 24;
+        cpu.pc = 0;
+
+        inst.rs1 = Register::X1;
+        inst.rs2 = Register::X2;
+
+        inst.imm.set_signed(64).unwrap();
+        let beq = RV32I::BEQ(inst);
+        let result = cpu.execute(beq);
+        assert!(result.is_ok());
+        assert_eq!(cpu.pc, 128); // doubled
+
+        inst.imm.set_signed(-128).unwrap();
+        let beq = RV32I::BEQ(inst);
+        let result = cpu.execute(beq);
+        assert!(result.is_ok());
+        assert_eq!(cpu.pc, -128i32 as u32); // doubled
+
+        inst.rs1 = Register::X3;
+        cpu.pc = 0;
+
+        inst.imm.set_signed(64).unwrap();
+        let beq = RV32I::BEQ(inst);
+        let result = cpu.execute(beq);
+        assert!(result.is_ok());
+        assert_eq!(cpu.pc, RV32I::LENGTH); // skipped
+    }
+
+    #[test]
+    fn rv32i_bne() {
+        let mut cpu = CPU::new();
+        let mut inst = BType::default();
+
+        cpu.x1 = 23;
+        cpu.x2 = 24;
+        cpu.pc = 0;
+
+        inst.rs1 = Register::X1;
+        inst.rs2 = Register::X2;
+
+        inst.imm.set_signed(64).unwrap();
+        let beq = RV32I::BNE(inst);
+        let result = cpu.execute(beq);
+        assert!(result.is_ok());
+        assert_eq!(cpu.pc, 128); // doubled
+
+        inst.imm.set_signed(-128).unwrap();
+        let beq = RV32I::BNE(inst);
+        let result = cpu.execute(beq);
+        assert!(result.is_ok());
+        assert_eq!(cpu.pc, -128i32 as u32); // doubled
+
+        cpu.x1 = 24; // should be equal now
+        cpu.pc = 0;
+
+        inst.imm.set_signed(64).unwrap();
+        let beq = RV32I::BNE(inst);
+        let result = cpu.execute(beq);
+        assert!(result.is_ok());
+        assert_eq!(cpu.pc, RV32I::LENGTH); // skipped
     }
 }

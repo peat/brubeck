@@ -142,7 +142,6 @@ mod immediate_tests {
         // top bit is zero
         assert_eq!(imm.as_u32(), 63);
 
-
         let result = imm.set_unsigned(255);
         assert!(result.is_ok());
         // top bit is one, should be sign extended
@@ -151,9 +150,6 @@ mod immediate_tests {
         let result = imm.set_signed(-128);
         assert!(result.is_ok());
         // top bit is one, should be sign extended
-        assert_eq!(
-            imm.as_u32(),
-            0b1111_1111_1111_1111_1111_1111_1000_0000
-        );
+        assert_eq!(imm.as_u32(), 0b1111_1111_1111_1111_1111_1111_1000_0000);
     }
 }

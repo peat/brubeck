@@ -945,7 +945,6 @@ mod tests {
 
         // all 1s across the register and imm
         let result = inst.imm.set_unsigned(inst.imm.unsigned_max());
-        println!("rv32i_andi_ori_xori: inst.imm {} {:#b}", inst.imm.as_u32(), inst.imm.as_u32());
         assert!(result.is_ok());
         cpu.x2 = u32::MAX;
 
@@ -1027,7 +1026,6 @@ mod tests {
         let mut inst = JType::default();
 
         inst.rd = Register::X1;
-        println!("inst: {:?}", inst);
         let result = inst.imm.set_unsigned(4);
         assert!(result.is_ok());
 

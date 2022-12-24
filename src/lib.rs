@@ -272,6 +272,10 @@ impl CPU {
             RV32I::JALR(i) => self.rv32i_jalr(i),
             RV32I::BEQ(i) => self.rv32i_beq(i),
             RV32I::BNE(i) => self.rv32i_bne(i),
+            RV32I::BLT(i) => self.rv32i_blt(i),
+            RV32I::BLTU(i) => self.rv32i_bltu(i),
+            RV32I::BGE(i) => self.rv32i_bge(i),
+            RV32I::BGEU(i) => self.rv32i_bgeu(i),
             e => Err(Error::NotImplemented(e)),
         }?;
 
@@ -631,6 +635,70 @@ impl CPU {
         let rs2 = self.get_register(instruction.rs2);
 
         if rs1 != rs2 {
+            let mut offset = instruction.imm.as_u32();
+            offset <<= 1; // multiple of 2
+            self.pc = self.pc.wrapping_add(offset);
+        } else {
+            self.pc += RV32I::LENGTH;
+        }
+
+        Ok(())
+    }
+
+    ///  BLT and BLTU take the branch if rs1 is less than rs2, using signed
+    ///  and unsigned comparison respectively.
+    fn rv32i_blt(&mut self, instruction: BType) -> Result<(), Error> {
+        let rs1 = self.get_register(instruction.rs1) as i32;
+        let rs2 = self.get_register(instruction.rs2) as i32;
+
+        if rs1 < rs2 {
+            let mut offset = instruction.imm.as_u32();
+            offset <<= 1; // multiple of 2
+            self.pc = self.pc.wrapping_add(offset);
+        } else {
+            self.pc += RV32I::LENGTH;
+        }
+
+        Ok(())
+    }
+
+    fn rv32i_bltu(&mut self, instruction: BType) -> Result<(), Error> {
+        let rs1 = self.get_register(instruction.rs1);
+        let rs2 = self.get_register(instruction.rs2);
+
+        if rs1 < rs2 {
+            let mut offset = instruction.imm.as_u32();
+            offset <<= 1; // multiple of 2
+            self.pc = self.pc.wrapping_add(offset);
+        } else {
+            self.pc += RV32I::LENGTH;
+        }
+
+        Ok(())
+    }
+
+    ///  BGE and BGEU take the branch if rs1 is greater than or equal to rs2,
+    ///  using signed and unsigned comparison respectively.
+    fn rv32i_bge(&mut self, instruction: BType) -> Result<(), Error> {
+        let rs1 = self.get_register(instruction.rs1) as i32;
+        let rs2 = self.get_register(instruction.rs2) as i32;
+
+        if rs1 >= rs2 {
+            let mut offset = instruction.imm.as_u32();
+            offset <<= 1; // multiple of 2
+            self.pc = self.pc.wrapping_add(offset);
+        } else {
+            self.pc += RV32I::LENGTH;
+        }
+
+        Ok(())
+    }
+
+    fn rv32i_bgeu(&mut self, instruction: BType) -> Result<(), Error> {
+        let rs1 = self.get_register(instruction.rs1);
+        let rs2 = self.get_register(instruction.rs2);
+
+        if rs1 >= rs2 {
             let mut offset = instruction.imm.as_u32();
             offset <<= 1; // multiple of 2
             self.pc = self.pc.wrapping_add(offset);

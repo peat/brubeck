@@ -121,8 +121,9 @@ impl ABI {
     }
 }
 
-#[derive(Default, Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct CPU {
+    pub memory: Vec<u8>,
     pub x0: u32,
     pub x1: u32,
     pub x2: u32,
@@ -158,9 +159,50 @@ pub struct CPU {
     pub pc: u32,
 }
 
+impl Default for CPU {
+    fn default() -> Self {
+        Self::new(2usize.pow(20)) // default 1 mebibyte
+    }
+}
+
 impl CPU {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(memory_size: usize) -> Self {
+        Self {
+            memory: vec![0; memory_size],
+            x0: 0,
+            x1: 0,
+            x2: 0,
+            x3: 0,
+            x4: 0,
+            x5: 0,
+            x6: 0,
+            x7: 0,
+            x8: 0,
+            x9: 0,
+            x10: 0,
+            x11: 0,
+            x12: 0,
+            x13: 0,
+            x14: 0,
+            x15: 0,
+            x16: 0,
+            x17: 0,
+            x18: 0,
+            x19: 0,
+            x20: 0,
+            x21: 0,
+            x22: 0,
+            x23: 0,
+            x24: 0,
+            x25: 0,
+            x26: 0,
+            x27: 0,
+            x28: 0,
+            x29: 0,
+            x30: 0,
+            x31: 0,
+            pc: 0,
+        }
     }
 
     pub fn get_register(&self, r: Register) -> u32 {
@@ -276,6 +318,11 @@ impl CPU {
             RV32I::BLTU(i) => self.rv32i_bltu(i),
             RV32I::BGE(i) => self.rv32i_bge(i),
             RV32I::BGEU(i) => self.rv32i_bgeu(i),
+            RV32I::LW(i) => self.rv32i_lw(i),
+            RV32I::LH(i) => self.rv32i_lh(i),
+            RV32I::LHU(i) => self.rv32i_lhu(i),
+            RV32I::LB(i) => self.rv32i_lb(i),
+            RV32I::LBU(i) => self.rv32i_lbu(i),
             e => Err(Error::NotImplemented(e)),
         }?;
 
@@ -708,12 +755,130 @@ impl CPU {
 
         Ok(())
     }
+
+    /// Load and store instructions transfer a value between the registers and
+    /// memory. Loads are encoded in the I-type format and stores are S-type.
+    /// The effective byte address is obtained by adding register rs1 to the
+    /// sign-extended 12-bit offset. Loads copy a value from memory to register
+    /// rd. Stores copy the value in register rs2 to memory
+    ///
+    /// The LW instruction loads a 32-bit value from memory into rd.
+
+    fn rv32i_lw(&mut self, instruction: IType) -> Result<(), Error> {
+        let rs1 = self.get_register(instruction.rs1);
+        let imm = instruction.imm.as_u32();
+
+        let offset = rs1.wrapping_add(imm);
+        let index = offset as usize;
+
+        if index >= self.memory.len() {
+            return Err(Error::AccessViolation(rs1));
+        }
+
+        let mut value_buf = [0u8; 4];
+        value_buf.clone_from_slice(&self.memory[index..index + 4]);
+        let value = u32::from_le_bytes(value_buf);
+
+        self.set_register(instruction.rd, value);
+        self.pc += RV32I::LENGTH;
+        Ok(())
+    }
+
+    /// LH loads a 16-bit value from memory, then sign-extends to 32-bits before
+    /// storing in rd.
+    fn rv32i_lh(&mut self, instruction: IType) -> Result<(), Error> {
+        let rs1 = self.get_register(instruction.rs1);
+        let imm = instruction.imm.as_u32();
+
+        let offset = rs1.wrapping_add(imm);
+        let index = offset as usize;
+
+        if index >= self.memory.len() {
+            return Err(Error::AccessViolation(rs1));
+        }
+
+        let mut value_buf = [0u8; 2];
+        value_buf.clone_from_slice(&self.memory[index..index + 2]);
+        let i16_value = i16::from_le_bytes(value_buf);
+        let value = i16_value as u32;
+
+        self.set_register(instruction.rd, value);
+        self.pc += RV32I::LENGTH;
+        Ok(())
+    }
+
+    /// LHU loads a 16-bit value from memory but then zero extends to 32-bits
+    /// before storing in rd.
+    fn rv32i_lhu(&mut self, instruction: IType) -> Result<(), Error> {
+        let rs1 = self.get_register(instruction.rs1);
+        let imm = instruction.imm.as_u32();
+
+        let offset = rs1.wrapping_add(imm);
+        let index = offset as usize;
+
+        if index >= self.memory.len() {
+            return Err(Error::AccessViolation(rs1));
+        }
+
+        let mut value_buf = [0u8; 2];
+        value_buf.clone_from_slice(&self.memory[index..index + 2]);
+        let u16_value = u16::from_le_bytes(value_buf);
+
+        let value = 0b0000_0000_0000_0000_1111_1111_1111_1111 & u16_value as u32;
+
+        self.set_register(instruction.rd, value);
+        self.pc += RV32I::LENGTH;
+        Ok(())
+    }
+
+    /// LB loads a 8-bit value from memory, then sign-extends to 32-bits before
+    /// storing in rd.
+    fn rv32i_lb(&mut self, instruction: IType) -> Result<(), Error> {
+        let rs1 = self.get_register(instruction.rs1);
+        let imm = instruction.imm.as_u32();
+
+        let offset = rs1.wrapping_add(imm);
+        let index = offset as usize;
+
+        if index >= self.memory.len() {
+            return Err(Error::AccessViolation(rs1));
+        }
+
+        let i8_value = self.memory[index];
+        let value = i8_value as u32;
+
+        self.set_register(instruction.rd, value);
+        self.pc += RV32I::LENGTH;
+        Ok(())
+    }
+
+    /// LBU loads a 8-bit value from memory but then zero extends to 32-bits
+    /// before storing in rd.
+    fn rv32i_lbu(&mut self, instruction: IType) -> Result<(), Error> {
+        let rs1 = self.get_register(instruction.rs1);
+        let imm = instruction.imm.as_u32();
+
+        let offset = rs1.wrapping_add(imm);
+        let index = offset as usize;
+
+        if index >= self.memory.len() {
+            return Err(Error::AccessViolation(rs1));
+        }
+
+        let u8_value = self.memory[index];
+        let value = 0b0000_0000_0000_0000_0000_0000_1111_1111 & u8_value as u32;
+
+        self.set_register(instruction.rd, value);
+        self.pc += RV32I::LENGTH;
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone)]
 pub enum Error {
     NotImplemented(RV32I),
     MisalignedJump(u32),
+    AccessViolation(u32),
 }
 
 #[derive(Debug, Copy, Clone, Default)]
@@ -905,7 +1070,7 @@ mod tests {
 
     #[test]
     fn rv32i_nop() {
-        let mut cpu = CPU::new();
+        let mut cpu = CPU::default();
         let nop = RV32I::NOP;
 
         // start from zero in the PC
@@ -921,7 +1086,7 @@ mod tests {
 
     #[test]
     fn rv32i_add_sub() {
-        let mut cpu = CPU::new();
+        let mut cpu = CPU::default();
         let mut inst = RType::default();
 
         inst.rd = Register::X1;
@@ -963,7 +1128,7 @@ mod tests {
 
     #[test]
     fn rv32i_addi() {
-        let mut cpu = CPU::new();
+        let mut cpu = CPU::default();
         let mut inst = IType::new();
 
         inst.rd = Register::X1;
@@ -995,7 +1160,7 @@ mod tests {
 
     #[test]
     fn rv32i_slti() {
-        let mut cpu = CPU::new();
+        let mut cpu = CPU::default();
         let mut inst = IType::default();
 
         inst.rd = Register::X1;
@@ -1029,7 +1194,7 @@ mod tests {
 
     #[test]
     fn rv32i_sltiu() {
-        let mut cpu = CPU::new();
+        let mut cpu = CPU::default();
         let mut inst = IType::default();
 
         cpu.x2 = 255; // initial value to compare against
@@ -1064,7 +1229,7 @@ mod tests {
 
     #[test]
     fn rv32i_andi_ori_xori() {
-        let mut cpu = CPU::new();
+        let mut cpu = CPU::default();
         let mut inst = IType::default();
 
         inst.rd = Register::X1;
@@ -1113,7 +1278,7 @@ mod tests {
 
     #[test]
     fn rv32i_lui() {
-        let mut cpu = CPU::new();
+        let mut cpu = CPU::default();
         let mut inst = UType::default();
 
         inst.rd = Register::X1;
@@ -1128,7 +1293,7 @@ mod tests {
 
     #[test]
     fn rv32i_auipc() {
-        let mut cpu = CPU::new();
+        let mut cpu = CPU::default();
         let mut inst = UType::default();
 
         inst.rd = Register::X1;
@@ -1149,7 +1314,7 @@ mod tests {
 
     #[test]
     fn rv32i_jal() {
-        let mut cpu = CPU::new();
+        let mut cpu = CPU::default();
         let mut inst = JType::default();
 
         inst.rd = Register::X1;
@@ -1172,7 +1337,7 @@ mod tests {
 
     #[test]
     fn rv32i_jalr() {
-        let mut cpu = CPU::new();
+        let mut cpu = CPU::default();
         let mut inst = IType::default();
 
         inst.rs1 = Register::X2;
@@ -1200,7 +1365,7 @@ mod tests {
 
     #[test]
     fn rv32i_beq() {
-        let mut cpu = CPU::new();
+        let mut cpu = CPU::default();
         let mut inst = BType::default();
 
         cpu.x1 = 24;
@@ -1234,7 +1399,7 @@ mod tests {
 
     #[test]
     fn rv32i_bne() {
-        let mut cpu = CPU::new();
+        let mut cpu = CPU::default();
         let mut inst = BType::default();
 
         cpu.x1 = 23;

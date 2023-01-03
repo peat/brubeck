@@ -310,6 +310,9 @@ impl CPU {
             RV32I::SLL(i) => self.rv32i_sll(i),
             RV32I::SRL(i) => self.rv32i_srl(i),
             RV32I::SRA(i) => self.rv32i_sra(i),
+            RV32I::SLLI(i) => self.rv32i_slli(i),
+            RV32I::SRLI(i) => self.rv32i_srli(i),
+            RV32I::SRAI(i) => self.rv32i_srai(i),
             RV32I::JAL(i) => self.rv32i_jal(i),
             RV32I::JALR(i) => self.rv32i_jalr(i),
             RV32I::BEQ(i) => self.rv32i_beq(i),
@@ -587,6 +590,58 @@ impl CPU {
         // lower 5 bit register mask
         let mask = 0b0000_0000_0000_0000_0000_0000_0001_1111;
         let shift_amount = rs2 & mask;
+
+        // Rust uses arithmetic right shifts on signed values!
+        let value = (rs1 as i32) >> shift_amount;
+        self.set_register(instruction.rd, value as u32);
+
+        self.pc += RV32I::LENGTH;
+        Ok(())
+    }
+
+    /// Shifts by a constant are encoded as a specialization of the I-type
+    /// format. The operand to be shifted is in rs1, and the shift amount is
+    /// encoded in the lower 5 bits of the I-immediate field. The right shift
+    /// type is encoded in bit 30. SLLI is a logical left shift (zeros are
+    /// shifted into the lower bits); SRLI is a logical right shift (zeros
+    /// are shifted into the upper bits); and SRAI is an arithmetic right shift
+    /// (the original sign bit is copied into the vacated upper bits).
+    fn rv32i_slli(&mut self, instruction: IType) -> Result<(), Error> {
+        let rs1 = self.get_register(instruction.rs1);
+        let imm = instruction.imm.as_u32();
+
+        let mask = 0b0000_0000_0000_0000_0000_0000_0001_1111;
+        let shift_amount = imm & mask;
+
+        let value = rs1 << shift_amount;
+        self.set_register(instruction.rd, value);
+
+        self.pc += RV32I::LENGTH;
+        Ok(())
+    }
+
+    fn rv32i_srli(&mut self, instruction: IType) -> Result<(), Error> {
+        let rs1 = self.get_register(instruction.rs1);
+        let imm = instruction.imm.as_u32();
+
+        // lower 5 bit register mask
+        let mask = 0b0000_0000_0000_0000_0000_0000_0001_1111;
+        let shift_amount = imm & mask;
+
+        let value = rs1 >> shift_amount;
+        self.set_register(instruction.rd, value);
+
+        self.pc += RV32I::LENGTH;
+        Ok(())
+    }
+
+    fn rv32i_srai(&mut self, instruction: IType) -> Result<(), Error> {
+        let rs1 = self.get_register(instruction.rs1);
+        let imm = instruction.imm.as_u32();
+
+        // lower 5 bit register mask
+        let mask = 0b0000_0000_0000_0000_0000_0000_0001_1111;
+        let shift_amount = imm & mask;
 
         // Rust uses arithmetic right shifts on signed values!
         let value = (rs1 as i32) >> shift_amount;
@@ -1099,28 +1154,21 @@ pub enum RV32I {
     ANDI(IType),  // ✅
     SLLI(IType),  // ✅
     SRLI(IType),  // ✅
-    SRAI(IType),
-    ADD(RType),  // ✅
-    SUB(RType),  // ✅
-    SLL(RType),  // ✅
-    SLT(RType),  // ✅
-    SLTU(RType), // ✅
-    XOR(RType),  // ✅
-    SRL(RType),  // ✅
-    SRA(RType),  // ✅
-    OR(RType),   // ✅
-    AND(RType),  // ✅
+    SRAI(IType),  // ✅
+    ADD(RType),   // ✅
+    SUB(RType),   // ✅
+    SLL(RType),   // ✅
+    SLT(RType),   // ✅
+    SLTU(RType),  // ✅
+    XOR(RType),   // ✅
+    SRL(RType),   // ✅
+    SRA(RType),   // ✅
+    OR(RType),    // ✅
+    AND(RType),   // ✅
     FENCE(IType),
-    FENCEI(IType),
     ECALL(IType),
     EBREAK(IType),
-    CSRRW(IType),
-    CSRRS(IType),
-    CSRRC(IType),
-    CSRRWI(IType),
-    CSRRSI(IType),
-    CSRRCI(IType),
-    NOP,
+    NOP, // ✅
 }
 
 impl RV32I {

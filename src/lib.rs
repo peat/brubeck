@@ -323,6 +323,9 @@ impl CPU {
             RV32I::LHU(i) => self.rv32i_lhu(i),
             RV32I::LB(i) => self.rv32i_lb(i),
             RV32I::LBU(i) => self.rv32i_lbu(i),
+            RV32I::SW(i) => self.rv32i_sw(i),
+            RV32I::SH(i) => self.rv32i_sh(i),
+            RV32I::SB(i) => self.rv32i_sb(i),
             e => Err(Error::NotImplemented(e)),
         }?;
 
@@ -872,6 +875,51 @@ impl CPU {
         self.pc += RV32I::LENGTH;
         Ok(())
     }
+
+    /// The SW, SH, and SB instructions store 32-bit, 16-bit, and 8-bit values
+    /// from the low bits of register rs2 to memory
+    fn rv32i_sw(&mut self, instruction: SType) -> Result<(), Error> {
+        self.store(instruction, 0)?;
+
+        self.pc += RV32I::LENGTH;
+        Ok(())
+    }
+
+    fn rv32i_sh(&mut self, instruction: SType) -> Result<(), Error> {
+        self.store(instruction, 2)?;
+
+        self.pc += RV32I::LENGTH;
+        Ok(())
+    }
+
+    fn rv32i_sb(&mut self, instruction: SType) -> Result<(), Error> {
+        self.store(instruction, 3)?;
+
+        self.pc += RV32I::LENGTH;
+        Ok(())
+    }
+
+    fn store(&mut self, instruction: SType, offset: usize) -> Result<(), Error> {
+        let base = self.get_register(instruction.rs1);
+        let src = self.get_register(instruction.rs2);
+        let imm = instruction.imm.as_u32();
+
+        let address = base.wrapping_add(imm);
+        let mut index = address as usize;
+
+        if index >= self.memory.len() {
+            return Err(Error::AccessViolation(address));
+        }
+
+        for (byte_index, byte) in src.to_le_bytes().into_iter().enumerate() {
+            if byte_index >= offset {
+                self.memory[index] = byte;
+                index += 1;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -923,10 +971,24 @@ impl IType {
 #[derive(Debug, Copy, Clone)]
 pub struct SType {
     pub opcode: u8,
-    pub imm: u16,
+    pub imm: Immediate,
     pub funct3: u8,
     pub rs1: Register,
     pub rs2: Register,
+}
+
+impl SType {
+    const IMM_BITS: u8 = 12;
+
+    pub fn new() -> Self {
+        Self {
+            opcode: 0, // TODO
+            imm: Immediate::new(Self::IMM_BITS),
+            funct3: 0, // TODO
+            rs1: Register::default(),
+            rs2: Register::default(),
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -1010,43 +1072,44 @@ impl JType {
 
 #[derive(Debug, Copy, Clone)]
 pub enum RV32I {
-    LUI(UType),
-    AUIPC(UType),
-    JAL(JType),
-    JALR(IType),
-    BEQ(BType),
-    BNE(BType),
-    BLT(BType),
-    BGE(BType),
-    BLTU(BType),
-    BGEU(BType),
-    LB(IType),
-    LH(IType),
-    LW(IType),
-    LBU(IType),
-    LHU(IType),
-    SB(SType),
-    SH(SType),
-    SW(SType),
-    ADDI(IType),
-    SLTI(IType),
-    SLTIU(IType),
-    XORI(IType),
-    ORI(IType),
-    ANDI(IType),
-    SLLI(IType),
-    SRLI(IType),
+    // ✅ indicates it's implemented, not verified!
+    LUI(UType),   // ✅
+    AUIPC(UType), // ✅
+    JAL(JType),   // ✅
+    JALR(IType),  // ✅
+    BEQ(BType),   // ✅
+    BNE(BType),   // ✅
+    BLT(BType),   // ✅
+    BGE(BType),   // ✅
+    BLTU(BType),  // ✅
+    BGEU(BType),  // ✅
+    LB(IType),    // ✅
+    LH(IType),    // ✅
+    LW(IType),    // ✅
+    LBU(IType),   // ✅
+    LHU(IType),   // ✅
+    SB(SType),    // ✅
+    SH(SType),    // ✅
+    SW(SType),    // ✅
+    ADDI(IType),  // ✅
+    SLTI(IType),  // ✅
+    SLTIU(IType), // ✅
+    XORI(IType),  // ✅
+    ORI(IType),   // ✅
+    ANDI(IType),  // ✅
+    SLLI(IType),  // ✅
+    SRLI(IType),  // ✅
     SRAI(IType),
-    ADD(RType),
-    SUB(RType),
-    SLL(RType),
-    SLT(RType),
-    SLTU(RType),
-    XOR(RType),
-    SRL(RType),
-    SRA(RType),
-    OR(RType),
-    AND(RType),
+    ADD(RType),  // ✅
+    SUB(RType),  // ✅
+    SLL(RType),  // ✅
+    SLT(RType),  // ✅
+    SLTU(RType), // ✅
+    XOR(RType),  // ✅
+    SRL(RType),  // ✅
+    SRA(RType),  // ✅
+    OR(RType),   // ✅
+    AND(RType),  // ✅
     FENCE(IType),
     FENCEI(IType),
     ECALL(IType),

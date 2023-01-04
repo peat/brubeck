@@ -841,8 +841,8 @@ impl CPU {
 
         let mut value_buf = [0u8; 2];
         value_buf.clone_from_slice(&self.memory[index..index + 2]);
-        let i16_value = i16::from_le_bytes(value_buf);
-        let value = i16_value as u32;
+        let u16_value = u16::from_le_bytes(value_buf);
+        let value = u16_value as u32;
 
         self.set_register(instruction.rd, value);
         self.increment_pc()
@@ -914,7 +914,7 @@ impl CPU {
     /// The SW, SH, and SB instructions store 32-bit, 16-bit, and 8-bit values
     /// from the low bits of register rs2 to memory
     fn rv32i_sw(&mut self, instruction: SType) -> Result<(), Error> {
-        self.store(instruction, 0)?;
+        self.store(instruction, 4)?;
         self.increment_pc()
     }
 
@@ -924,11 +924,11 @@ impl CPU {
     }
 
     fn rv32i_sb(&mut self, instruction: SType) -> Result<(), Error> {
-        self.store(instruction, 3)?;
+        self.store(instruction, 1)?;
         self.increment_pc()
     }
 
-    fn store(&mut self, instruction: SType, offset: usize) -> Result<(), Error> {
+    fn store(&mut self, instruction: SType, bytes: usize) -> Result<(), Error> {
         let base = self.get_register(instruction.rs1);
         let src = self.get_register(instruction.rs2);
         let imm = instruction.imm.as_u32();
@@ -941,7 +941,7 @@ impl CPU {
         }
 
         for (byte_index, byte) in src.to_le_bytes().into_iter().enumerate() {
-            if byte_index >= offset {
+            if byte_index < bytes {
                 self.memory[index] = byte;
                 index += 1;
             }
@@ -1354,14 +1354,14 @@ mod tests {
         inst.rs2 = Register::X2;
 
         inst.imm.set_signed(64).unwrap();
-        let beq = RV32I::BNE(inst);
-        let result = cpu.execute(beq);
+        let bne = RV32I::BNE(inst);
+        let result = cpu.execute(bne);
         assert!(result.is_ok());
         assert_eq!(cpu.pc, 128); // doubled
 
         inst.imm.set_signed(-128).unwrap();
-        let beq = RV32I::BNE(inst);
-        let result = cpu.execute(beq);
+        let bne = RV32I::BNE(inst);
+        let result = cpu.execute(bne);
         assert!(result.is_ok());
         assert_eq!(cpu.pc, -128i32 as u32); // doubled
 
@@ -1369,9 +1369,312 @@ mod tests {
         cpu.pc = 0;
 
         inst.imm.set_signed(64).unwrap();
-        let beq = RV32I::BNE(inst);
-        let result = cpu.execute(beq);
+        let bne = RV32I::BNE(inst);
+        let result = cpu.execute(bne);
         assert!(result.is_ok());
         assert_eq!(cpu.pc, RV32I::LENGTH); // skipped
+    }
+
+    #[test]
+    fn rv32i_blt() {
+        let mut cpu = CPU::default();
+        let mut inst = BType::default();
+
+        cpu.x1 = 23;
+        cpu.x2 = 24;
+        cpu.pc = 0;
+
+        inst.rs1 = Register::X1;
+        inst.rs2 = Register::X2;
+
+        inst.imm.set_signed(64).unwrap();
+        let blt = RV32I::BLT(inst);
+        let result = cpu.execute(blt);
+        assert!(result.is_ok());
+        assert_eq!(cpu.pc, 128); // doubled
+
+        inst.imm.set_signed(-128).unwrap();
+        let blt = RV32I::BLT(inst);
+        let result = cpu.execute(blt);
+        assert!(result.is_ok());
+        assert_eq!(cpu.pc, -128i32 as u32); // doubled
+
+        cpu.x1 = 24; // should be equal now
+        cpu.pc = 0;
+
+        inst.imm.set_signed(64).unwrap();
+        let blt = RV32I::BLT(inst);
+        let result = cpu.execute(blt);
+        assert!(result.is_ok());
+        assert_eq!(cpu.pc, RV32I::LENGTH); // skipped
+    }
+
+    #[test]
+    fn rv32i_bltu() {
+        let mut cpu = CPU::default();
+        let mut inst = BType::default();
+
+        cpu.x1 = 23;
+        cpu.x2 = 24;
+        cpu.pc = 0;
+
+        inst.rs1 = Register::X1;
+        inst.rs2 = Register::X2;
+
+        inst.imm.set_unsigned(64).unwrap();
+        let bltu = RV32I::BLTU(inst);
+        let result = cpu.execute(bltu);
+        assert!(result.is_ok());
+        assert_eq!(cpu.pc, 128); // doubled
+
+        inst.imm.set_unsigned(0).unwrap();
+        let bltu = RV32I::BLTU(inst);
+        let result = cpu.execute(bltu);
+        assert!(result.is_ok());
+        assert_eq!(cpu.pc, 128i32 as u32); // doubled
+
+        cpu.x1 = 24; // should be equal now
+        cpu.pc = 0;
+
+        inst.imm.set_unsigned(64).unwrap();
+        let bltu = RV32I::BLTU(inst);
+        let result = cpu.execute(bltu);
+        assert!(result.is_ok());
+        assert_eq!(cpu.pc, RV32I::LENGTH); // skipped
+    }
+
+    #[test]
+    fn rv32i_bge() {
+        let mut cpu = CPU::default();
+        let mut inst = BType::default();
+
+        cpu.x1 = 24;
+        cpu.x2 = 23;
+        cpu.pc = 0;
+
+        inst.rs1 = Register::X1;
+        inst.rs2 = Register::X2;
+
+        inst.imm.set_signed(64).unwrap();
+        let bge = RV32I::BGE(inst);
+        let result = cpu.execute(bge);
+        assert!(result.is_ok());
+        assert_eq!(cpu.pc, 128); // doubled
+
+        inst.imm.set_signed(-128).unwrap();
+        let bge = RV32I::BGE(inst);
+        let result = cpu.execute(bge);
+        assert!(result.is_ok());
+        assert_eq!(cpu.pc, -128i32 as u32); // doubled
+
+        cpu.x2 = 24; // should be equal now
+        cpu.pc = 0;
+
+        inst.imm.set_signed(64).unwrap();
+        let bge = RV32I::BGE(inst);
+        let result = cpu.execute(bge);
+        assert!(result.is_ok());
+        assert_eq!(cpu.pc, 128); // equal, taken
+    }
+
+    #[test]
+    fn rv32i_bgeu() {
+        let mut cpu = CPU::default();
+        let mut inst = BType::default();
+
+        cpu.x1 = 24;
+        cpu.x2 = 23;
+        cpu.pc = 0;
+
+        inst.rs1 = Register::X1;
+        inst.rs2 = Register::X2;
+
+        inst.imm.set_unsigned(64).unwrap();
+        let bgeu = RV32I::BGEU(inst);
+        let result = cpu.execute(bgeu);
+        assert!(result.is_ok());
+        assert_eq!(cpu.pc, 128); // doubled
+
+        inst.imm.set_unsigned(0).unwrap();
+        let bgeu = RV32I::BGEU(inst);
+        let result = cpu.execute(bgeu);
+        assert!(result.is_ok());
+        assert_eq!(cpu.pc, 128i32 as u32); // doubled
+
+        cpu.x2 = 24; // should be equal now
+        cpu.pc = 0;
+
+        inst.imm.set_unsigned(64).unwrap();
+        let bgeu = RV32I::BGEU(inst);
+        let result = cpu.execute(bgeu);
+        assert!(result.is_ok());
+        assert_eq!(cpu.pc, 128); // equal, taken
+    }
+
+    #[test]
+    fn rv32i_lw_lh_lb() {
+        let mut cpu = CPU::default();
+        let mut inst = IType::default();
+
+        cpu.memory[1024] = 1;
+        cpu.memory[1025] = 2;
+        cpu.memory[1026] = 3;
+        cpu.memory[1027] = 4;
+
+        cpu.x1 = 1024;
+
+        inst.rs1 = Register::X1;
+        inst.rd = Register::X2;
+
+        inst.imm.set_unsigned(0).unwrap(); // zero offset
+        let lw = RV32I::LW(inst);
+        let result = cpu.execute(lw);
+        assert!(result.is_ok());
+        let lw_target = u32::from_le_bytes([1, 2, 3, 4]);
+        assert_eq!(cpu.x2, lw_target);
+
+        inst.imm.set_unsigned(2).unwrap(); // +2 offset
+        let lw = RV32I::LW(inst);
+        let result = cpu.execute(lw);
+        assert!(result.is_ok());
+        let lw_target = u32::from_le_bytes([3, 4, 0, 0]);
+        assert_eq!(cpu.x2, lw_target);
+
+        inst.imm.set_unsigned(0).unwrap(); // zero offset
+        let lh = RV32I::LH(inst);
+        let result = cpu.execute(lh);
+        assert!(result.is_ok());
+        let lh_target = u32::from_le_bytes([1, 2, 0, 0]);
+        assert_eq!(cpu.x2, lh_target);
+
+        inst.imm.set_unsigned(1).unwrap(); // +1 offset
+        let lh = RV32I::LH(inst);
+        let result = cpu.execute(lh);
+        assert!(result.is_ok());
+        let lh_target = u32::from_le_bytes([2, 3, 0, 0]);
+        assert_eq!(cpu.x2, lh_target);
+
+        inst.imm.set_unsigned(0).unwrap(); // zero offset
+        let lb = RV32I::LB(inst);
+        let result = cpu.execute(lb);
+        assert!(result.is_ok());
+        let lb_target = u32::from_le_bytes([1, 0, 0, 0]);
+        assert_eq!(cpu.x2, lb_target);
+
+        inst.imm.set_unsigned(1).unwrap(); // +1 offset
+        let lb = RV32I::LB(inst);
+        let result = cpu.execute(lb);
+        assert!(result.is_ok());
+        let lb_target = u32::from_le_bytes([2, 0, 0, 0]);
+        assert_eq!(cpu.x2, lb_target);
+    }
+
+    #[test]
+    fn rv32i_sw_sh_sb() {
+        let mut cpu = CPU::default();
+        let mut inst = SType::default();
+
+        cpu.x1 = 100; // base address
+        cpu.x2 = 0b1111_1111_1111_1110_1111_1100_1111_1000; // value to store
+
+        inst.rs1 = Register::X1;
+        inst.rs2 = Register::X2;
+
+        inst.imm.set_unsigned(0).unwrap(); // zero offset
+        let sw = RV32I::SW(inst);
+        let result = cpu.execute(sw);
+        assert!(result.is_ok());
+        assert_eq!(cpu.memory[100], 0b1111_1000);
+        assert_eq!(cpu.memory[101], 0b1111_1100);
+        assert_eq!(cpu.memory[102], 0b1111_1110);
+        assert_eq!(cpu.memory[103], 0b1111_1111);
+
+        cpu.x1 = 200; // base address
+        let sh = RV32I::SH(inst);
+        let result = cpu.execute(sh);
+        assert!(result.is_ok());
+        assert_eq!(cpu.memory[200], 0b1111_1000);
+        assert_eq!(cpu.memory[201], 0b1111_1100);
+
+        cpu.x1 = 300; // base address
+        let sb = RV32I::SB(inst);
+        let result = cpu.execute(sb);
+        assert!(result.is_ok());
+        assert_eq!(cpu.memory[300], 0b1111_1000);
+    }
+
+    #[test]
+    fn rv32i_sw_lw_roundtrip() {
+        let mut cpu = CPU::default();
+
+        cpu.x1 = 100; // base address
+        cpu.x2 = 0b1111_1111_1111_1110_1111_1100_1111_1000; // value to store
+        
+        let mut store_inst = SType::default();
+        store_inst.rs1 = Register::X1;
+        store_inst.rs2 = Register::X2;
+
+        let sw = RV32I::SW(store_inst);
+        let result = cpu.execute(sw);
+        assert!(result.is_ok());
+
+        let mut load_inst = IType::default();
+        load_inst.rs1 = Register::X1; // base address
+        load_inst.rd = Register::X3; // destination register
+
+        let lw = RV32I::LW(load_inst);
+        let result = cpu.execute(lw);
+        assert!(result.is_ok());
+        assert_eq!(cpu.x2, cpu.x3);
+    }
+
+    #[test]
+    fn rv32i_sh_lh_roundtrip() {
+        let mut cpu = CPU::default();
+
+        cpu.x1 = 100; // base address
+        cpu.x2 = 0b1111_1111_1111_1110_1111_1100_1111_1000; // value to store
+        
+        let mut store_inst = SType::default();
+        store_inst.rs1 = Register::X1;
+        store_inst.rs2 = Register::X2;
+
+        let sh = RV32I::SH(store_inst);
+        let result = cpu.execute(sh);
+        assert!(result.is_ok());
+
+        let mut load_inst = IType::default();
+        load_inst.rs1 = Register::X1; // base address
+        load_inst.rd = Register::X3; // destination register
+
+        let lh = RV32I::LH(load_inst);
+        let result = cpu.execute(lh);
+        assert!(result.is_ok());
+        assert_eq!(cpu.x3, 0b1111_1100_1111_1000);
+    }
+
+    #[test]
+    fn rv32i_sb_lb_roundtrip() {
+        let mut cpu = CPU::default();
+
+        cpu.x1 = 100; // base address
+        cpu.x2 = 0b1111_1111_1111_1110_1111_1100_1111_1000; // value to store
+        
+        let mut store_inst = SType::default();
+        store_inst.rs1 = Register::X1;
+        store_inst.rs2 = Register::X2;
+
+        let sb = RV32I::SB(store_inst);
+        let result = cpu.execute(sb);
+        assert!(result.is_ok());
+
+        let mut load_inst = IType::default();
+        load_inst.rs1 = Register::X1; // base address
+        load_inst.rd = Register::X3; // destination register
+
+        let lb = RV32I::LB(load_inst);
+        let result = cpu.execute(lb);
+        assert!(result.is_ok());
+        assert_eq!(cpu.x3, 0b1111_1000);
     }
 }

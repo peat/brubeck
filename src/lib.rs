@@ -293,53 +293,57 @@ impl CPU {
 
     pub fn execute(&mut self, instruction: RV32I) -> Result<(), Error> {
         match instruction {
-            RV32I::NOP => self.rv32i_nop(),
-            RV32I::ADDI(i) => self.rv32i_addi(i),
-            RV32I::SLTI(i) => self.rv32i_slti(i),
-            RV32I::SLTIU(i) => self.rv32i_sltiu(i),
-            RV32I::ANDI(i) => self.rv32i_andi(i),
-            RV32I::ORI(i) => self.rv32i_ori(i),
-            RV32I::XORI(i) => self.rv32i_xori(i),
-            RV32I::LUI(i) => self.rv32i_lui(i),
-            RV32I::AUIPC(i) => self.rv32i_auipc(i),
             RV32I::ADD(i) => self.rv32i_add(i),
-            RV32I::SUB(i) => self.rv32i_sub(i),
-            RV32I::SLT(i) => self.rv32i_slt(i),
-            RV32I::SLTU(i) => self.rv32i_sltu(i),
+            RV32I::ADDI(i) => self.rv32i_addi(i),
             RV32I::AND(i) => self.rv32i_and(i),
-            RV32I::OR(i) => self.rv32i_or(i),
-            RV32I::XOR(i) => self.rv32i_xor(i),
-            RV32I::SLL(i) => self.rv32i_sll(i),
-            RV32I::SRL(i) => self.rv32i_srl(i),
-            RV32I::SRA(i) => self.rv32i_sra(i),
-            RV32I::SLLI(i) => self.rv32i_slli(i),
-            RV32I::SRLI(i) => self.rv32i_srli(i),
-            RV32I::SRAI(i) => self.rv32i_srai(i),
-            RV32I::JAL(i) => self.rv32i_jal(i),
-            RV32I::JALR(i) => self.rv32i_jalr(i),
+            RV32I::ANDI(i) => self.rv32i_andi(i),
+            RV32I::AUIPC(i) => self.rv32i_auipc(i),
             RV32I::BEQ(i) => self.rv32i_beq(i),
-            RV32I::BNE(i) => self.rv32i_bne(i),
-            RV32I::BLT(i) => self.rv32i_blt(i),
-            RV32I::BLTU(i) => self.rv32i_bltu(i),
             RV32I::BGE(i) => self.rv32i_bge(i),
             RV32I::BGEU(i) => self.rv32i_bgeu(i),
-            RV32I::LW(i) => self.rv32i_lw(i),
-            RV32I::LH(i) => self.rv32i_lh(i),
-            RV32I::LHU(i) => self.rv32i_lhu(i),
+            RV32I::BLT(i) => self.rv32i_blt(i),
+            RV32I::BLTU(i) => self.rv32i_bltu(i),
+            RV32I::BNE(i) => self.rv32i_bne(i),
+            RV32I::JAL(i) => self.rv32i_jal(i),
+            RV32I::JALR(i) => self.rv32i_jalr(i),
             RV32I::LB(i) => self.rv32i_lb(i),
             RV32I::LBU(i) => self.rv32i_lbu(i),
-            RV32I::SW(i) => self.rv32i_sw(i),
-            RV32I::SH(i) => self.rv32i_sh(i),
+            RV32I::LH(i) => self.rv32i_lh(i),
+            RV32I::LHU(i) => self.rv32i_lhu(i),
+            RV32I::LUI(i) => self.rv32i_lui(i),
+            RV32I::LW(i) => self.rv32i_lw(i),
+            RV32I::NOP => self.rv32i_nop(),
+            RV32I::OR(i) => self.rv32i_or(i),
+            RV32I::ORI(i) => self.rv32i_ori(i),
             RV32I::SB(i) => self.rv32i_sb(i),
+            RV32I::SH(i) => self.rv32i_sh(i),
+            RV32I::SLL(i) => self.rv32i_sll(i),
+            RV32I::SLLI(i) => self.rv32i_slli(i),
+            RV32I::SLT(i) => self.rv32i_slt(i),
+            RV32I::SLTI(i) => self.rv32i_slti(i),
+            RV32I::SLTIU(i) => self.rv32i_sltiu(i),
+            RV32I::SLTU(i) => self.rv32i_sltu(i),
+            RV32I::SRA(i) => self.rv32i_sra(i),
+            RV32I::SRAI(i) => self.rv32i_srai(i),
+            RV32I::SRL(i) => self.rv32i_srl(i),
+            RV32I::SRLI(i) => self.rv32i_srli(i),
+            RV32I::SUB(i) => self.rv32i_sub(i),
+            RV32I::SW(i) => self.rv32i_sw(i),
+            RV32I::XOR(i) => self.rv32i_xor(i),
+            RV32I::XORI(i) => self.rv32i_xori(i),
             e => Err(Error::NotImplemented(e)),
         }?;
 
         Ok(())
     }
 
-    fn rv32i_nop(&mut self) -> Result<(), Error> {
+    fn increment_pc(&mut self) -> Result<(), Error> {
         self.pc += RV32I::LENGTH;
         Ok(())
+    }
+
+    fn rv32i_nop(&mut self) -> Result<(), Error> {
+        self.increment_pc()
     }
 
     /// ADD and SUB perform addition and subtraction respectively. Overflows
@@ -349,16 +353,14 @@ impl CPU {
         let a = self.get_register(instruction.rs1);
         let b = self.get_register(instruction.rs2);
         self.set_register(instruction.rd, a.wrapping_add(b));
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     fn rv32i_sub(&mut self, instruction: RType) -> Result<(), Error> {
         let a = self.get_register(instruction.rs1);
         let b = self.get_register(instruction.rs2);
         self.set_register(instruction.rd, a.wrapping_sub(b));
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     /// ADDI adds the sign-extended 12-bit immediate to register rs1. Arithmetic
@@ -372,8 +374,7 @@ impl CPU {
         let new_value = rs1.wrapping_add(imm);
 
         self.set_register(instruction.rd, new_value);
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     /// SLTI (set less than immediate) places the value 1 in register rd if
@@ -390,8 +391,7 @@ impl CPU {
             self.set_register(instruction.rd, 0);
         }
 
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     /// SLTIU is similar but compares the values as unsigned numbers (i.e., the
@@ -408,8 +408,7 @@ impl CPU {
             self.set_register(instruction.rd, 0);
         }
 
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     /// ANDI, ORI, XORI are logical operations that perform bitwise AND, OR,
@@ -423,8 +422,7 @@ impl CPU {
         let value = imm & rs1;
         self.set_register(instruction.rd, value);
 
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     fn rv32i_ori(&mut self, instruction: IType) -> Result<(), Error> {
@@ -434,8 +432,7 @@ impl CPU {
         let value = imm | rs1;
         self.set_register(instruction.rd, value);
 
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     fn rv32i_xori(&mut self, instruction: IType) -> Result<(), Error> {
@@ -445,8 +442,7 @@ impl CPU {
         let value = imm ^ rs1;
         self.set_register(instruction.rd, value);
 
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     /// LUI (load upper immediate) is used to build 32-bit constants and uses
@@ -458,8 +454,7 @@ impl CPU {
         imm <<= 12;
         self.set_register(instruction.rd, imm);
 
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     /// AUIPC (add upper immediate to pc) is used to build pc-relative
@@ -473,8 +468,7 @@ impl CPU {
         let value = imm + pc;
         self.set_register(instruction.rd, value);
 
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     /// SLT and SLTU perform signed and unsigned compares respectively, writing
@@ -491,8 +485,7 @@ impl CPU {
             self.set_register(instruction.rd, 0);
         }
 
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     fn rv32i_sltu(&mut self, instruction: RType) -> Result<(), Error> {
@@ -515,8 +508,7 @@ impl CPU {
             }
         }
 
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     /// AND, OR, and XOR perform bitwise logical operations
@@ -527,8 +519,7 @@ impl CPU {
         let value = rs1 & rs2;
         self.set_register(instruction.rd, value);
 
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     fn rv32i_or(&mut self, instruction: RType) -> Result<(), Error> {
@@ -538,8 +529,7 @@ impl CPU {
         let value = rs1 | rs2;
         self.set_register(instruction.rd, value);
 
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     fn rv32i_xor(&mut self, instruction: RType) -> Result<(), Error> {
@@ -549,8 +539,7 @@ impl CPU {
         let value = rs1 ^ rs2;
         self.set_register(instruction.rd, value);
 
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     /// SLL, SRL, and SRA perform logical left, logical right, and arithmetic
@@ -566,8 +555,7 @@ impl CPU {
         let value = rs1 << shift_amount;
         self.set_register(instruction.rd, value);
 
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     fn rv32i_srl(&mut self, instruction: RType) -> Result<(), Error> {
@@ -581,8 +569,7 @@ impl CPU {
         let value = rs1 >> shift_amount;
         self.set_register(instruction.rd, value);
 
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     fn rv32i_sra(&mut self, instruction: RType) -> Result<(), Error> {
@@ -597,8 +584,7 @@ impl CPU {
         let value = (rs1 as i32) >> shift_amount;
         self.set_register(instruction.rd, value as u32);
 
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     /// Shifts by a constant are encoded as a specialization of the I-type
@@ -618,8 +604,7 @@ impl CPU {
         let value = rs1 << shift_amount;
         self.set_register(instruction.rd, value);
 
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     fn rv32i_srli(&mut self, instruction: IType) -> Result<(), Error> {
@@ -633,8 +618,7 @@ impl CPU {
         let value = rs1 >> shift_amount;
         self.set_register(instruction.rd, value);
 
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     fn rv32i_srai(&mut self, instruction: IType) -> Result<(), Error> {
@@ -649,8 +633,7 @@ impl CPU {
         let value = (rs1 as i32) >> shift_amount;
         self.set_register(instruction.rd, value as u32);
 
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     /// The jump and link (JAL) instruction uses the J-type format, where the
@@ -840,8 +823,7 @@ impl CPU {
         let value = u32::from_le_bytes(value_buf);
 
         self.set_register(instruction.rd, value);
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     /// LH loads a 16-bit value from memory, then sign-extends to 32-bits before
@@ -863,8 +845,7 @@ impl CPU {
         let value = i16_value as u32;
 
         self.set_register(instruction.rd, value);
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     /// LHU loads a 16-bit value from memory but then zero extends to 32-bits
@@ -887,8 +868,7 @@ impl CPU {
         let value = 0b0000_0000_0000_0000_1111_1111_1111_1111 & u16_value as u32;
 
         self.set_register(instruction.rd, value);
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     /// LB loads a 8-bit value from memory, then sign-extends to 32-bits before
@@ -908,8 +888,7 @@ impl CPU {
         let value = i8_value as u32;
 
         self.set_register(instruction.rd, value);
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     /// LBU loads a 8-bit value from memory but then zero extends to 32-bits
@@ -929,31 +908,24 @@ impl CPU {
         let value = 0b0000_0000_0000_0000_0000_0000_1111_1111 & u8_value as u32;
 
         self.set_register(instruction.rd, value);
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     /// The SW, SH, and SB instructions store 32-bit, 16-bit, and 8-bit values
     /// from the low bits of register rs2 to memory
     fn rv32i_sw(&mut self, instruction: SType) -> Result<(), Error> {
         self.store(instruction, 0)?;
-
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     fn rv32i_sh(&mut self, instruction: SType) -> Result<(), Error> {
         self.store(instruction, 2)?;
-
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     fn rv32i_sb(&mut self, instruction: SType) -> Result<(), Error> {
         self.store(instruction, 3)?;
-
-        self.pc += RV32I::LENGTH;
-        Ok(())
+        self.increment_pc()
     }
 
     fn store(&mut self, instruction: SType, offset: usize) -> Result<(), Error> {
@@ -989,47 +961,47 @@ pub enum Error {
 #[derive(Debug, Copy, Clone)]
 pub enum RV32I {
     // ✅ indicates it's implemented, not verified!
-    LUI(UType),   // ✅
+    ADD(RType),   // ✅
+    ADDI(IType),  // ✅
+    AND(RType),   // ✅
+    ANDI(IType),  // ✅
     AUIPC(UType), // ✅
+    BEQ(BType),   // ✅
+    BGE(BType),   // ✅
+    BGEU(BType),  // ✅
+    BLT(BType),   // ✅
+    BLTU(BType),  // ✅
+    BNE(BType),   // ✅
+    EBREAK(IType),
+    ECALL(IType),
+    FENCE(IType),
     JAL(JType),   // ✅
     JALR(IType),  // ✅
-    BEQ(BType),   // ✅
-    BNE(BType),   // ✅
-    BLT(BType),   // ✅
-    BGE(BType),   // ✅
-    BLTU(BType),  // ✅
-    BGEU(BType),  // ✅
     LB(IType),    // ✅
-    LH(IType),    // ✅
-    LW(IType),    // ✅
     LBU(IType),   // ✅
+    LH(IType),    // ✅
     LHU(IType),   // ✅
+    LUI(UType),   // ✅
+    LW(IType),    // ✅
+    NOP,          // ✅
+    OR(RType),    // ✅
+    ORI(IType),   // ✅
     SB(SType),    // ✅
     SH(SType),    // ✅
-    SW(SType),    // ✅
-    ADDI(IType),  // ✅
+    SLL(RType),   // ✅
+    SLLI(IType),  // ✅
+    SLT(RType),   // ✅
     SLTI(IType),  // ✅
     SLTIU(IType), // ✅
-    XORI(IType),  // ✅
-    ORI(IType),   // ✅
-    ANDI(IType),  // ✅
-    SLLI(IType),  // ✅
-    SRLI(IType),  // ✅
-    SRAI(IType),  // ✅
-    ADD(RType),   // ✅
-    SUB(RType),   // ✅
-    SLL(RType),   // ✅
-    SLT(RType),   // ✅
     SLTU(RType),  // ✅
-    XOR(RType),   // ✅
-    SRL(RType),   // ✅
     SRA(RType),   // ✅
-    OR(RType),    // ✅
-    AND(RType),   // ✅
-    FENCE(IType),
-    ECALL(IType),
-    EBREAK(IType),
-    NOP, // ✅
+    SRAI(IType),  // ✅
+    SRL(RType),   // ✅
+    SRLI(IType),  // ✅
+    SUB(RType),   // ✅
+    SW(SType),    // ✅
+    XOR(RType),   // ✅
+    XORI(IType),  // ✅
 }
 
 impl RV32I {

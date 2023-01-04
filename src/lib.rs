@@ -1609,7 +1609,7 @@ mod tests {
 
         cpu.x1 = 100; // base address
         cpu.x2 = 0b1111_1111_1111_1110_1111_1100_1111_1000; // value to store
-        
+
         let mut store_inst = SType::default();
         store_inst.rs1 = Register::X1;
         store_inst.rs2 = Register::X2;
@@ -1634,7 +1634,7 @@ mod tests {
 
         cpu.x1 = 100; // base address
         cpu.x2 = 0b1111_1111_1111_1110_1111_1100_1111_1000; // value to store
-        
+
         let mut store_inst = SType::default();
         store_inst.rs1 = Register::X1;
         store_inst.rs2 = Register::X2;
@@ -1659,7 +1659,7 @@ mod tests {
 
         cpu.x1 = 100; // base address
         cpu.x2 = 0b1111_1111_1111_1110_1111_1100_1111_1000; // value to store
-        
+
         let mut store_inst = SType::default();
         store_inst.rs1 = Register::X1;
         store_inst.rs2 = Register::X2;

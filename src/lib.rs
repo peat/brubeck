@@ -291,46 +291,46 @@ impl CPU {
         self.set_register(abi.to_r(), v)
     }
 
-    pub fn execute(&mut self, instruction: RV32I) -> Result<(), Error> {
+    pub fn execute(&mut self, instruction: Instruction) -> Result<(), Error> {
         match instruction {
-            RV32I::ADD(i) => self.rv32i_add(i),
-            RV32I::ADDI(i) => self.rv32i_addi(i),
-            RV32I::AND(i) => self.rv32i_and(i),
-            RV32I::ANDI(i) => self.rv32i_andi(i),
-            RV32I::AUIPC(i) => self.rv32i_auipc(i),
-            RV32I::BEQ(i) => self.rv32i_beq(i),
-            RV32I::BGE(i) => self.rv32i_bge(i),
-            RV32I::BGEU(i) => self.rv32i_bgeu(i),
-            RV32I::BLT(i) => self.rv32i_blt(i),
-            RV32I::BLTU(i) => self.rv32i_bltu(i),
-            RV32I::BNE(i) => self.rv32i_bne(i),
-            RV32I::JAL(i) => self.rv32i_jal(i),
-            RV32I::JALR(i) => self.rv32i_jalr(i),
-            RV32I::LB(i) => self.rv32i_lb(i),
-            RV32I::LBU(i) => self.rv32i_lbu(i),
-            RV32I::LH(i) => self.rv32i_lh(i),
-            RV32I::LHU(i) => self.rv32i_lhu(i),
-            RV32I::LUI(i) => self.rv32i_lui(i),
-            RV32I::LW(i) => self.rv32i_lw(i),
-            RV32I::NOP => self.rv32i_nop(),
-            RV32I::OR(i) => self.rv32i_or(i),
-            RV32I::ORI(i) => self.rv32i_ori(i),
-            RV32I::SB(i) => self.rv32i_sb(i),
-            RV32I::SH(i) => self.rv32i_sh(i),
-            RV32I::SLL(i) => self.rv32i_sll(i),
-            RV32I::SLLI(i) => self.rv32i_slli(i),
-            RV32I::SLT(i) => self.rv32i_slt(i),
-            RV32I::SLTI(i) => self.rv32i_slti(i),
-            RV32I::SLTIU(i) => self.rv32i_sltiu(i),
-            RV32I::SLTU(i) => self.rv32i_sltu(i),
-            RV32I::SRA(i) => self.rv32i_sra(i),
-            RV32I::SRAI(i) => self.rv32i_srai(i),
-            RV32I::SRL(i) => self.rv32i_srl(i),
-            RV32I::SRLI(i) => self.rv32i_srli(i),
-            RV32I::SUB(i) => self.rv32i_sub(i),
-            RV32I::SW(i) => self.rv32i_sw(i),
-            RV32I::XOR(i) => self.rv32i_xor(i),
-            RV32I::XORI(i) => self.rv32i_xori(i),
+            Instruction::ADD(i) => self.rv32i_add(i),
+            Instruction::ADDI(i) => self.rv32i_addi(i),
+            Instruction::AND(i) => self.rv32i_and(i),
+            Instruction::ANDI(i) => self.rv32i_andi(i),
+            Instruction::AUIPC(i) => self.rv32i_auipc(i),
+            Instruction::BEQ(i) => self.rv32i_beq(i),
+            Instruction::BGE(i) => self.rv32i_bge(i),
+            Instruction::BGEU(i) => self.rv32i_bgeu(i),
+            Instruction::BLT(i) => self.rv32i_blt(i),
+            Instruction::BLTU(i) => self.rv32i_bltu(i),
+            Instruction::BNE(i) => self.rv32i_bne(i),
+            Instruction::JAL(i) => self.rv32i_jal(i),
+            Instruction::JALR(i) => self.rv32i_jalr(i),
+            Instruction::LB(i) => self.rv32i_lb(i),
+            Instruction::LBU(i) => self.rv32i_lbu(i),
+            Instruction::LH(i) => self.rv32i_lh(i),
+            Instruction::LHU(i) => self.rv32i_lhu(i),
+            Instruction::LUI(i) => self.rv32i_lui(i),
+            Instruction::LW(i) => self.rv32i_lw(i),
+            Instruction::NOP => self.rv32i_nop(),
+            Instruction::OR(i) => self.rv32i_or(i),
+            Instruction::ORI(i) => self.rv32i_ori(i),
+            Instruction::SB(i) => self.rv32i_sb(i),
+            Instruction::SH(i) => self.rv32i_sh(i),
+            Instruction::SLL(i) => self.rv32i_sll(i),
+            Instruction::SLLI(i) => self.rv32i_slli(i),
+            Instruction::SLT(i) => self.rv32i_slt(i),
+            Instruction::SLTI(i) => self.rv32i_slti(i),
+            Instruction::SLTIU(i) => self.rv32i_sltiu(i),
+            Instruction::SLTU(i) => self.rv32i_sltu(i),
+            Instruction::SRA(i) => self.rv32i_sra(i),
+            Instruction::SRAI(i) => self.rv32i_srai(i),
+            Instruction::SRL(i) => self.rv32i_srl(i),
+            Instruction::SRLI(i) => self.rv32i_srli(i),
+            Instruction::SUB(i) => self.rv32i_sub(i),
+            Instruction::SW(i) => self.rv32i_sw(i),
+            Instruction::XOR(i) => self.rv32i_xor(i),
+            Instruction::XORI(i) => self.rv32i_xori(i),
             e => Err(Error::NotImplemented(e)),
         }?;
 
@@ -338,7 +338,7 @@ impl CPU {
     }
 
     fn increment_pc(&mut self) -> Result<(), Error> {
-        self.pc += RV32I::LENGTH;
+        self.pc += Instruction::LENGTH;
         Ok(())
     }
 
@@ -660,7 +660,7 @@ impl CPU {
         }
 
         // set the return address
-        let return_address = self.pc.wrapping_add(RV32I::LENGTH);
+        let return_address = self.pc.wrapping_add(Instruction::LENGTH);
 
         self.set_register(Register::PC, offset_address);
         self.set_register(instruction.rd, return_address);
@@ -690,7 +690,7 @@ impl CPU {
             return Err(Error::MisalignedJump(offset_address));
         }
 
-        let return_address = self.pc.wrapping_add(RV32I::LENGTH);
+        let return_address = self.pc.wrapping_add(Instruction::LENGTH);
 
         self.set_register(Register::PC, offset_address);
         self.set_register(instruction.rd, return_address);
@@ -714,7 +714,7 @@ impl CPU {
             offset <<= 1; // multiple of 2
             self.pc = self.pc.wrapping_add(offset);
         } else {
-            self.pc += RV32I::LENGTH;
+            self.pc += Instruction::LENGTH;
         }
 
         Ok(())
@@ -729,7 +729,7 @@ impl CPU {
             offset <<= 1; // multiple of 2
             self.pc = self.pc.wrapping_add(offset);
         } else {
-            self.pc += RV32I::LENGTH;
+            self.pc += Instruction::LENGTH;
         }
 
         Ok(())
@@ -746,7 +746,7 @@ impl CPU {
             offset <<= 1; // multiple of 2
             self.pc = self.pc.wrapping_add(offset);
         } else {
-            self.pc += RV32I::LENGTH;
+            self.pc += Instruction::LENGTH;
         }
 
         Ok(())
@@ -761,7 +761,7 @@ impl CPU {
             offset <<= 1; // multiple of 2
             self.pc = self.pc.wrapping_add(offset);
         } else {
-            self.pc += RV32I::LENGTH;
+            self.pc += Instruction::LENGTH;
         }
 
         Ok(())
@@ -778,7 +778,7 @@ impl CPU {
             offset <<= 1; // multiple of 2
             self.pc = self.pc.wrapping_add(offset);
         } else {
-            self.pc += RV32I::LENGTH;
+            self.pc += Instruction::LENGTH;
         }
 
         Ok(())
@@ -793,7 +793,7 @@ impl CPU {
             offset <<= 1; // multiple of 2
             self.pc = self.pc.wrapping_add(offset);
         } else {
-            self.pc += RV32I::LENGTH;
+            self.pc += Instruction::LENGTH;
         }
 
         Ok(())
@@ -953,13 +953,13 @@ impl CPU {
 
 #[derive(Debug, Clone)]
 pub enum Error {
-    NotImplemented(RV32I),
+    NotImplemented(Instruction),
     MisalignedJump(u32),
     AccessViolation(u32),
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum RV32I {
+pub enum Instruction {
     // ✅ indicates it's implemented, not verified!
     ADD(RType),   // ✅
     ADDI(IType),  // ✅
@@ -1004,7 +1004,7 @@ pub enum RV32I {
     XORI(IType),  // ✅
 }
 
-impl RV32I {
+impl Instruction {
     const LENGTH: u32 = 4; // 4 bytes, 32 bits
 }
 
@@ -1015,7 +1015,7 @@ mod tests {
     #[test]
     fn rv32i_nop() {
         let mut cpu = CPU::default();
-        let nop = RV32I::NOP;
+        let nop = Instruction::NOP;
 
         // start from zero in the PC
         let result = cpu.execute(nop);
@@ -1037,8 +1037,8 @@ mod tests {
         inst.rs1 = Register::X2;
         inst.rs2 = Register::X3;
 
-        let add = RV32I::ADD(inst);
-        let sub = RV32I::SUB(inst);
+        let add = Instruction::ADD(inst);
+        let sub = Instruction::SUB(inst);
 
         // zero values
         let result = cpu.execute(add);
@@ -1079,7 +1079,7 @@ mod tests {
         inst.rs1 = Register::X1;
         inst.imm.set_unsigned(0).unwrap();
 
-        let addi = RV32I::ADDI(inst);
+        let addi = Instruction::ADDI(inst);
 
         // zero value
         let result = cpu.execute(addi);
@@ -1088,7 +1088,7 @@ mod tests {
 
         // positive values
         inst.imm.set_unsigned(5).unwrap();
-        let addi = RV32I::ADDI(inst);
+        let addi = Instruction::ADDI(inst);
         let result = cpu.execute(addi);
         assert!(result.is_ok());
         assert_eq!(cpu.x1, 5);
@@ -1096,7 +1096,7 @@ mod tests {
         // negative values; this is a mess!
         let result = inst.imm.set_signed(-3);
         assert!(result.is_ok());
-        let addi = RV32I::ADDI(inst);
+        let addi = Instruction::ADDI(inst);
         let result = cpu.execute(addi);
         assert!(result.is_ok());
         assert_eq!(cpu.x1, 2);
@@ -1111,29 +1111,29 @@ mod tests {
         inst.rs1 = Register::X2;
         inst.imm.set_unsigned(0).unwrap();
 
-        let slti = RV32I::SLTI(inst);
+        let slti = Instruction::SLTI(inst);
 
         // zero / equal value
         let result = cpu.execute(slti);
         assert!(result.is_ok());
         assert_eq!(cpu.x1, 0);
-        assert_eq!(cpu.pc, RV32I::LENGTH);
+        assert_eq!(cpu.pc, Instruction::LENGTH);
 
         // greater than value
         inst.imm.set_signed(1).unwrap();
-        let slti = RV32I::SLTI(inst);
+        let slti = Instruction::SLTI(inst);
         let result = cpu.execute(slti);
         assert!(result.is_ok());
         assert_eq!(cpu.x1, 1);
-        assert_eq!(cpu.pc, RV32I::LENGTH * 2);
+        assert_eq!(cpu.pc, Instruction::LENGTH * 2);
 
         // less than value (negative, just for kicks)
         inst.imm.set_signed(-1).unwrap();
-        let slti = RV32I::SLTI(inst);
+        let slti = Instruction::SLTI(inst);
         let result = cpu.execute(slti);
         assert!(result.is_ok());
         assert_eq!(cpu.x1, 0);
-        assert_eq!(cpu.pc, RV32I::LENGTH * 3);
+        assert_eq!(cpu.pc, Instruction::LENGTH * 3);
     }
 
     #[test]
@@ -1148,27 +1148,27 @@ mod tests {
 
         // equal value
         inst.imm.set_unsigned(255).unwrap();
-        let sltiu = RV32I::SLTIU(inst);
+        let sltiu = Instruction::SLTIU(inst);
         let result = cpu.execute(sltiu);
         assert!(result.is_ok());
         assert_eq!(cpu.x1, 0);
-        assert_eq!(cpu.pc, RV32I::LENGTH);
+        assert_eq!(cpu.pc, Instruction::LENGTH);
 
         // greater than value
         inst.imm.set_unsigned(256).unwrap();
-        let sltiu = RV32I::SLTIU(inst);
+        let sltiu = Instruction::SLTIU(inst);
         let result = cpu.execute(sltiu);
         assert!(result.is_ok());
         assert_eq!(cpu.x1, 1);
-        assert_eq!(cpu.pc, RV32I::LENGTH * 2);
+        assert_eq!(cpu.pc, Instruction::LENGTH * 2);
 
         // less than value
         inst.imm.set_unsigned(254).unwrap();
-        let sltiu = RV32I::SLTIU(inst);
+        let sltiu = Instruction::SLTIU(inst);
         let result = cpu.execute(sltiu);
         assert!(result.is_ok());
         assert_eq!(cpu.x1, 0);
-        assert_eq!(cpu.pc, RV32I::LENGTH * 3);
+        assert_eq!(cpu.pc, Instruction::LENGTH * 3);
     }
 
     #[test]
@@ -1184,17 +1184,17 @@ mod tests {
         assert!(result.is_ok());
         cpu.x2 = u32::MAX;
 
-        let andi = RV32I::ANDI(inst);
+        let andi = Instruction::ANDI(inst);
         let result = cpu.execute(andi);
         assert!(result.is_ok());
         assert_eq!(cpu.x1, u32::MAX);
 
-        let ori = RV32I::ORI(inst);
+        let ori = Instruction::ORI(inst);
         let result = cpu.execute(ori);
         assert!(result.is_ok());
         assert_eq!(cpu.x1, u32::MAX);
 
-        let xori = RV32I::XORI(inst);
+        let xori = Instruction::XORI(inst);
         let result = cpu.execute(xori);
         assert!(result.is_ok());
         assert_eq!(cpu.x1, 0);
@@ -1204,17 +1204,17 @@ mod tests {
         assert!(result.is_ok());
         cpu.x2 = u32::MAX;
 
-        let andi = RV32I::ANDI(inst);
+        let andi = Instruction::ANDI(inst);
         let result = cpu.execute(andi);
         assert!(result.is_ok());
         assert_eq!(cpu.x1, 0);
 
-        let ori = RV32I::ORI(inst);
+        let ori = Instruction::ORI(inst);
         let result = cpu.execute(ori);
         assert!(result.is_ok());
         assert_eq!(cpu.x1, u32::MAX);
 
-        let xori = RV32I::XORI(inst);
+        let xori = Instruction::XORI(inst);
         let result = cpu.execute(xori);
         assert!(result.is_ok());
         assert_eq!(cpu.x1, u32::MAX);
@@ -1229,7 +1229,7 @@ mod tests {
         let result = inst.imm.set_unsigned(1);
         assert!(result.is_ok());
 
-        let lui = RV32I::LUI(inst);
+        let lui = Instruction::LUI(inst);
         let result = cpu.execute(lui);
         assert!(result.is_ok());
         assert_eq!(cpu.x1, 0b0000_0000_0000_0000_0001_0000_0000_0000);
@@ -1245,7 +1245,7 @@ mod tests {
         assert!(result.is_ok());
 
         // from PC 0
-        let auipc = RV32I::AUIPC(inst);
+        let auipc = Instruction::AUIPC(inst);
         let result = cpu.execute(auipc);
         assert!(result.is_ok());
         assert_eq!(cpu.x1, 0b0000_0000_0000_0000_0001_0000_0000_0000);
@@ -1265,7 +1265,7 @@ mod tests {
         let result = inst.imm.set_unsigned(4);
         assert!(result.is_ok());
 
-        let jal = RV32I::JAL(inst);
+        let jal = Instruction::JAL(inst);
         let result = cpu.execute(jal);
         assert!(result.is_ok());
         assert_eq!(cpu.pc, 8); // current pc (0) + (4 * 2)
@@ -1274,7 +1274,7 @@ mod tests {
         // misalignment check!
         let result = inst.imm.set_unsigned(1);
         assert!(result.is_ok());
-        let jal = RV32I::JAL(inst);
+        let jal = Instruction::JAL(inst);
         let result = cpu.execute(jal);
         assert!(result.is_err());
     }
@@ -1289,7 +1289,7 @@ mod tests {
         let result = inst.imm.set_unsigned(12);
         assert!(result.is_ok());
 
-        let jalr = RV32I::JALR(inst);
+        let jalr = Instruction::JALR(inst);
         let result = cpu.execute(jalr);
         assert!(result.is_ok());
         assert_eq!(cpu.pc, 12);
@@ -1300,7 +1300,7 @@ mod tests {
         let result = inst.imm.set_signed(-12);
         assert!(result.is_ok());
 
-        let jalr = RV32I::JALR(inst);
+        let jalr = Instruction::JALR(inst);
         let result = cpu.execute(jalr);
         assert!(result.is_ok());
         assert_eq!(cpu.pc, 12);
@@ -1320,13 +1320,13 @@ mod tests {
         inst.rs2 = Register::X2;
 
         inst.imm.set_signed(64).unwrap();
-        let beq = RV32I::BEQ(inst);
+        let beq = Instruction::BEQ(inst);
         let result = cpu.execute(beq);
         assert!(result.is_ok());
         assert_eq!(cpu.pc, 128); // doubled
 
         inst.imm.set_signed(-128).unwrap();
-        let beq = RV32I::BEQ(inst);
+        let beq = Instruction::BEQ(inst);
         let result = cpu.execute(beq);
         assert!(result.is_ok());
         assert_eq!(cpu.pc, -128i32 as u32); // doubled
@@ -1335,10 +1335,10 @@ mod tests {
         cpu.pc = 0;
 
         inst.imm.set_signed(64).unwrap();
-        let beq = RV32I::BEQ(inst);
+        let beq = Instruction::BEQ(inst);
         let result = cpu.execute(beq);
         assert!(result.is_ok());
-        assert_eq!(cpu.pc, RV32I::LENGTH); // skipped
+        assert_eq!(cpu.pc, Instruction::LENGTH); // skipped
     }
 
     #[test]
@@ -1354,13 +1354,13 @@ mod tests {
         inst.rs2 = Register::X2;
 
         inst.imm.set_signed(64).unwrap();
-        let bne = RV32I::BNE(inst);
+        let bne = Instruction::BNE(inst);
         let result = cpu.execute(bne);
         assert!(result.is_ok());
         assert_eq!(cpu.pc, 128); // doubled
 
         inst.imm.set_signed(-128).unwrap();
-        let bne = RV32I::BNE(inst);
+        let bne = Instruction::BNE(inst);
         let result = cpu.execute(bne);
         assert!(result.is_ok());
         assert_eq!(cpu.pc, -128i32 as u32); // doubled
@@ -1369,10 +1369,10 @@ mod tests {
         cpu.pc = 0;
 
         inst.imm.set_signed(64).unwrap();
-        let bne = RV32I::BNE(inst);
+        let bne = Instruction::BNE(inst);
         let result = cpu.execute(bne);
         assert!(result.is_ok());
-        assert_eq!(cpu.pc, RV32I::LENGTH); // skipped
+        assert_eq!(cpu.pc, Instruction::LENGTH); // skipped
     }
 
     #[test]
@@ -1388,13 +1388,13 @@ mod tests {
         inst.rs2 = Register::X2;
 
         inst.imm.set_signed(64).unwrap();
-        let blt = RV32I::BLT(inst);
+        let blt = Instruction::BLT(inst);
         let result = cpu.execute(blt);
         assert!(result.is_ok());
         assert_eq!(cpu.pc, 128); // doubled
 
         inst.imm.set_signed(-128).unwrap();
-        let blt = RV32I::BLT(inst);
+        let blt = Instruction::BLT(inst);
         let result = cpu.execute(blt);
         assert!(result.is_ok());
         assert_eq!(cpu.pc, -128i32 as u32); // doubled
@@ -1403,10 +1403,10 @@ mod tests {
         cpu.pc = 0;
 
         inst.imm.set_signed(64).unwrap();
-        let blt = RV32I::BLT(inst);
+        let blt = Instruction::BLT(inst);
         let result = cpu.execute(blt);
         assert!(result.is_ok());
-        assert_eq!(cpu.pc, RV32I::LENGTH); // skipped
+        assert_eq!(cpu.pc, Instruction::LENGTH); // skipped
     }
 
     #[test]
@@ -1422,13 +1422,13 @@ mod tests {
         inst.rs2 = Register::X2;
 
         inst.imm.set_unsigned(64).unwrap();
-        let bltu = RV32I::BLTU(inst);
+        let bltu = Instruction::BLTU(inst);
         let result = cpu.execute(bltu);
         assert!(result.is_ok());
         assert_eq!(cpu.pc, 128); // doubled
 
         inst.imm.set_unsigned(0).unwrap();
-        let bltu = RV32I::BLTU(inst);
+        let bltu = Instruction::BLTU(inst);
         let result = cpu.execute(bltu);
         assert!(result.is_ok());
         assert_eq!(cpu.pc, 128i32 as u32); // doubled
@@ -1437,10 +1437,10 @@ mod tests {
         cpu.pc = 0;
 
         inst.imm.set_unsigned(64).unwrap();
-        let bltu = RV32I::BLTU(inst);
+        let bltu = Instruction::BLTU(inst);
         let result = cpu.execute(bltu);
         assert!(result.is_ok());
-        assert_eq!(cpu.pc, RV32I::LENGTH); // skipped
+        assert_eq!(cpu.pc, Instruction::LENGTH); // skipped
     }
 
     #[test]
@@ -1456,13 +1456,13 @@ mod tests {
         inst.rs2 = Register::X2;
 
         inst.imm.set_signed(64).unwrap();
-        let bge = RV32I::BGE(inst);
+        let bge = Instruction::BGE(inst);
         let result = cpu.execute(bge);
         assert!(result.is_ok());
         assert_eq!(cpu.pc, 128); // doubled
 
         inst.imm.set_signed(-128).unwrap();
-        let bge = RV32I::BGE(inst);
+        let bge = Instruction::BGE(inst);
         let result = cpu.execute(bge);
         assert!(result.is_ok());
         assert_eq!(cpu.pc, -128i32 as u32); // doubled
@@ -1471,7 +1471,7 @@ mod tests {
         cpu.pc = 0;
 
         inst.imm.set_signed(64).unwrap();
-        let bge = RV32I::BGE(inst);
+        let bge = Instruction::BGE(inst);
         let result = cpu.execute(bge);
         assert!(result.is_ok());
         assert_eq!(cpu.pc, 128); // equal, taken
@@ -1490,13 +1490,13 @@ mod tests {
         inst.rs2 = Register::X2;
 
         inst.imm.set_unsigned(64).unwrap();
-        let bgeu = RV32I::BGEU(inst);
+        let bgeu = Instruction::BGEU(inst);
         let result = cpu.execute(bgeu);
         assert!(result.is_ok());
         assert_eq!(cpu.pc, 128); // doubled
 
         inst.imm.set_unsigned(0).unwrap();
-        let bgeu = RV32I::BGEU(inst);
+        let bgeu = Instruction::BGEU(inst);
         let result = cpu.execute(bgeu);
         assert!(result.is_ok());
         assert_eq!(cpu.pc, 128i32 as u32); // doubled
@@ -1505,7 +1505,7 @@ mod tests {
         cpu.pc = 0;
 
         inst.imm.set_unsigned(64).unwrap();
-        let bgeu = RV32I::BGEU(inst);
+        let bgeu = Instruction::BGEU(inst);
         let result = cpu.execute(bgeu);
         assert!(result.is_ok());
         assert_eq!(cpu.pc, 128); // equal, taken
@@ -1527,42 +1527,42 @@ mod tests {
         inst.rd = Register::X2;
 
         inst.imm.set_unsigned(0).unwrap(); // zero offset
-        let lw = RV32I::LW(inst);
+        let lw = Instruction::LW(inst);
         let result = cpu.execute(lw);
         assert!(result.is_ok());
         let lw_target = u32::from_le_bytes([1, 2, 3, 4]);
         assert_eq!(cpu.x2, lw_target);
 
         inst.imm.set_unsigned(2).unwrap(); // +2 offset
-        let lw = RV32I::LW(inst);
+        let lw = Instruction::LW(inst);
         let result = cpu.execute(lw);
         assert!(result.is_ok());
         let lw_target = u32::from_le_bytes([3, 4, 0, 0]);
         assert_eq!(cpu.x2, lw_target);
 
         inst.imm.set_unsigned(0).unwrap(); // zero offset
-        let lh = RV32I::LH(inst);
+        let lh = Instruction::LH(inst);
         let result = cpu.execute(lh);
         assert!(result.is_ok());
         let lh_target = u32::from_le_bytes([1, 2, 0, 0]);
         assert_eq!(cpu.x2, lh_target);
 
         inst.imm.set_unsigned(1).unwrap(); // +1 offset
-        let lh = RV32I::LH(inst);
+        let lh = Instruction::LH(inst);
         let result = cpu.execute(lh);
         assert!(result.is_ok());
         let lh_target = u32::from_le_bytes([2, 3, 0, 0]);
         assert_eq!(cpu.x2, lh_target);
 
         inst.imm.set_unsigned(0).unwrap(); // zero offset
-        let lb = RV32I::LB(inst);
+        let lb = Instruction::LB(inst);
         let result = cpu.execute(lb);
         assert!(result.is_ok());
         let lb_target = u32::from_le_bytes([1, 0, 0, 0]);
         assert_eq!(cpu.x2, lb_target);
 
         inst.imm.set_unsigned(1).unwrap(); // +1 offset
-        let lb = RV32I::LB(inst);
+        let lb = Instruction::LB(inst);
         let result = cpu.execute(lb);
         assert!(result.is_ok());
         let lb_target = u32::from_le_bytes([2, 0, 0, 0]);
@@ -1581,7 +1581,7 @@ mod tests {
         inst.rs2 = Register::X2;
 
         inst.imm.set_unsigned(0).unwrap(); // zero offset
-        let sw = RV32I::SW(inst);
+        let sw = Instruction::SW(inst);
         let result = cpu.execute(sw);
         assert!(result.is_ok());
         assert_eq!(cpu.memory[100], 0b1111_1000);
@@ -1590,14 +1590,14 @@ mod tests {
         assert_eq!(cpu.memory[103], 0b1111_1111);
 
         cpu.x1 = 200; // base address
-        let sh = RV32I::SH(inst);
+        let sh = Instruction::SH(inst);
         let result = cpu.execute(sh);
         assert!(result.is_ok());
         assert_eq!(cpu.memory[200], 0b1111_1000);
         assert_eq!(cpu.memory[201], 0b1111_1100);
 
         cpu.x1 = 300; // base address
-        let sb = RV32I::SB(inst);
+        let sb = Instruction::SB(inst);
         let result = cpu.execute(sb);
         assert!(result.is_ok());
         assert_eq!(cpu.memory[300], 0b1111_1000);
@@ -1614,7 +1614,7 @@ mod tests {
         store_inst.rs1 = Register::X1;
         store_inst.rs2 = Register::X2;
 
-        let sw = RV32I::SW(store_inst);
+        let sw = Instruction::SW(store_inst);
         let result = cpu.execute(sw);
         assert!(result.is_ok());
 
@@ -1622,7 +1622,7 @@ mod tests {
         load_inst.rs1 = Register::X1; // base address
         load_inst.rd = Register::X3; // destination register
 
-        let lw = RV32I::LW(load_inst);
+        let lw = Instruction::LW(load_inst);
         let result = cpu.execute(lw);
         assert!(result.is_ok());
         assert_eq!(cpu.x2, cpu.x3);
@@ -1639,7 +1639,7 @@ mod tests {
         store_inst.rs1 = Register::X1;
         store_inst.rs2 = Register::X2;
 
-        let sh = RV32I::SH(store_inst);
+        let sh = Instruction::SH(store_inst);
         let result = cpu.execute(sh);
         assert!(result.is_ok());
 
@@ -1647,7 +1647,7 @@ mod tests {
         load_inst.rs1 = Register::X1; // base address
         load_inst.rd = Register::X3; // destination register
 
-        let lh = RV32I::LH(load_inst);
+        let lh = Instruction::LH(load_inst);
         let result = cpu.execute(lh);
         assert!(result.is_ok());
         assert_eq!(cpu.x3, 0b1111_1100_1111_1000);
@@ -1664,7 +1664,7 @@ mod tests {
         store_inst.rs1 = Register::X1;
         store_inst.rs2 = Register::X2;
 
-        let sb = RV32I::SB(store_inst);
+        let sb = Instruction::SB(store_inst);
         let result = cpu.execute(sb);
         assert!(result.is_ok());
 
@@ -1672,7 +1672,7 @@ mod tests {
         load_inst.rs1 = Register::X1; // base address
         load_inst.rd = Register::X3; // destination register
 
-        let lb = RV32I::LB(load_inst);
+        let lb = Instruction::LB(load_inst);
         let result = cpu.execute(lb);
         assert!(result.is_ok());
         assert_eq!(cpu.x3, 0b1111_1000);

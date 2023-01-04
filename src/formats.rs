@@ -49,6 +49,12 @@ pub struct SType {
     pub rs2: Register,
 }
 
+impl Default for SType {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SType {
     const IMM_BITS: u8 = 12;
 

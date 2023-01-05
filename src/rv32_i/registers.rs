@@ -1,4 +1,18 @@
+/// Used to access [CPU](crate::rv32_i::CPU) registers via `get_register()`
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+/// ```
+/// use brubeck::rv32_i::*;
+///
+/// let mut cpu = CPU::default();
+/// let nop = Instruction::NOP;
+/// let result = cpu.execute(nop);
+///
+/// // successful execution is ok!
+/// assert!(result.is_ok());
+///
+/// // PC should be incremented by the length of the NOP instruction
+/// assert_eq!(cpu.pc, Instruction::LENGTH);
+/// ```
 pub enum Register {
     X0,
     X1,
@@ -41,45 +55,80 @@ impl Default for Register {
     }
 }
 
+/// ABI ("application binary interface") mapping for [CPU](crate::rv32_i::CPU) registers.
 #[derive(Debug, Copy, Clone)]
 pub enum ABI {
+    /// Always zero; X0 register
     Zero,
+    /// Return address; X1 register
     RA,
+    /// Stack pointer; X2 register
     SP,
+    /// Global pointer; X3 register
     GP,
+    /// Thread pointer; X4 register
     TP,
+    /// Temporary / alternate link register; X5 register
     T0,
+    /// Temporaries; X6 register
     T1,
+    /// Temporaries; X7 register
     T2,
+    /// Saved register / frame pointer; X8 register
     S0,
+    /// Saved register / frame pointer; X8 register
     FP,
+    /// Saved register; X9 register
     S1,
+    /// Function arguments / return values; X10 register
     A0,
+    /// Function arguments / return values; X11 register
     A1,
+    /// Function arguments; X12 register
     A2,
+    /// Function arguments; X13 register
     A3,
+    /// Function arguments; X14 register
     A4,
+    /// Function arguments; X15 register
     A5,
+    /// Function arguments; X16 register
     A6,
+    /// Function arguments; X17 register
     A7,
+    /// Saved registers; X18 register
     S2,
+    /// Saved registers; X19 register
     S3,
+    /// Saved registers; X20 register
     S4,
+    /// Saved registers; X21 register
     S5,
+    /// Saved registers; X22 register
     S6,
+    /// Saved registers; X23 register
     S7,
+    /// Saved registers; X24 register
     S8,
+    /// Saved registers; X25 register
     S9,
+    /// Saved registers; X26 register
     S10,
+    /// Saved registers; X27 register
     S11,
+    /// Temporaries; X28 register
     T3,
+    /// Temporaries; X29 register
     T4,
+    /// Temporaries; X30 register
     T5,
+    /// Temporaries; X31 register
     T6,
 }
 
 impl ABI {
-    pub fn to_r(&self) -> Register {
+    /// Provides the cooresponding CPU register for the ABI register
+    pub fn to_register(&self) -> Register {
         match self {
             Self::Zero => Register::X0,
             Self::RA => Register::X1,

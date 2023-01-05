@@ -1,5 +1,12 @@
 use super::*;
 
+/// Represents the state of registers and memory for a little endian, single
+/// hardware thread ("hart") RV32I CPU.
+///
+/// Registers can be accessed directly, via `get_register()`, or `get_abi()`
+/// (for [ABI](crate::rv32_i::ABI) aliases). Registers operate as native u32 values for ease of use.
+/// Memory operates as little endian, so the 16-bit value `0x12ab` would be
+/// stored in memory as `[0xab, 0x12]`.
 #[derive(Debug, Clone)]
 pub struct CPU {
     pub memory: Vec<u8>,
@@ -39,12 +46,16 @@ pub struct CPU {
 }
 
 impl Default for CPU {
+    /// Initializes the [CPU] with 1 mebibyte (2^20) of memory
     fn default() -> Self {
         Self::new(2usize.pow(20)) // default 1 mebibyte
     }
 }
 
 impl CPU {
+    /// Creates a single hardware thread ("hart") CPU implementing the RV32I
+    /// instruction set. Memory size is counted in bytes; `default()` will
+    /// initialize with 1 mebibyte.
     pub fn new(memory_size: usize) -> Self {
         Self {
             memory: vec![0; memory_size],
@@ -84,6 +95,9 @@ impl CPU {
         }
     }
 
+    /// Gets the value for a given register.
+    ///
+    /// `Register::X0` will always remain zero
     pub fn get_register(&self, r: Register) -> u32 {
         match r {
             Register::X0 => self.x0,
@@ -122,9 +136,12 @@ impl CPU {
         }
     }
 
+    /// Sets a given register to the provided value.
+    ///
+    /// `Register::X0` will always remain zero
     pub fn set_register(&mut self, r: Register, v: u32) {
         match r {
-            Register::X0 => self.x0 = v,
+            Register::X0 => self.x0 = 0,
             Register::X1 => self.x1 = v,
             Register::X2 => self.x2 = v,
             Register::X3 => self.x3 = v,
@@ -160,14 +177,31 @@ impl CPU {
         }
     }
 
-    pub fn get(&self, abi: ABI) -> u32 {
-        self.get_register(abi.to_r())
+    /// Gets the content of a register by it's ABI name
+    pub fn get_abi(&self, abi: ABI) -> u32 {
+        self.get_register(abi.to_register())
     }
 
-    pub fn set(&mut self, abi: ABI, v: u32) {
-        self.set_register(abi.to_r(), v)
+    /// Sets the content of a register by it's ABI name
+    pub fn set_abi(&mut self, abi: ABI, v: u32) {
+        self.set_register(abi.to_register(), v)
     }
 
+    /// Does what it says on the tin!
+    ///
+    /// ```
+    /// use brubeck::rv32_i::*;
+    ///
+    /// let mut cpu = CPU::default();
+    /// let nop = Instruction::NOP;
+    /// let result = cpu.execute(nop);
+    ///
+    /// // successful execution is ok!
+    /// assert!(result.is_ok());
+    ///
+    /// // PC should be incremented by the length of the NOP instruction
+    /// assert_eq!(cpu.pc, Instruction::LENGTH);
+    /// ```
     pub fn execute(&mut self, instruction: Instruction) -> Result<(), Error> {
         match instruction {
             Instruction::ADD(i) => self.rv32i_add(i),
@@ -213,6 +247,12 @@ impl CPU {
 
         Ok(())
     }
+
+    /*
+     *  All functions below are either instructions or helper functions for execution.
+     *
+     *  Naming follows the convention isa_instruction (eg: rv32i_nop)
+     */
 
     fn increment_pc(&mut self) -> Result<(), Error> {
         self.pc += Instruction::LENGTH;

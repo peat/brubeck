@@ -1,5 +1,5 @@
-use crate::immediate::Immediate;
-use crate::Register;
+use crate::rv32_i::Register;
+use crate::Immediate;
 
 #[derive(Debug, Copy, Clone, Default)]
 pub struct RType {

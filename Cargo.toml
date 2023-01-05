@@ -9,6 +9,7 @@ repository = "https://github.com/peat/brubeck"
 readme = "README.md"
 keywords = ["risc-v", "riscv"]
 categories = ["emulators"]
+include = ["**/*.rs", "Cargo.toml"]
 
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

@@ -1,7 +1,15 @@
 [package]
 name = "brubeck"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
+license = "Apache-2.0"
+description = "A RISC-V REPL and emulation library ... a work in progress!"
+homepage = "https://github.com/peat/brubeck"
+repository = "https://github.com/peat/brubeck"
+readme = "README.md"
+keywords = ["risc-v", "riscv"]
+categories = ["emulators"]
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

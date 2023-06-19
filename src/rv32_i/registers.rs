@@ -1,5 +1,5 @@
 /// Used to access [CPU](crate::rv32_i::CPU) registers via `get_register()`
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
 /// ```
 /// use brubeck::rv32_i::*;
 ///
@@ -14,6 +14,7 @@
 /// assert_eq!(cpu.pc, Instruction::LENGTH);
 /// ```
 pub enum Register {
+    #[default]
     X0,
     X1,
     X2,
@@ -47,12 +48,6 @@ pub enum Register {
     X30,
     X31,
     PC,
-}
-
-impl Default for Register {
-    fn default() -> Self {
-        Register::X0
-    }
 }
 
 /// ABI ("application binary interface") mapping for [CPU](crate::rv32_i::CPU) registers.

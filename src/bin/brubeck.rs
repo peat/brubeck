@@ -1,4 +1,4 @@
-use brubeck::interpreter::{Error, Input, Interpreter};
+use brubeck::interpreter::Interpreter;
 
 use std::io;
 
@@ -12,15 +12,9 @@ fn main() -> io::Result<()> {
         let mut buffer = String::new();
         io::stdin().read_line(&mut buffer)?;
 
-        let result = match Interpreter::parse(&buffer) {
-            Ok(Input::Exec(instruction)) => interpreter.execute(instruction),
-            Ok(command) => interpreter.command(command),
-            Err(e) => Err(e),
-        };
-
-        let output = match result {
-            Ok(s) => format!("✅ {}", s),
-            Err(Error::Generic(s)) => format!("❌ {}", s),
+        let output = match interpreter.interpret(&buffer) {
+            Ok(_) => "✅".to_owned(),
+            Err(s) => format!("❌ {}", s),
         };
         println!("=> {}", output);
     }

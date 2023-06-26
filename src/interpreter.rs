@@ -1,9 +1,6 @@
 use std::fmt::Display;
 
-use crate::{
-    rv32_i::{BType, IType, Instruction, JType, RType, Register, SType, UType, ABI, CPU},
-    Immediate,
-};
+use crate::rv32_i::{BType, IType, Instruction, JType, RType, Register, SType, UType, ABI, CPU};
 
 #[derive(Default)]
 pub struct Interpreter {

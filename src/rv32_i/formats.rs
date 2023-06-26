@@ -1,7 +1,7 @@
 use crate::rv32_i::Register;
 use crate::Immediate;
 
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone, Default, PartialEq)]
 pub struct RType {
     pub opcode: u8,
     pub rd: Register,
@@ -11,7 +11,7 @@ pub struct RType {
     pub funct7: u8,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct IType {
     pub opcode: u8,
     pub rd: Register,
@@ -40,7 +40,7 @@ impl IType {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct SType {
     pub opcode: u8,
     pub imm: Immediate,
@@ -69,7 +69,7 @@ impl SType {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct BType {
     pub opcode: u8,
     pub imm: Immediate,
@@ -98,7 +98,7 @@ impl Default for BType {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct UType {
     pub opcode: u8,
     pub rd: Register,
@@ -123,7 +123,7 @@ impl UType {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct JType {
     pub opcode: u8,
     pub rd: Register,

@@ -1,6 +1,9 @@
 use std::fmt::Display;
 
-use crate::rv32_i::{BType, IType, Instruction, JType, RType, Register, SType, UType, ABI, CPU};
+use crate::{
+    rv32_i::{BType, IType, Instruction, JType, RType, Register, SType, UType, ABI, CPU},
+    Immediate,
+};
 
 #[derive(Default)]
 pub struct Interpreter {
@@ -14,10 +17,10 @@ impl Interpreter {
         }
     }
 
-    pub fn interpret(&mut self, input: &str) -> Result<(), Error> {
-        let _command = parse(input)?;
+    pub fn interpret(&mut self, input: &str) -> Result<String, Error> {
+        let command = parse(input)?;
 
-        Ok(())
+        self.run_command(command)
     }
 
     pub fn execute(&mut self, instruction: Instruction) -> Result<String, Error> {
@@ -27,7 +30,7 @@ impl Interpreter {
         }
     }
 
-    pub fn command(&mut self, input: Command) -> Result<String, Error> {
+    pub fn run_command(&mut self, input: Command) -> Result<String, Error> {
         match input {
             Command::Exec(instruction) => self.execute(instruction),
             Command::PC => Ok(format!("pc: {} (0x{:x})", self.cpu.pc, self.cpu.pc)),
@@ -41,18 +44,21 @@ impl Interpreter {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub enum Command {
     PC,
     Inspect(Register),
     Exec(Instruction),
 }
 
+#[derive(Debug, PartialEq)]
 pub enum Token {
     Register(Register),
     Instruction(Instruction),
     Value32(u32),
 }
 
+#[derive(Debug)]
 pub enum Error {
     Generic(String),
     UnrecognizedToken(String),
@@ -70,19 +76,84 @@ impl Display for Error {
 }
 
 fn parse(input: &str) -> Result<Command, Error> {
-    let mut tokens = vec![];
+    // clean up whitespace, punctuation, capitalization, etc ...
+    let normalized = normalize(input);
 
-    // normalize and tokenize the input
-    for attempt in normalize(input) {
-        tokens.push(tokenize(attempt)?);
-    }
+    // convert the normalized input into recognized tokens
+    let mut tokens = tokenize(normalized)?;
 
-    // TODO: build the command from the tokenized input
-
-    Err(Error::Generic("Not Implemented".to_owned()))
+    // build a command from those tokens
+    build_command(&mut tokens)
 }
 
-fn tokenize(input: String) -> Result<Token, Error> {
+fn build_command(tokens: &mut Vec<Token>) -> Result<Command, Error> {
+    if tokens.is_empty() {
+        return Err(Error::Generic("Empty tokens in build!".to_owned()));
+    }
+
+    let first_token = tokens.remove(0);
+
+    match first_token {
+        Token::Register(register) => Ok(Command::Inspect(register)),
+        Token::Value32(value) => Err(Error::Generic(format!("Value: {}", value))),
+        Token::Instruction(mut i) => Ok(Command::Exec(build_instruction(&mut i, tokens)?)),
+    }
+}
+
+fn build_instruction(instruction: &mut Instruction, args: &[Token]) -> Result<Instruction, Error> {
+    let output = match instruction {
+        // build instructions
+        Instruction::ADD(mut rtype) => Instruction::ADD(build_rtype(&mut rtype, args)?),
+        Instruction::ADDI(mut itype) => Instruction::ADDI(build_itype(&mut itype, args)?),
+
+        // unrecognized instruction
+        e => {
+            return Err(Error::Generic(format!(
+                "build_instruction - not implemented: {:?}",
+                e
+            )))
+        }
+    };
+
+    Ok(output)
+}
+
+fn build_itype(itype: &mut IType, args: &[Token]) -> Result<IType, Error> {
+    if let [Token::Register(rd), Token::Register(rs1), Token::Value32(imm)] = args {
+        itype.rd = *rd;
+        itype.rs1 = *rs1;
+        itype
+            .imm
+            .set_unsigned(*imm)
+            .map_err(|e| Error::Generic(format!("{:?}", e)))?;
+        Ok(*itype)
+    } else {
+        Err(Error::Generic(format!(
+            "Invalid RType arguments: {:?}",
+            args
+        )))
+    }
+}
+
+fn build_rtype(rtype: &mut RType, args: &[Token]) -> Result<RType, Error> {
+    if let [Token::Register(rd), Token::Register(rs1), Token::Register(rs2)] = args {
+        rtype.rd = *rd;
+        rtype.rs1 = *rs1;
+        rtype.rs2 = *rs2;
+        Ok(*rtype)
+    } else {
+        Err(Error::Generic(format!(
+            "Invalid RType arguments: {:?}",
+            args
+        )))
+    }
+}
+
+fn tokenize(input: Vec<String>) -> Result<Vec<Token>, Error> {
+    input.into_iter().map(tokenize_one).collect()
+}
+
+fn tokenize_one(input: String) -> Result<Token, Error> {
     let token = match input.as_str() {
         // registers
         "PC" => Token::Register(Register::PC),
@@ -230,11 +301,11 @@ fn normalize(input: &str) -> Vec<String> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[test]
-    fn test_normalize() {
+    fn normalize_input() {
         let a = "whitespace is   weird \t and can be dumb";
         let b = "commas ,are, ok\t,too";
 
@@ -246,7 +317,55 @@ mod test {
     }
 
     #[test]
-    fn test_tokenize() {
-        unimplemented!();
+    fn tokenize_input() {
+        let a = "ADD x1, x2, x3";
+
+        let normalized = normalize(a);
+        let result = tokenize(normalized);
+
+        assert!(result.is_ok());
+
+        let tokens = result.unwrap();
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::Instruction(Instruction::ADD(RType::default())),
+                Token::Register(Register::X1),
+                Token::Register(Register::X2),
+                Token::Register(Register::X3)
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_command() {
+        let a = "ADD x1, x2, x3";
+        let result = parse(a);
+
+        assert!(result.is_ok());
+
+        let rtype = RType {
+            rd: Register::X1,
+            rs1: Register::X2,
+            rs2: Register::X3,
+            ..Default::default()
+        };
+
+        assert_eq!(result.unwrap(), Command::Exec(Instruction::ADD(rtype)));
+    }
+
+    #[test]
+    fn trivial_add() {
+        let mut i = Interpreter::default();
+        i.cpu.x2 = 3;
+        i.cpu.x3 = 5;
+
+        assert_eq!(i.cpu.x1, 0);
+
+        let input = "ADD x1, x2, x3";
+        assert!(i.interpret(input).is_ok());
+
+        assert_eq!(i.cpu.x1, 8);
     }
 }

@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Instruction {
     // ✅ indicates it's implemented, not verified!
     ADD(RType),   // ✅

@@ -1,5 +1,5 @@
 /// Variably sized "immediate" values for RISC-V instruction formats (eg: [`IType`](crate::rv32_i::IType))
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone, Default, PartialEq)]
 pub struct Immediate {
     value: u32,
     bits: u8,

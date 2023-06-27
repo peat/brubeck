@@ -1,12 +1,21 @@
 //! # Brubeck: A RISC-V REPL in Progress
 //!
-//! Provides a "read, evaluate, print, loop" interactive environment for
+//! Brubeck provides a "read, evaluate, print, loop" interactive environment for
 //! RISC-V assembly language. What could be more fun?!
+//!
+//! From Wikipedia: _"[Dave Brubeck](https://en.wikipedia.org/wiki/Dave_Brubeck)
+//! was an American jazz pianist and composer. Often regarded as a foremost
+//! exponent of cool jazz, Brubeck's work is characterized by unusual time
+//! signatures and superimposing contrasting rhythms, meters, and tonalities.
+//! [His song] "Take Five" became the highest-selling jazz single of all time."_
 //!
 //! ## HERE BE DRAGONS
 //!
-//! Don't expect this to work out of the box. I'm working the kinks out of the
-//! RV32I implementation to start; interactivity coming soon!
+//! Don't expect this to work out of the box. There is a lot of nuance in the
+//! behavior of an ISA, particularly with error modes, addressing, etc.
+//!
+//! The very basic stuff works great. Go ahead and ADD and SUB to your hart's
+//! content. Don't rely on it for anything else quite yet.
 //!
 //! ## Running
 //!
@@ -17,10 +26,12 @@
 //! `sp` if you prefer the [ABI](crate::rv32_i::ABI) name). To examine a
 //! region in memory ... well, that's TBD.
 //!
-//! To execute an instruction, type in its name and arguments (eg: `nop`).
+//! To execute an instruction, type in its name and arguments (eg: `nop` or `addi x2, x0, 5`).
 //!
-//! Only `NOP` is supported in the REPL, however, the majority of the RV32I
-//! instruction set is implemented in the library.
+//! The majority of the RV32I instruction set is implemented, with a couple of
+//! exceptions (eg: EBREAK, ECALL, EFENCE).
+//!
+//! For information about the implementation, see the [Interpreter](crate::interpreter).
 //!
 //! ## The Library
 //!
@@ -102,18 +113,12 @@
 //!
 //! ```
 //!
-//! ## Origin of the Name
-//!
-//! From Wikipedia: _"[Dave Brubeck](https://en.wikipedia.org/wiki/Dave_Brubeck)
-//! was an American jazz pianist and composer. Often regarded as a foremost
-//! exponent of cool jazz, Brubeck's work is characterized by unusual time
-//! signatures and superimposing contrasting rhythms, meters, and tonalities.
-//! [His song] "Take Five" became the highest-selling jazz single of all time."_
 
+/// Provides immediate value checks, conversions, etc.
 mod immediate;
 
-/// Parses and executes REPL instructions and commands.
 pub mod interpreter;
 pub mod rv32_i;
 
 pub use immediate::Immediate;
+pub use interpreter::Interpreter;

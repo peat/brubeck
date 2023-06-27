@@ -1,9 +1,11 @@
-//! Implementation of the RV32I ISA
+//! Implementation of the RISC-V 32bit Integer Base (RV32I) ISA
+//!
+//! This includes the [CPU], [instructions](Instruction), encoding [formats](formats), and [registers](Register).
 
-mod cpu;
-mod formats;
-mod instructions;
-mod registers;
+pub mod cpu;
+pub mod formats;
+pub mod instructions;
+pub mod registers;
 
 pub use cpu::*;
 pub use formats::*;

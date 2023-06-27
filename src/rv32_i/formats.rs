@@ -1,3 +1,5 @@
+//! Encoding formats for RV32I instructions.
+
 use crate::rv32_i::Register;
 use crate::Immediate;
 

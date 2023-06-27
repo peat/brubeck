@@ -1,3 +1,31 @@
+//! The interpreter takes input, parses it, and executes it in the [CPU](crate::rv32_i::CPU)
+//!
+//! Right now it demonstrates a basic proof of concept; next steps will be making the results and
+//! errors much more useful instead of being Strings.
+//!
+//! Future work will be extending the interpreter input language to more closely match standard
+//! RISC-V assembly; at the moment it's extremely bare bones.
+//!
+//! ## Examples
+//!
+//! ```
+//! use brubeck::interpreter::Interpreter;
+//!
+//! let mut i = Interpreter::new();
+//!
+//! // output will be a Result<String, Error>, in this case a Debug representation of an ADDI
+//! // instruction with `rd` set to `x1`, `rs1` set to `zero`, and `imm` set to `3`. It won't
+//! // generate the opcode or other parts of the instruction yet.
+//! let output = i.interpret("ADDI x1, zero, 3");
+//! assert!(output.is_ok());
+//!
+//! // the output will be a String containing the value of the `PC` register, which increments
+//! // by 4 bytes with each instruction executed. `PC` and other registers don't change when
+//! // inspected directly.
+//! let output = i.interpret("PC");
+//! assert!(output.is_ok());
+//! ```
+
 use std::fmt::Display;
 
 use crate::rv32_i::{BType, IType, Instruction, JType, RType, Register, SType, UType, ABI, CPU};
@@ -8,18 +36,22 @@ pub struct Interpreter {
 }
 
 impl Interpreter {
+    /// Creates a new Interpreter with 1 mebibyte of memory.
     pub fn new() -> Self {
         Self {
             cpu: CPU::default(), // initializes with 1 mebibyte of memory
         }
     }
 
+    /// Interprets a single command, which could be an instruction (eg: `ADDI x1, zero, 3`) or an
+    /// inspection for registers or memory (eg: `PC` or `X1`). Returns a String or an Error that's
+    /// also just a String. This needs some work.
     pub fn interpret(&mut self, input: &str) -> Result<String, Error> {
         let command = parse(input)?;
-
         self.run_command(command)
     }
 
+    /// Executes an [Instruction] directly, skipping the parsing steps.
     pub fn execute(&mut self, instruction: Instruction) -> Result<String, Error> {
         match self.cpu.execute(instruction) {
             Ok(()) => Ok(format!("{:?}", instruction)),
@@ -27,10 +59,10 @@ impl Interpreter {
         }
     }
 
+    /// Executes a [Command], which can be an instruction or an inspection
     pub fn run_command(&mut self, input: Command) -> Result<String, Error> {
         match input {
             Command::Exec(instruction) => self.execute(instruction),
-            Command::PC => Ok(format!("pc: {} (0x{:x})", self.cpu.pc, self.cpu.pc)),
             Command::Inspect(r) => Ok(format!(
                 "{:?}: {:?} (0x{:x})",
                 r,
@@ -43,7 +75,6 @@ impl Interpreter {
 
 #[derive(Debug, PartialEq)]
 pub enum Command {
-    PC,
     Inspect(Register),
     Exec(Instruction),
 }
@@ -102,17 +133,114 @@ fn build_instruction(instruction: &mut Instruction, args: &[Token]) -> Result<In
         // build instructions
         Instruction::ADD(mut rtype) => Instruction::ADD(build_rtype(&mut rtype, args)?),
         Instruction::ADDI(mut itype) => Instruction::ADDI(build_itype(&mut itype, args)?),
-
-        // unrecognized instruction
-        e => {
-            return Err(Error::Generic(format!(
-                "build_instruction - not implemented: {:?}",
-                e
-            )))
-        }
+        Instruction::AND(mut rtype) => Instruction::AND(build_rtype(&mut rtype, args)?),
+        Instruction::ANDI(mut itype) => Instruction::ANDI(build_itype(&mut itype, args)?),
+        Instruction::AUIPC(mut utype) => Instruction::AUIPC(build_utype(&mut utype, args)?),
+        Instruction::BEQ(mut btype) => Instruction::BEQ(build_btype(&mut btype, args)?),
+        Instruction::BGE(mut btype) => Instruction::BGE(build_btype(&mut btype, args)?),
+        Instruction::BGEU(mut btype) => Instruction::BGEU(build_btype(&mut btype, args)?),
+        Instruction::BLT(mut btype) => Instruction::BLT(build_btype(&mut btype, args)?),
+        Instruction::BLTU(mut btype) => Instruction::BLTU(build_btype(&mut btype, args)?),
+        Instruction::BNE(mut btype) => Instruction::BNE(build_btype(&mut btype, args)?),
+        Instruction::EBREAK(mut itype) => Instruction::EBREAK(build_itype(&mut itype, args)?),
+        Instruction::ECALL(mut itype) => Instruction::ECALL(build_itype(&mut itype, args)?),
+        Instruction::FENCE(mut itype) => Instruction::FENCE(build_itype(&mut itype, args)?),
+        Instruction::JAL(mut jtype) => Instruction::JAL(build_jtype(&mut jtype, args)?),
+        Instruction::JALR(mut itype) => Instruction::JALR(build_itype(&mut itype, args)?),
+        Instruction::LB(mut itype) => Instruction::LB(build_itype(&mut itype, args)?),
+        Instruction::LBU(mut itype) => Instruction::LBU(build_itype(&mut itype, args)?),
+        Instruction::LH(mut itype) => Instruction::LH(build_itype(&mut itype, args)?),
+        Instruction::LHU(mut itype) => Instruction::LHU(build_itype(&mut itype, args)?),
+        Instruction::LUI(mut utype) => Instruction::LUI(build_utype(&mut utype, args)?),
+        Instruction::LW(mut itype) => Instruction::LW(build_itype(&mut itype, args)?),
+        Instruction::NOP => Instruction::NOP,
+        Instruction::OR(mut rtype) => Instruction::OR(build_rtype(&mut rtype, args)?),
+        Instruction::ORI(mut itype) => Instruction::ORI(build_itype(&mut itype, args)?),
+        Instruction::SB(mut stype) => Instruction::SB(build_stype(&mut stype, args)?),
+        Instruction::SH(mut stype) => Instruction::SH(build_stype(&mut stype, args)?),
+        Instruction::SLL(mut rtype) => Instruction::SLL(build_rtype(&mut rtype, args)?),
+        Instruction::SLLI(mut itype) => Instruction::SLLI(build_itype(&mut itype, args)?),
+        Instruction::SLT(mut rtype) => Instruction::SLT(build_rtype(&mut rtype, args)?),
+        Instruction::SLTI(mut itype) => Instruction::SLTI(build_itype(&mut itype, args)?),
+        Instruction::SLTIU(mut itype) => Instruction::SLTIU(build_itype(&mut itype, args)?),
+        Instruction::SLTU(mut rtype) => Instruction::SLTU(build_rtype(&mut rtype, args)?),
+        Instruction::SRA(mut rtype) => Instruction::SRA(build_rtype(&mut rtype, args)?),
+        Instruction::SRAI(mut itype) => Instruction::SRAI(build_itype(&mut itype, args)?),
+        Instruction::SRL(mut rtype) => Instruction::SRL(build_rtype(&mut rtype, args)?),
+        Instruction::SRLI(mut itype) => Instruction::SRLI(build_itype(&mut itype, args)?),
+        Instruction::SUB(mut rtype) => Instruction::SUB(build_rtype(&mut rtype, args)?),
+        Instruction::SW(mut stype) => Instruction::SW(build_stype(&mut stype, args)?),
+        Instruction::XOR(mut rtype) => Instruction::XOR(build_rtype(&mut rtype, args)?),
+        Instruction::XORI(mut itype) => Instruction::XORI(build_itype(&mut itype, args)?),
     };
 
     Ok(output)
+}
+
+fn build_utype(utype: &mut UType, args: &[Token]) -> Result<UType, Error> {
+    if let [Token::Register(rd), Token::Value32(imm)] = args {
+        utype.rd = *rd;
+        utype
+            .imm
+            .set_unsigned(*imm)
+            .map_err(|e| Error::Generic(format!("{:?}", e)))?;
+        Ok(*utype)
+    } else {
+        Err(Error::Generic(format!(
+            "Invalid UType arguments: {:?}",
+            args
+        )))
+    }
+}
+
+fn build_jtype(jtype: &mut JType, args: &[Token]) -> Result<JType, Error> {
+    if let [Token::Register(rd), Token::Value32(imm)] = args {
+        jtype.rd = *rd;
+        jtype
+            .imm
+            .set_unsigned(*imm)
+            .map_err(|e| Error::Generic(format!("{:?}", e)))?;
+        Ok(*jtype)
+    } else {
+        Err(Error::Generic(format!(
+            "Invalid JType arguments: {:?}",
+            args
+        )))
+    }
+}
+
+fn build_btype(btype: &mut BType, args: &[Token]) -> Result<BType, Error> {
+    if let [Token::Register(rs1), Token::Register(rs2), Token::Value32(imm)] = args {
+        btype.rs1 = *rs1;
+        btype.rs2 = *rs2;
+        btype
+            .imm
+            .set_unsigned(*imm)
+            .map_err(|e| Error::Generic(format!("{:?}", e)))?;
+        Ok(*btype)
+    } else {
+        Err(Error::Generic(format!(
+            "Invalid BType arguments: {:?}",
+            args
+        )))
+    }
+}
+
+fn build_stype(stype: &mut SType, args: &[Token]) -> Result<SType, Error> {
+    if let [Token::Register(rs1), Token::Register(rs2), Token::Value32(imm)] = args {
+        stype.rs1 = *rs1;
+        stype.rs2 = *rs2;
+        stype
+            .imm
+            .set_unsigned(*imm)
+            .map_err(|e| Error::Generic(format!("{:?}", e)))?;
+        Ok(*stype)
+    } else {
+        Err(Error::Generic(format!(
+            "Invalid SType arguments: {:?}",
+            args
+        )))
+    }
 }
 
 fn build_itype(itype: &mut IType, args: &[Token]) -> Result<IType, Error> {
@@ -126,7 +254,7 @@ fn build_itype(itype: &mut IType, args: &[Token]) -> Result<IType, Error> {
         Ok(*itype)
     } else {
         Err(Error::Generic(format!(
-            "Invalid RType arguments: {:?}",
+            "Invalid IType arguments: {:?}",
             args
         )))
     }

@@ -1,12 +1,13 @@
+//! Represents the state of registers and memory for a little endian, single
+//! hardware thread ("hart") RV32I CPU.
+//!
+//! Registers can be accessed directly, via `get_register()`, or `get_abi()`
+//! (for [ABI](crate::rv32_i::ABI) aliases). Registers operate as native u32 values for ease of use.
+//! Memory operates as little endian, so the 16-bit value `0x12ab` would be
+//! stored in memory as `[0xab, 0x12]`.
+
 use super::*;
 
-/// Represents the state of registers and memory for a little endian, single
-/// hardware thread ("hart") RV32I CPU.
-///
-/// Registers can be accessed directly, via `get_register()`, or `get_abi()`
-/// (for [ABI](crate::rv32_i::ABI) aliases). Registers operate as native u32 values for ease of use.
-/// Memory operates as little endian, so the 16-bit value `0x12ab` would be
-/// stored in memory as `[0xab, 0x12]`.
 #[derive(Debug, Clone)]
 pub struct CPU {
     pub memory: Vec<u8>,

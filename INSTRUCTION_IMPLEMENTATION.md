@@ -107,13 +107,21 @@ Common RISC-V pseudo-instructions that expand to real instructions:
 - RET → JALR x0, x1, 0
 - LI rd, imm → ADDI/LUI+ADDI sequence
 
-### Not Present (6 CSR instructions)
-- CSRRW - Atomic Read/Write CSR
-- CSRRS - Atomic Read and Set Bits
-- CSRRC - Atomic Read and Clear Bits
-- CSRRWI - Immediate variant of CSRRW
-- CSRRSI - Immediate variant of CSRRS
-- CSRRCI - Immediate variant of CSRRC
+### In Progress (6 CSR instructions)
+CSR infrastructure complete with comprehensive test suite. Implementation in progress:
+- CSRRW - Atomic Read/Write CSR ⚠️ (tests ready, execution methods pending)
+- CSRRS - Atomic Read and Set Bits ⚠️ (tests ready, execution methods pending)
+- CSRRC - Atomic Read and Clear Bits ⚠️ (tests ready, execution methods pending)
+- CSRRWI - Immediate variant of CSRRW ⚠️ (tests ready, execution methods pending)
+- CSRRSI - Immediate variant of CSRRS ⚠️ (tests ready, execution methods pending)
+- CSRRCI - Immediate variant of CSRRC ⚠️ (tests ready, execution methods pending)
+
+**CSR Infrastructure Complete:**
+- 4096 CSR address space with existence and read-only tracking
+- Standard CSRs initialized (mstatus, misa, cycle, time, instret, etc.)
+- WARL behavior for mstatus register
+- Comprehensive test suite with 25+ tests covering spec compliance
+- Educational documentation with RISC-V spec references
 
 ## References
 - RV32I Base Integer Instruction Set: `riscv-isa-manual/src/rv32.adoc`

@@ -39,9 +39,9 @@ x3
 
 ## TODO
 
-* Add CSR (Control and Status Register) instructions
+* Complete CSR instruction execution methods (infrastructure and tests ready)
 * Add memory inspection commands
-* Improve parser error messages and validation
+* Implement CSR instruction parsing in REPL
 
 ## Contact
 

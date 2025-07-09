@@ -724,7 +724,6 @@ impl CPU {
     /// rd. Stores copy the value in register rs2 to memory
     ///
     /// The LW instruction loads a 32-bit value from memory into rd.
-
     fn rv32i_lw(&mut self, instruction: IType) -> Result<(), Error> {
         let rs1 = self.get_register(instruction.rs1);
         let imm = instruction.imm.as_u32();

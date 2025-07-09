@@ -54,8 +54,8 @@ impl Interpreter {
     /// Executes an [Instruction] directly, skipping the parsing steps.
     pub fn execute(&mut self, instruction: Instruction) -> Result<String, Error> {
         match self.cpu.execute(instruction) {
-            Ok(()) => Ok(format!("{:?}", instruction)),
-            e => Err(Error::Generic(format!("{:?}", e))),
+            Ok(()) => Ok(format!("{instruction:?}")),
+            e => Err(Error::Generic(format!("{e:?}"))),
         }
     }
 
@@ -96,7 +96,7 @@ impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let err_string = match self {
             Self::Generic(s) => s.to_owned(),
-            Self::UnrecognizedToken(s) => format!("Unrecognized token: '{}'", s),
+            Self::UnrecognizedToken(s) => format!("Unrecognized token: '{s}'"),
         };
 
         write!(f, "{err_string}")
@@ -123,7 +123,7 @@ fn build_command(tokens: &mut Vec<Token>) -> Result<Command, Error> {
 
     match first_token {
         Token::Register(register) => Ok(Command::Inspect(register)),
-        Token::Value32(value) => Err(Error::Generic(format!("Value: {}", value))),
+        Token::Value32(value) => Err(Error::Generic(format!("Value: {value}"))),
         Token::Instruction(mut i) => Ok(Command::Exec(build_instruction(&mut i, tokens)?)),
     }
 }
@@ -183,12 +183,11 @@ fn build_utype(utype: &mut UType, args: &[Token]) -> Result<UType, Error> {
         utype
             .imm
             .set_unsigned(*imm)
-            .map_err(|e| Error::Generic(format!("{:?}", e)))?;
+            .map_err(|e| Error::Generic(format!("{e:?}")))?;
         Ok(*utype)
     } else {
         Err(Error::Generic(format!(
-            "Invalid UType arguments: {:?}",
-            args
+            "Invalid UType arguments: {args:?}"
         )))
     }
 }
@@ -199,12 +198,11 @@ fn build_jtype(jtype: &mut JType, args: &[Token]) -> Result<JType, Error> {
         jtype
             .imm
             .set_unsigned(*imm)
-            .map_err(|e| Error::Generic(format!("{:?}", e)))?;
+            .map_err(|e| Error::Generic(format!("{e:?}")))?;
         Ok(*jtype)
     } else {
         Err(Error::Generic(format!(
-            "Invalid JType arguments: {:?}",
-            args
+            "Invalid JType arguments: {args:?}"
         )))
     }
 }
@@ -216,12 +214,11 @@ fn build_btype(btype: &mut BType, args: &[Token]) -> Result<BType, Error> {
         btype
             .imm
             .set_unsigned(*imm)
-            .map_err(|e| Error::Generic(format!("{:?}", e)))?;
+            .map_err(|e| Error::Generic(format!("{e:?}")))?;
         Ok(*btype)
     } else {
         Err(Error::Generic(format!(
-            "Invalid BType arguments: {:?}",
-            args
+            "Invalid BType arguments: {args:?}"
         )))
     }
 }
@@ -233,12 +230,11 @@ fn build_stype(stype: &mut SType, args: &[Token]) -> Result<SType, Error> {
         stype
             .imm
             .set_unsigned(*imm)
-            .map_err(|e| Error::Generic(format!("{:?}", e)))?;
+            .map_err(|e| Error::Generic(format!("{e:?}")))?;
         Ok(*stype)
     } else {
         Err(Error::Generic(format!(
-            "Invalid SType arguments: {:?}",
-            args
+            "Invalid SType arguments: {args:?}"
         )))
     }
 }
@@ -250,12 +246,11 @@ fn build_itype(itype: &mut IType, args: &[Token]) -> Result<IType, Error> {
         itype
             .imm
             .set_unsigned(*imm)
-            .map_err(|e| Error::Generic(format!("{:?}", e)))?;
+            .map_err(|e| Error::Generic(format!("{e:?}")))?;
         Ok(*itype)
     } else {
         Err(Error::Generic(format!(
-            "Invalid IType arguments: {:?}",
-            args
+            "Invalid IType arguments: {args:?}"
         )))
     }
 }
@@ -268,8 +263,7 @@ fn build_rtype(rtype: &mut RType, args: &[Token]) -> Result<RType, Error> {
         Ok(*rtype)
     } else {
         Err(Error::Generic(format!(
-            "Invalid RType arguments: {:?}",
-            args
+            "Invalid RType arguments: {args:?}"
         )))
     }
 }

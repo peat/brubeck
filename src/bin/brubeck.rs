@@ -13,9 +13,9 @@ fn main() -> io::Result<()> {
         io::stdin().read_line(&mut buffer)?;
 
         let output = match interpreter.interpret(&buffer) {
-            Ok(s) => format!("✅ {}", s),
-            Err(s) => format!("❌ {}", s),
+            Ok(s) => format!("✅ {s}"),
+            Err(s) => format!("❌ {s}"),
         };
-        println!("=> {}", output);
+        println!("=> {output}");
     }
 }

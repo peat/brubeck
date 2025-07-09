@@ -223,10 +223,13 @@ impl Display for Error {
 ///
 /// # Examples
 /// ```
-/// let cmd = parse("ADDI x1, zero, 100")?;     // Immediate instruction
-/// let cmd = parse("LW x1, 4(x2)")?;           // Load with offset notation  
-/// let cmd = parse("MV x1, x2")?;              // Pseudo-instruction
-/// let cmd = parse("x1")?;                     // Register inspection
+/// use brubeck::interpreter::Interpreter;
+/// 
+/// let mut interpreter = Interpreter::new();
+/// let result = interpreter.interpret("ADDI x1, zero, 100");     // Immediate instruction
+/// let result = interpreter.interpret("LW x1, 4(x2)");           // Load with offset notation  
+/// let result = interpreter.interpret("MV x1, x2");              // Pseudo-instruction
+/// let result = interpreter.interpret("x1");                     // Register inspection
 /// ```
 ///
 /// # Educational Notes

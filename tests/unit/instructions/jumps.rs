@@ -2,186 +2,218 @@
 //!
 //! These tests verify unconditional jumps, link register behavior,
 //! and alignment requirements as specified in the RISC-V ISA.
+//!
+//! Reference: RISC-V ISA Manual, Volume I: Unprivileged ISA, Version 20191213
+//! Section 2.5 - Control Transfer Instructions
+//!
+//! Key concepts:
+//! - JAL: Jump And Link - PC-relative jump with return address
+//! - JALR: Jump And Link Register - register-indirect jump
+//! - Return address = PC + 4 (next instruction)
+//! - JAL offset is in multiples of 2 (like branches)
+//! - JALR clears LSB of target address for alignment
+//!
+//! Common patterns:
+//! ```
+//! JAL ra, function    # Call function (ra = x1)
+//! ...
+//! JALR x0, 0(ra)     # Return from function
+//! ```
 
 use brubeck::rv32_i::{
-    cpu::CPU,
     formats::{IType, JType},
     instructions::Instruction,
     registers::Register,
 };
 
+// Import test helpers
+use crate::unit::test_helpers::{CpuAssertions, CpuBuilder, ExecuteWithContext};
+
 #[test]
 fn test_jal_basic() {
-    let mut cpu = CPU::default();
+    // JAL: Jump And Link
+    // rd = PC + 4; PC = PC + sign_extend(immediate)
+    // Used for function calls when offset is known at compile time
+    let mut cpu = CpuBuilder::new().with_pc(0).build();
+
     let mut inst = JType::default();
-    
-    inst.rd = Register::X1;
-    inst.imm.set_unsigned(4).unwrap(); // Jump offset of 4 (will be multiplied by 2)
-    
+    inst.rd = Register::X1; // Standard link register (ra)
+    inst.imm.set_unsigned(4).unwrap(); // Encoded offset (actual: 4*2 = 8)
+
     let jal = Instruction::JAL(inst);
-    let result = cpu.execute(jal);
-    assert!(result.is_ok());
-    
-    // JAL jumps to PC + (immediate * 2)
-    assert_eq!(cpu.pc, 8, "JAL: PC should be 0 + (4 * 2) = 8");
-    
-    // JAL stores return address (PC + 4) in rd
-    assert_eq!(cpu.x1, 4, "JAL: Return address should be stored in x1");
+    cpu.execute_expect(jal, "JAL forward jump");
+
+    // JAL performs two operations:
+    cpu.assert_pc(8, "PC = 0 + 8 (forward jump)");
+    cpu.assert_register(Register::X1, 4, "ra = PC + 4 (return address)");
 }
 
 #[test]
 fn test_jal_misalignment() {
-    // JAL requires target address to be 4-byte aligned in RV32I
-    let mut cpu = CPU::default();
+    // RV32I requires 4-byte alignment for instruction fetch
+    // JAL to misaligned address should fail
+    let mut cpu = CpuBuilder::new().with_pc(0).build();
+
     let mut inst = JType::default();
-    
     inst.rd = Register::X1;
-    inst.imm.set_unsigned(1).unwrap(); // Offset of 1 (will become 2, misaligned)
-    
+    inst.imm.set_unsigned(1).unwrap(); // Becomes offset 2 (not 4-byte aligned)
+
     let jal = Instruction::JAL(inst);
     let result = cpu.execute(jal);
-    
-    assert!(result.is_err(), 
-        "JAL: Should fail with misaligned target address (2 is not 4-byte aligned)");
+
+    assert!(
+        result.is_err(),
+        "JAL to address 2 should fail (requires 4-byte alignment)"
+    );
 }
 
 #[test]
 fn test_jal_negative_offset() {
-    let mut cpu = CPU::default();
+    // Backward jumps are used for loops and backward branches
+    let mut cpu = CpuBuilder::new().with_pc(1000).build();
+
     let mut inst = JType::default();
-    
-    // Start from a higher PC to test backward jump
-    cpu.pc = 1000;
-    
     inst.rd = Register::X1;
-    inst.imm.set_signed(-100).unwrap(); // Jump backward by 200 bytes
-    
+    inst.imm.set_signed(-100).unwrap(); // Encoded: -100, Actual: -200
+
     let jal = Instruction::JAL(inst);
-    cpu.execute(jal).unwrap();
-    
-    assert_eq!(cpu.pc, 800, "JAL: Should jump backward to 1000 + (-100 * 2) = 800");
-    assert_eq!(cpu.x1, 1004, "JAL: Return address should be 1000 + 4");
+    cpu.execute_expect(jal, "JAL backward jump");
+
+    cpu.assert_pc(800, "PC = 1000 + (-200) = 800");
+    cpu.assert_register(Register::X1, 1004, "ra saves next instruction");
 }
 
 #[test]
 fn test_jal_x0_destination() {
-    // JAL with rd=x0 is used for unconditional jumps without saving return address
-    let mut cpu = CPU::default();
+    // JAL x0, offset is effectively an unconditional jump (no return)
+    // Common pattern: infinite loops, goto statements
+    let mut cpu = CpuBuilder::new().with_pc(0).build();
+
     let mut inst = JType::default();
-    
-    inst.rd = Register::X0;
+    inst.rd = Register::X0; // Discard return address
     inst.imm.set_unsigned(10).unwrap();
-    
+
     let jal = Instruction::JAL(inst);
-    cpu.execute(jal).unwrap();
-    
-    assert_eq!(cpu.pc, 20, "JAL: Should jump even with x0 destination");
-    assert_eq!(cpu.get_register(Register::X0), 0, "x0 should remain zero");
+    cpu.execute_expect(jal, "JAL with x0 (goto)");
+
+    cpu.assert_pc(20, "Jump executed: PC = 0 + 20");
+    cpu.assert_register(Register::X0, 0, "x0 remains zero (write ignored)");
 }
 
 #[test]
 fn test_jalr_basic() {
-    let mut cpu = CPU::default();
+    // JALR: Jump And Link Register
+    // rd = PC + 4; PC = (rs1 + sign_extend(immediate)) & ~1
+    // Used for indirect jumps (function pointers, returns)
+    let mut cpu = CpuBuilder::new()
+        .with_pc(0)
+        .with_register(Register::X2, 100) // Base address
+        .build();
+
     let mut inst = IType::default();
-    
     inst.rs1 = Register::X2;
-    inst.rd = Register::X1;
-    inst.imm.set_unsigned(12).unwrap();
-    
-    // JALR jumps to rs1 + immediate
-    cpu.x2 = 0; // Base address in x2
-    
+    inst.rd = Register::X1; // Save return address
+    inst.imm.set_signed(12).unwrap();
+
     let jalr = Instruction::JALR(inst);
-    let result = cpu.execute(jalr);
-    assert!(result.is_ok());
-    
-    assert_eq!(cpu.pc, 12, "JALR: PC should be x2(0) + imm(12) = 12");
-    assert_eq!(cpu.x1, 4, "JALR: Return address should be stored in x1");
+    cpu.execute_expect(jalr, "JALR basic jump");
+
+    cpu.assert_pc(112, "PC = (100 + 12) & ~1 = 112");
+    cpu.assert_register(Register::X1, 4, "Return address saved");
 }
 
 #[test]
 fn test_jalr_with_base() {
-    let mut cpu = CPU::default();
+    // JALR with negative offset - common for computed jumps
+    let mut cpu = CpuBuilder::new()
+        .with_pc(0)
+        .with_register(Register::X2, 24) // Base address
+        .build();
+
     let mut inst = IType::default();
-    
     inst.rs1 = Register::X2;
     inst.rd = Register::X1;
     inst.imm.set_signed(-12).unwrap();
-    
-    cpu.pc = 0;
-    cpu.x2 = 24; // Base address
-    
+
     let jalr = Instruction::JALR(inst);
-    cpu.execute(jalr).unwrap();
-    
-    assert_eq!(cpu.pc, 12, "JALR: PC should be x2(24) + imm(-12) = 12");
-    assert_eq!(cpu.x1, 4, "JALR: Return address should be 0 + 4");
+    cpu.execute_expect(jalr, "JALR with negative offset");
+
+    cpu.assert_pc(12, "PC = 24 + (-12) = 12");
+    cpu.assert_register(Register::X1, 4, "Return address = 0 + 4");
 }
 
 #[test]
 fn test_jalr_least_significant_bit() {
-    // JALR sets the least-significant bit of the result to zero
-    let mut cpu = CPU::default();
+    // JALR clears LSB to ensure even address alignment
+    // This supports future compressed instructions (2-byte aligned)
+    let mut cpu = CpuBuilder::new()
+        .with_pc(0)
+        .with_register(Register::X2, 13) // Odd address
+        .build();
+
     let mut inst = IType::default();
-    
     inst.rs1 = Register::X2;
     inst.rd = Register::X1;
     inst.imm.set_unsigned(0).unwrap();
-    
-    // Set base to an odd address
-    cpu.x2 = 13; // Odd address
-    
+
     let jalr = Instruction::JALR(inst);
-    cpu.execute(jalr).unwrap();
-    
-    assert_eq!(cpu.pc, 12, 
-        "JALR: Should clear LSB, so 13 becomes 12");
+    cpu.execute_expect(jalr, "JALR with odd address");
+
+    cpu.assert_pc(12, "PC = 13 & ~1 = 12 (LSB cleared)");
 }
 
 #[test]
 fn test_jalr_return_pattern() {
-    // Common pattern: JALR x0, 0(x1) is used for function return
-    let mut cpu = CPU::default();
+    // Standard function return: JALR x0, 0(ra)
+    // This is the RET pseudo-instruction
+    let mut cpu = CpuBuilder::new()
+        .with_pc(0x2000) // Current function location
+        .with_register(Register::X1, 0x1000) // Return address (ra)
+        .build();
+
     let mut inst = IType::default();
-    
-    inst.rd = Register::X0;  // No need to save return address
-    inst.rs1 = Register::X1;  // Return address register
+    inst.rd = Register::X0; // Discard "return" address
+    inst.rs1 = Register::X1; // Jump to address in ra
     inst.imm.set_unsigned(0).unwrap();
-    
-    cpu.x1 = 0x1000; // Simulated return address
-    
+
     let jalr = Instruction::JALR(inst);
-    cpu.execute(jalr).unwrap();
-    
-    assert_eq!(cpu.pc, 0x1000, "JALR: Should return to address in x1");
-    assert_eq!(cpu.get_register(Register::X0), 0, "x0 should remain zero");
+    cpu.execute_expect(jalr, "Function return (RET)");
+
+    cpu.assert_pc(0x1000, "Returned to caller");
+    cpu.assert_register(Register::X0, 0, "x0 unchanged");
 }
 
-#[test] 
+#[test]
 fn test_jal_jalr_call_return() {
-    // Test function call and return pattern
-    let mut cpu = CPU::default();
-    
-    // 1. JAL to function (save return address)
+    // Complete function call/return sequence
+    // This demonstrates the standard RISC-V calling convention
+    let mut cpu = CpuBuilder::new()
+        .with_pc(0x1000) // Main program
+        .build();
+
+    // Step 1: Call function using JAL
     let mut jal_inst = JType::default();
-    jal_inst.rd = Register::X1;  // Return address register
+    jal_inst.rd = Register::X1; // Save return address in ra
     jal_inst.imm.set_unsigned(100).unwrap(); // Jump forward 200 bytes
-    
+
     let jal = Instruction::JAL(jal_inst);
-    cpu.execute(jal).unwrap();
-    
-    let return_addr = cpu.x1;
-    assert_eq!(return_addr, 4, "Return address should be saved");
-    assert_eq!(cpu.pc, 200, "Should jump to function");
-    
-    // 2. JALR to return (using saved address)
+    cpu.execute_expect(jal, "JAL to function");
+
+    // Verify function call
+    cpu.assert_pc(0x1000 + 200, "Jumped to function at 0x10C8");
+    cpu.assert_register(Register::X1, 0x1004, "Return address saved");
+
+    // Step 2: Simulate some work in the function
+    cpu.pc = 0x2000; // Function does some work...
+
+    // Step 3: Return from function using JALR (RET pseudo-instruction)
     let mut jalr_inst = IType::default();
-    jalr_inst.rd = Register::X0;  // Don't save return address
-    jalr_inst.rs1 = Register::X1; // Use saved return address
+    jalr_inst.rd = Register::X0; // RET doesn't save new return address
+    jalr_inst.rs1 = Register::X1; // Jump to saved return address
     jalr_inst.imm.set_unsigned(0).unwrap();
-    
+
     let jalr = Instruction::JALR(jalr_inst);
-    cpu.execute(jalr).unwrap();
-    
-    assert_eq!(cpu.pc, return_addr, "Should return to saved address");
+    cpu.execute_expect(jalr, "JALR return from function");
+
+    cpu.assert_pc(0x1004, "Returned to instruction after JAL");
 }

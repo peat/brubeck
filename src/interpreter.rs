@@ -1,10 +1,9 @@
 //! The interpreter takes input, parses it, and executes it in the [CPU](crate::rv32_i::CPU)
 //!
-//! Right now it demonstrates a basic proof of concept; next steps will be making the results and
-//! errors much more useful instead of being Strings.
-//!
-//! Future work will be extending the interpreter input language to more closely match standard
-//! RISC-V assembly; at the moment it's extremely bare bones.
+//! The interpreter supports standard RISC-V assembly syntax for the RV32I instruction
+//! set, including common pseudo-instructions. It can parse register names (both 
+//! x0-x31 and ABI names), immediate values in decimal/hex/binary formats, and 
+//! execute instructions or inspect register state.
 //!
 //! ## Examples
 //!
@@ -13,22 +12,22 @@
 //!
 //! let mut i = Interpreter::new();
 //!
-//! // output will be a Result<String, Error>, in this case a Debug representation of an ADDI
-//! // instruction with `rd` set to `x1`, `rs1` set to `zero`, and `imm` set to `3`. It won't
-//! // generate the opcode or other parts of the instruction yet.
+//! // Execute an ADDI instruction that sets register x1 to 3
 //! let output = i.interpret("ADDI x1, zero, 3");
 //! assert!(output.is_ok());
 //!
-//! // the output will be a String containing the value of the `PC` register, which increments
-//! // by 4 bytes with each instruction executed. `PC` and other registers don't change when
-//! // inspected directly.
+//! // Inspect register x1 to see its value
+//! let output = i.interpret("x1");
+//! assert!(output.unwrap().contains("3"));
+//!
+//! // The PC register shows the current program counter
 //! let output = i.interpret("PC");
 //! assert!(output.is_ok());
 //! ```
 
 use std::fmt::Display;
 
-use crate::rv32_i::{BType, IType, Instruction, JType, RType, Register, SType, UType, ABI, CPU};
+use crate::rv32_i::{BType, IType, Instruction, JType, PseudoInstruction, RType, Register, SType, UType, ABI, CPU};
 
 #[derive(Default)]
 pub struct Interpreter {
@@ -44,8 +43,8 @@ impl Interpreter {
     }
 
     /// Interprets a single command, which could be an instruction (eg: `ADDI x1, zero, 3`) or an
-    /// inspection for registers or memory (eg: `PC` or `X1`). Returns a String or an Error that's
-    /// also just a String. This needs some work.
+    /// inspection for registers (eg: `PC` or `X1`). Returns a String representation of the 
+    /// result or an Error.
     pub fn interpret(&mut self, input: &str) -> Result<String, Error> {
         let command = parse(input)?;
         self.run_command(command)
@@ -63,6 +62,7 @@ impl Interpreter {
     pub fn run_command(&mut self, input: Command) -> Result<String, Error> {
         match input {
             Command::Exec(instruction) => self.execute(instruction),
+            Command::ExecPseudo(pseudo) => self.execute_pseudo(pseudo),
             Command::Inspect(r) => Ok(format!(
                 "{:?}: {:?} (0x{:x})",
                 r,
@@ -71,18 +71,44 @@ impl Interpreter {
             )),
         }
     }
+
+    /// Executes a pseudo-instruction by expanding it and running the real instructions
+    pub fn execute_pseudo(
+        &mut self,
+        pseudo: PseudoInstruction,
+    ) -> Result<String, Error> {
+        let instructions = pseudo
+            .expand()
+            .map_err(|e| Error::Generic(format!("Failed to expand pseudo-instruction: {e}")))?;
+
+        let mut results = Vec::new();
+        for inst in instructions {
+            match self.cpu.execute(inst) {
+                Ok(()) => results.push(format!("{inst:?}")),
+                Err(e) => return Err(Error::Generic(format!("{e:?}"))),
+            }
+        }
+
+        Ok(format!(
+            "Pseudo {:?} expanded to: {}",
+            pseudo,
+            results.join(", ")
+        ))
+    }
 }
 
 #[derive(Debug, PartialEq)]
 pub enum Command {
     Inspect(Register),
     Exec(Instruction),
+    ExecPseudo(PseudoInstruction),
 }
 
 #[derive(Debug, PartialEq)]
 pub enum Token {
     Register(Register),
     Instruction(Instruction),
+    PseudoInstruction(PseudoInstruction),
     Value32(u32),
 }
 
@@ -125,6 +151,9 @@ fn build_command(tokens: &mut Vec<Token>) -> Result<Command, Error> {
         Token::Register(register) => Ok(Command::Inspect(register)),
         Token::Value32(value) => Err(Error::Generic(format!("Value: {value}"))),
         Token::Instruction(mut i) => Ok(Command::Exec(build_instruction(&mut i, tokens)?)),
+        Token::PseudoInstruction(mut p) => Ok(Command::ExecPseudo(build_pseudo_instruction(
+            &mut p, tokens,
+        )?)),
     }
 }
 
@@ -177,6 +206,95 @@ fn build_instruction(instruction: &mut Instruction, args: &[Token]) -> Result<In
     Ok(output)
 }
 
+fn build_pseudo_instruction(
+    pseudo: &mut PseudoInstruction,
+    args: &[Token],
+) -> Result<PseudoInstruction, Error> {
+
+    let output = match pseudo {
+        PseudoInstruction::MV { rd: _, rs: _ } => {
+            if let [Token::Register(dest), Token::Register(src)] = args {
+                PseudoInstruction::MV {
+                    rd: *dest,
+                    rs: *src,
+                }
+            } else {
+                return Err(Error::Generic(format!("Invalid MV arguments: {args:?}")));
+            }
+        }
+        PseudoInstruction::NOT { rd: _, rs: _ } => {
+            if let [Token::Register(dest), Token::Register(src)] = args {
+                PseudoInstruction::NOT {
+                    rd: *dest,
+                    rs: *src,
+                }
+            } else {
+                return Err(Error::Generic(format!("Invalid NOT arguments: {args:?}")));
+            }
+        }
+        PseudoInstruction::SEQZ { rd: _, rs: _ } => {
+            if let [Token::Register(dest), Token::Register(src)] = args {
+                PseudoInstruction::SEQZ {
+                    rd: *dest,
+                    rs: *src,
+                }
+            } else {
+                return Err(Error::Generic(format!("Invalid SEQZ arguments: {args:?}")));
+            }
+        }
+        PseudoInstruction::SNEZ { rd: _, rs: _ } => {
+            if let [Token::Register(dest), Token::Register(src)] = args {
+                PseudoInstruction::SNEZ {
+                    rd: *dest,
+                    rs: *src,
+                }
+            } else {
+                return Err(Error::Generic(format!("Invalid SNEZ arguments: {args:?}")));
+            }
+        }
+        PseudoInstruction::J { offset: _ } => {
+            if let [Token::Value32(val)] = args {
+                PseudoInstruction::J {
+                    offset: *val as i32,
+                }
+            } else {
+                return Err(Error::Generic(format!("Invalid J arguments: {args:?}")));
+            }
+        }
+        PseudoInstruction::JR { rs: _ } => {
+            if let [Token::Register(src)] = args {
+                PseudoInstruction::JR { rs: *src }
+            } else {
+                return Err(Error::Generic(format!("Invalid JR arguments: {args:?}")));
+            }
+        }
+        PseudoInstruction::RET => {
+            if args.is_empty() {
+                PseudoInstruction::RET
+            } else {
+                return Err(Error::Generic(format!("RET takes no arguments, got: {args:?}")));
+            }
+        }
+        PseudoInstruction::LI { rd: _, imm: _ } => {
+            if let [Token::Register(dest), Token::Value32(val)] = args {
+                PseudoInstruction::LI {
+                    rd: *dest,
+                    imm: *val as i32,
+                }
+            } else {
+                return Err(Error::Generic(format!("Invalid LI arguments: {args:?}")));
+            }
+        }
+        PseudoInstruction::LA { .. } => {
+            return Err(Error::Generic(
+                "LA pseudo-instruction not yet implemented".to_string(),
+            ));
+        }
+    };
+
+    Ok(output)
+}
+
 fn build_utype(utype: &mut UType, args: &[Token]) -> Result<UType, Error> {
     if let [Token::Register(rd), Token::Value32(imm)] = args {
         utype.rd = *rd;
@@ -186,9 +304,7 @@ fn build_utype(utype: &mut UType, args: &[Token]) -> Result<UType, Error> {
             .map_err(|e| Error::Generic(format!("{e:?}")))?;
         Ok(*utype)
     } else {
-        Err(Error::Generic(format!(
-            "Invalid UType arguments: {args:?}"
-        )))
+        Err(Error::Generic(format!("Invalid UType arguments: {args:?}")))
     }
 }
 
@@ -201,9 +317,7 @@ fn build_jtype(jtype: &mut JType, args: &[Token]) -> Result<JType, Error> {
             .map_err(|e| Error::Generic(format!("{e:?}")))?;
         Ok(*jtype)
     } else {
-        Err(Error::Generic(format!(
-            "Invalid JType arguments: {args:?}"
-        )))
+        Err(Error::Generic(format!("Invalid JType arguments: {args:?}")))
     }
 }
 
@@ -217,9 +331,7 @@ fn build_btype(btype: &mut BType, args: &[Token]) -> Result<BType, Error> {
             .map_err(|e| Error::Generic(format!("{e:?}")))?;
         Ok(*btype)
     } else {
-        Err(Error::Generic(format!(
-            "Invalid BType arguments: {args:?}"
-        )))
+        Err(Error::Generic(format!("Invalid BType arguments: {args:?}")))
     }
 }
 
@@ -233,9 +345,7 @@ fn build_stype(stype: &mut SType, args: &[Token]) -> Result<SType, Error> {
             .map_err(|e| Error::Generic(format!("{e:?}")))?;
         Ok(*stype)
     } else {
-        Err(Error::Generic(format!(
-            "Invalid SType arguments: {args:?}"
-        )))
+        Err(Error::Generic(format!("Invalid SType arguments: {args:?}")))
     }
 }
 
@@ -249,9 +359,7 @@ fn build_itype(itype: &mut IType, args: &[Token]) -> Result<IType, Error> {
             .map_err(|e| Error::Generic(format!("{e:?}")))?;
         Ok(*itype)
     } else {
-        Err(Error::Generic(format!(
-            "Invalid IType arguments: {args:?}"
-        )))
+        Err(Error::Generic(format!("Invalid IType arguments: {args:?}")))
     }
 }
 
@@ -262,9 +370,7 @@ fn build_rtype(rtype: &mut RType, args: &[Token]) -> Result<RType, Error> {
         rtype.rs2 = *rs2;
         Ok(*rtype)
     } else {
-        Err(Error::Generic(format!(
-            "Invalid RType arguments: {args:?}"
-        )))
+        Err(Error::Generic(format!("Invalid RType arguments: {args:?}")))
     }
 }
 
@@ -387,6 +493,35 @@ fn tokenize_one(input: String) -> Result<Token, Error> {
         "XOR" => Token::Instruction(Instruction::XOR(RType::default())),
         "XORI" => Token::Instruction(Instruction::XORI(IType::default())),
 
+        // Pseudo-instructions - these expand to real instructions
+        "MV" => Token::PseudoInstruction(PseudoInstruction::MV {
+            rd: Register::X0,
+            rs: Register::X0,
+        }),
+        "NOT" => Token::PseudoInstruction(PseudoInstruction::NOT {
+            rd: Register::X0,
+            rs: Register::X0,
+        }),
+        "SEQZ" => Token::PseudoInstruction(PseudoInstruction::SEQZ {
+            rd: Register::X0,
+            rs: Register::X0,
+        }),
+        "SNEZ" => Token::PseudoInstruction(PseudoInstruction::SNEZ {
+            rd: Register::X0,
+            rs: Register::X0,
+        }),
+        "J" => {
+            Token::PseudoInstruction(PseudoInstruction::J { offset: 0 })
+        }
+        "JR" => Token::PseudoInstruction(PseudoInstruction::JR {
+            rs: Register::X0,
+        }),
+        "RET" => Token::PseudoInstruction(PseudoInstruction::RET),
+        "LI" => Token::PseudoInstruction(PseudoInstruction::LI {
+            rd: Register::X0,
+            imm: 0,
+        }),
+
         // everything else could be a value
         _ => parse_value(input)?,
     };
@@ -396,8 +531,20 @@ fn tokenize_one(input: String) -> Result<Token, Error> {
 
 fn parse_value(input: String) -> Result<Token, Error> {
     // it's gotta be a number; we might build something more NASM-complete later
-    match input.parse::<i32>() {
-        Ok(value) => Ok(Token::Value32(value as u32)),
+    // Support hex (0x), binary (0b), and decimal
+    let value = if input.starts_with("0X") || input.starts_with("0x") {
+        // Parse hex
+        i32::from_str_radix(&input[2..], 16)
+    } else if input.starts_with("0B") || input.starts_with("0b") {
+        // Parse binary
+        i32::from_str_radix(&input[2..], 2)
+    } else {
+        // Parse decimal
+        input.parse::<i32>()
+    };
+
+    match value {
+        Ok(v) => Ok(Token::Value32(v as u32)),
         Err(_) => Err(Error::UnrecognizedToken(input)),
     }
 }

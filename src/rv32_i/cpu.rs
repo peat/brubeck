@@ -243,7 +243,9 @@ impl CPU {
             Instruction::SW(i) => self.rv32i_sw(i),
             Instruction::XOR(i) => self.rv32i_xor(i),
             Instruction::XORI(i) => self.rv32i_xori(i),
-            e => Err(Error::NotImplemented(e)),
+            Instruction::FENCE(_) => self.rv32i_fence(),
+            Instruction::ECALL(_) => self.rv32i_ecall(),
+            Instruction::EBREAK(_) => self.rv32i_ebreak(),
         }?;
 
         Ok(())
@@ -868,11 +870,52 @@ impl CPU {
 
         Ok(())
     }
+
+    /// FENCE instruction is used to order device I/O and memory accesses.
+    /// In a simple implementation, it can be implemented as a NOP.
+    ///
+    /// Reference: RISC-V ISA Manual, Volume I: Version 20191213
+    /// Section 2.7 - Memory Ordering Instructions
+    fn rv32i_fence(&mut self) -> Result<(), Error> {
+        // For a simple single-threaded implementation, FENCE acts as NOP
+        // In a more complex implementation, this would ensure memory ordering
+        self.increment_pc()
+    }
+
+    /// ECALL (Environment Call) is used to make a service request to the
+    /// execution environment. In a real system, this would trap to the OS.
+    ///
+    /// Reference: RISC-V ISA Manual, Volume I: Version 20191213
+    /// Section 2.8 - Environment Call and Breakpoints
+    fn rv32i_ecall(&mut self) -> Result<(), Error> {
+        // For now, we'll treat this as an unhandled system call
+        // In a real implementation, this would:
+        // 1. Save PC to a CSR (mepc/sepc/uepc)
+        // 2. Set mcause/scause/ucause to indicate an environment call
+        // 3. Transfer control to the trap handler
+        // For educational purposes, we'll return a specific error
+        Err(Error::EnvironmentCall)
+    }
+
+    /// EBREAK is used to return control to a debugging environment.
+    ///
+    /// Reference: RISC-V ISA Manual, Volume I: Version 20191213
+    /// Section 2.8 - Environment Call and Breakpoints
+    fn rv32i_ebreak(&mut self) -> Result<(), Error> {
+        // For now, we'll treat this as a breakpoint trap
+        // In a real implementation, this would:
+        // 1. Save PC to a CSR (mepc/sepc/uepc)
+        // 2. Set mcause/scause/ucause to indicate a breakpoint
+        // 3. Transfer control to the debugger
+        // For educational purposes, we'll return a specific error
+        Err(Error::Breakpoint)
+    }
 }
 
 #[derive(Debug, Clone)]
 pub enum Error {
-    NotImplemented(Instruction),
     MisalignedJump(u32),
     AccessViolation(u32),
+    EnvironmentCall,
+    Breakpoint,
 }

@@ -1,146 +1,158 @@
 //! Unit tests for arithmetic instructions (ADD, ADDI, SUB)
-//! 
+//!
 //! These tests verify the behavior of basic arithmetic operations as specified
 //! in the RISC-V ISA manual, including overflow behavior and sign extension.
+//!
+//! Reference: RISC-V ISA Manual, Volume I: Unprivileged ISA, Version 20191213
+//! Section 2.4 - Integer Computational Instructions
+//!
+//! Key concepts tested:
+//! - Modular arithmetic (overflow wraps at 2^32)
+//! - Sign extension of 12-bit immediates
+//! - x0 register special behavior (hardwired to zero)
 
 use brubeck::rv32_i::{
-    cpu::CPU,
     formats::{IType, RType},
     instructions::Instruction,
     registers::Register,
 };
 
+// Import test helpers
+use crate::unit::test_helpers::{values, CpuAssertions, CpuBuilder, ExecuteWithContext};
+
 #[test]
 fn test_add_sub_basic() {
-    let mut cpu = CPU::default();
-    let mut rtype = RType::default();
+    // ADD: rd = rs1 + rs2
+    // SUB: rd = rs1 - rs2
+    let mut cpu = CpuBuilder::new()
+        .with_register(Register::X2, 8)
+        .with_register(Register::X3, 4)
+        .build();
 
-    rtype.rd = Register::X1;
-    rtype.rs1 = Register::X2;
-    rtype.rs2 = Register::X3;
+    let rtype = RType {
+        rd: Register::X1,
+        rs1: Register::X2,
+        rs2: Register::X3,
+        ..Default::default()
+    };
 
     let add = Instruction::ADD(rtype);
     let sub = Instruction::SUB(rtype);
 
-    // Test zero values
-    assert_eq!(cpu.x1, 0);
-    assert_eq!(cpu.x2, 0);
-    assert_eq!(cpu.x3, 0);
+    // Test ADD: 8 + 4 = 12
+    cpu.execute_expect(add, "ADD: 8 + 4");
+    cpu.assert_register(Register::X1, 12, "ADD result");
 
-    let result = cpu.execute(add);
-    assert!(result.is_ok());
-    assert_eq!(cpu.x1, 0, "ADD: 0 + 0 should equal 0");
-
-    // Test non-overflowing add and sub
-    cpu.set_register(Register::X2, 8);
-    cpu.set_register(Register::X3, 4);
-
-    let result = cpu.execute(add);
-    assert!(result.is_ok());
-    assert_eq!(cpu.x1, 12, "ADD: 8 + 4 should equal 12");
-
-    let result = cpu.execute(sub);
-    assert!(result.is_ok());
-    assert_eq!(cpu.x1, 4, "SUB: 8 - 4 should equal 4");
+    // Test SUB: 8 - 4 = 4
+    cpu.execute_expect(sub, "SUB: 8 - 4");
+    cpu.assert_register(Register::X1, 4, "SUB result");
 }
 
 #[test]
 fn test_add_sub_overflow() {
-    // Test overflow behavior - RISC-V ignores overflow and keeps lower 32 bits
-    let mut cpu = CPU::default();
-    let mut rtype = RType::default();
+    // RISC-V spec: "Arithmetic overflow is ignored and the result is simply
+    // the low XLEN bits of the result" (XLEN=32 for RV32I)
+    let mut cpu = CpuBuilder::new()
+        .with_register(Register::X2, 3)
+        .with_register(Register::X3, values::U32_MAX - 1)
+        .build();
 
-    rtype.rd = Register::X1;
-    rtype.rs1 = Register::X2;
-    rtype.rs2 = Register::X3;
+    let rtype = RType {
+        rd: Register::X1,
+        rs1: Register::X2,
+        rs2: Register::X3,
+        ..Default::default()
+    };
 
     let add = Instruction::ADD(rtype);
     let sub = Instruction::SUB(rtype);
 
-    // Test unsigned overflow in addition
-    cpu.set_register(Register::X2, 3);
-    cpu.set_register(Register::X3, u32::MAX - 1);
+    // Test unsigned overflow in addition: 3 + (2^32-2) = 2^32+1 = 1 (mod 2^32)
+    cpu.execute_expect(add, "ADD with overflow");
+    cpu.assert_register(Register::X1, 1, "ADD overflow wraps to 1");
 
-    let result = cpu.execute(add);
-    assert!(result.is_ok());
-    assert_eq!(cpu.x1, 1, "ADD overflow: 3 + (2^32-2) should wrap to 1");
-
-    // Test subtraction with overflow
-    let result = cpu.execute(sub);
-    assert!(result.is_ok());
-    assert_eq!(cpu.x1, 5, "SUB overflow: 3 - (2^32-2) should wrap to 5");
+    // Test subtraction with overflow: 3 - (2^32-2) = 5 (mod 2^32)
+    cpu.execute_expect(sub, "SUB with underflow");
+    cpu.assert_register(Register::X1, 5, "SUB underflow wraps to 5");
 }
 
 #[test]
 fn test_addi_basic() {
-    let mut cpu = CPU::default();
-    let mut inst = IType::default();
+    // ADDI: rd = rs1 + sign_extend(immediate[11:0])
+    // Common uses: increment/decrement, stack pointer adjustment, load immediate
+    let mut cpu = CpuBuilder::new().build();
 
+    // Test 1: Add zero (NOP-like behavior when rd=rs1)
+    let mut inst = IType::default();
     inst.rd = Register::X1;
     inst.rs1 = Register::X1;
     inst.imm.set_unsigned(0).unwrap();
-
     let addi = Instruction::ADDI(inst);
+    cpu.execute_expect(addi, "ADDI with zero immediate");
+    cpu.assert_register(Register::X1, 0, "0 + 0 = 0");
 
-    // Test adding zero
-    let result = cpu.execute(addi);
-    assert!(result.is_ok());
-    assert_eq!(cpu.x1, 0, "ADDI: 0 + 0 should equal 0");
-
-    // Test positive immediate
+    // Test 2: Positive immediate (common increment pattern)
     inst.imm.set_unsigned(5).unwrap();
     let addi = Instruction::ADDI(inst);
-    let result = cpu.execute(addi);
-    assert!(result.is_ok());
-    assert_eq!(cpu.x1, 5, "ADDI: 0 + 5 should equal 5");
+    cpu.execute_expect(addi, "ADDI positive immediate");
+    cpu.assert_register(Register::X1, 5, "0 + 5 = 5");
 
-    // Test negative immediate (sign-extended)
-    let result = inst.imm.set_signed(-3);
-    assert!(result.is_ok());
+    // Test 3: Negative immediate (tests sign extension)
+    inst.imm.set_signed(-3).unwrap();
     let addi = Instruction::ADDI(inst);
-    let result = cpu.execute(addi);
-    assert!(result.is_ok());
-    assert_eq!(cpu.x1, 2, "ADDI: 5 + (-3) should equal 2");
+    cpu.execute_expect(addi, "ADDI negative immediate");
+    cpu.assert_register(Register::X1, 2, "5 + (-3) = 2");
 }
 
 #[test]
 fn test_addi_sign_extension() {
-    // Test that ADDI properly sign-extends 12-bit immediates
-    let mut cpu = CPU::default();
-    let mut inst = IType::default();
+    // RISC-V spec: ADDI sign-extends the 12-bit immediate to 32 bits
+    // This is critical for negative numbers and address calculations
+    let mut cpu = CpuBuilder::new().build();
 
-    inst.rd = Register::X1;
-    inst.rs1 = Register::X0; // Use x0 (always 0) as base
+    // Test boundary values for 12-bit signed immediate
+    let test_cases = [
+        (2047, 2047_u32, "max positive immediate (+2047)"),
+        (-2048, (-2048_i32) as u32, "max negative immediate (-2048)"),
+        (
+            -1,
+            values::NEG_ONE,
+            "negative one sign-extends to 0xFFFFFFFF",
+        ),
+        (1, 1, "positive values unchanged"),
+    ];
 
-    // Test maximum positive 12-bit immediate (2047)
-    inst.imm.set_signed(2047).unwrap();
-    let addi = Instruction::ADDI(inst);
-    cpu.execute(addi).unwrap();
-    assert_eq!(cpu.x1, 2047, "ADDI: Maximum positive immediate");
+    for (imm_val, expected, desc) in test_cases {
+        let mut inst = IType::default();
+        inst.rd = Register::X1;
+        inst.rs1 = Register::X0; // x0 = 0, so result = 0 + immediate
+        inst.imm.set_signed(imm_val).unwrap();
+        let addi = Instruction::ADDI(inst);
 
-    // Test minimum negative 12-bit immediate (-2048)
-    inst.imm.set_signed(-2048).unwrap();
-    let addi = Instruction::ADDI(inst);
-    cpu.execute(addi).unwrap();
-    assert_eq!(cpu.x1 as i32, -2048, "ADDI: Minimum negative immediate");
+        cpu.execute_expect(addi, desc);
+        cpu.assert_register(Register::X1, expected, desc);
+    }
 }
 
 #[test]
 fn test_x0_destination() {
-    // Test that writes to x0 are ignored (x0 always reads as zero)
-    let mut cpu = CPU::default();
-    let mut rtype = RType::default();
+    // RISC-V spec: x0 is hardwired to zero
+    // - Reads always return 0
+    // - Writes are ignored
+    let mut cpu = CpuBuilder::new()
+        .with_register(Register::X1, 100)
+        .with_register(Register::X2, 200)
+        .build();
 
-    rtype.rd = Register::X0; // Destination is x0
-    rtype.rs1 = Register::X1;
-    rtype.rs2 = Register::X2;
-
-    cpu.set_register(Register::X1, 100);
-    cpu.set_register(Register::X2, 200);
+    let rtype = RType {
+        rd: Register::X0, // Attempt to write to x0
+        rs1: Register::X1,
+        rs2: Register::X2,
+        ..Default::default()
+    };
 
     let add = Instruction::ADD(rtype);
-    cpu.execute(add).unwrap();
-    
-    assert_eq!(cpu.get_register(Register::X0), 0, 
-        "x0 should always read as zero, even after ADD attempt");
+    cpu.execute_expect(add, "ADD to x0 register");
+
+    cpu.assert_register(Register::X0, 0, "x0 remains zero after write attempt");
 }

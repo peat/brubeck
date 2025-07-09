@@ -2,345 +2,419 @@
 //!
 //! These tests verify memory access patterns, different widths (byte, halfword, word),
 //! sign extension behavior, and little-endian byte ordering.
+//!
+//! Reference: RISC-V ISA Manual, Volume I: Unprivileged ISA, Version 20191213
+//! Section 2.6 - Load and Store Instructions
+//!
+//! Key concepts tested:
+//! - Little-endian byte ordering
+//! - Sign extension (LB, LH) vs zero extension (LBU, LHU)
+//! - Immediate offset addressing
+//! - Memory alignment behavior
+//!
+//! Memory Layout Visualization (Little-Endian):
+//! Word 0x12345678 stored at address 1024:
+//! ```
+//! Address: [1024] [1025] [1026] [1027]
+//! Bytes:    0x78   0x56   0x34   0x12
+//!           LSB                    MSB
+//! ```
 
 use brubeck::rv32_i::{
-    cpu::CPU,
     formats::{IType, SType},
     instructions::Instruction,
     registers::Register,
 };
 
+// Import test helpers
+use crate::unit::test_helpers::{values, CpuAssertions, CpuBuilder, ExecuteWithContext};
+
 #[test]
 fn test_lw_basic() {
-    let mut cpu = CPU::default();
+    // LW: rd = sign_extend(memory[rs1 + sign_extend(immediate)])
+    // Loads 32-bit word from memory
+    let mut cpu = CpuBuilder::new()
+        .with_register(Register::X1, values::TEST_ADDR)
+        .with_memory_word_le(values::TEST_ADDR, 0x12345678)
+        .build();
+
     let mut inst = IType::default();
-    
-    // Set up memory with test pattern
-    cpu.memory[1024] = 0x78; // LSB
-    cpu.memory[1025] = 0x56;
-    cpu.memory[1026] = 0x34;
-    cpu.memory[1027] = 0x12; // MSB
-    
-    cpu.x1 = 1024; // Base address
     inst.rs1 = Register::X1;
     inst.rd = Register::X2;
     inst.imm.set_unsigned(0).unwrap(); // Zero offset
-    
+
     let lw = Instruction::LW(inst);
-    let result = cpu.execute(lw);
-    assert!(result.is_ok());
-    
-    // Little-endian: memory bytes are loaded in order
-    assert_eq!(cpu.x2, 0x12345678, 
-        "LW: Should load 32-bit value in little-endian order");
+    cpu.execute_expect(lw, "LW from base address");
+
+    cpu.assert_register(
+        Register::X2,
+        0x12345678,
+        "LW loads full 32-bit word in little-endian order",
+    );
 }
 
 #[test]
 fn test_lw_with_offset() {
-    let mut cpu = CPU::default();
+    // Test positive and negative offsets for load instructions
+    let mut cpu = CpuBuilder::new()
+        .with_register(Register::X1, values::TEST_ADDR)
+        .with_memory_pattern(
+            values::TEST_ADDR,
+            &[
+                0x11, 0x22, 0x33, 0x44, // Word at offset 0
+                0x55, 0x66, 0x77, 0x88, // Word at offset 4
+            ],
+        )
+        .build();
+
     let mut inst = IType::default();
-    
-    // Set up memory
-    cpu.memory[1024] = 0x11;
-    cpu.memory[1025] = 0x22;
-    cpu.memory[1026] = 0x33;
-    cpu.memory[1027] = 0x44;
-    cpu.memory[1028] = 0x55;
-    cpu.memory[1029] = 0x66;
-    
-    cpu.x1 = 1024;
     inst.rs1 = Register::X1;
     inst.rd = Register::X2;
-    inst.imm.set_signed(2).unwrap(); // +2 offset
-    
+
+    // Test positive offset
+    inst.imm.set_signed(4).unwrap();
     let lw = Instruction::LW(inst);
-    cpu.execute(lw).unwrap();
-    
-    assert_eq!(cpu.x2, 0x66554433,
-        "LW: Should load from base + offset (1024 + 2)");
+    cpu.execute_expect(lw, "LW with positive offset");
+    cpu.assert_register(
+        Register::X2,
+        0x88776655,
+        "LW from base + 4 loads second word",
+    );
+
+    // Test offset 2 (misaligned but allowed in this implementation)
+    inst.imm.set_signed(2).unwrap();
+    let lw = Instruction::LW(inst);
+    cpu.execute_expect(lw, "LW with misaligned offset");
+    cpu.assert_register(
+        Register::X2,
+        0x66554433,
+        "LW from base + 2 (misaligned access)",
+    );
 }
 
 #[test]
 fn test_lh_sign_extension() {
-    let mut cpu = CPU::default();
+    // LH: Load halfword with sign extension
+    // Bit 15 determines sign: 0 = positive, 1 = negative
+    let mut cpu = CpuBuilder::new()
+        .with_register(Register::X1, values::TEST_ADDR)
+        .build();
+
     let mut inst = IType::default();
-    
-    // Test positive halfword
-    cpu.memory[1024] = 0x34;
-    cpu.memory[1025] = 0x12; // 0x1234 (positive)
-    
-    cpu.x1 = 1024;
     inst.rs1 = Register::X1;
     inst.rd = Register::X2;
     inst.imm.set_unsigned(0).unwrap();
-    
     let lh = Instruction::LH(inst);
-    cpu.execute(lh).unwrap();
-    assert_eq!(cpu.x2, 0x00001234,
-        "LH: Positive halfword should be zero-extended");
-    
-    // Test negative halfword
-    cpu.memory[1024] = 0x00;
-    cpu.memory[1025] = 0x80; // 0x8000 (negative in signed 16-bit)
-    
-    cpu.execute(lh).unwrap();
-    assert_eq!(cpu.x2, 0xFFFF8000,
-        "LH: Negative halfword should be sign-extended");
+
+    // Test cases: (bytes, expected_result, description)
+    let test_cases = [
+        ([0x34, 0x12], 0x00001234, "positive halfword (bit 15 = 0)"),
+        ([0x00, 0x80], 0xFFFF8000, "negative halfword (bit 15 = 1)"),
+        (
+            [0xFF, 0xFF],
+            0xFFFFFFFF,
+            "all ones sign-extends to all ones",
+        ),
+        ([0xFF, 0x7F], 0x00007FFF, "max positive halfword"),
+    ];
+
+    for (bytes, expected, desc) in test_cases {
+        cpu.memory[values::TEST_ADDR as usize] = bytes[0];
+        cpu.memory[values::TEST_ADDR as usize + 1] = bytes[1];
+
+        cpu.execute_expect(lh, desc);
+        cpu.assert_register(Register::X2, expected, desc);
+    }
 }
 
 #[test]
 fn test_lhu_zero_extension() {
-    let mut cpu = CPU::default();
+    // LHU: Load halfword unsigned (zero-extended)
+    // Always fills upper 16 bits with zeros
+    let mut cpu = CpuBuilder::new()
+        .with_register(Register::X1, values::TEST_ADDR)
+        .build();
+
     let mut inst = IType::default();
-    
-    // Test value that would be negative if sign-extended
-    cpu.memory[1024] = 0xFF;
-    cpu.memory[1025] = 0xFF; // 0xFFFF
-    
-    cpu.x1 = 1024;
     inst.rs1 = Register::X1;
     inst.rd = Register::X2;
     inst.imm.set_unsigned(0).unwrap();
-    
     let lhu = Instruction::LHU(inst);
-    cpu.execute(lhu).unwrap();
-    assert_eq!(cpu.x2, 0x0000FFFF,
-        "LHU: Should zero-extend, not sign-extend");
+
+    // Test value that would be negative if sign-extended
+    cpu.memory[values::TEST_ADDR as usize] = 0xFF;
+    cpu.memory[values::TEST_ADDR as usize + 1] = 0xFF; // 0xFFFF
+
+    cpu.execute_expect(lhu, "LHU with all bits set");
+    cpu.assert_register(
+        Register::X2,
+        0x0000FFFF,
+        "LHU zero-extends to 32 bits (no sign extension)",
+    );
 }
 
 #[test]
 fn test_lb_sign_extension() {
-    let mut cpu = CPU::default();
+    // LB: Load byte with sign extension
+    // Bit 7 determines sign: 0 = positive, 1 = negative
+    let mut cpu = CpuBuilder::new()
+        .with_register(Register::X1, values::TEST_ADDR)
+        .build();
+
     let mut inst = IType::default();
-    
-    cpu.x1 = 1024;
     inst.rs1 = Register::X1;
     inst.rd = Register::X2;
     inst.imm.set_unsigned(0).unwrap();
-    
-    // Test positive byte
-    cpu.memory[1024] = 0x7F; // Maximum positive signed byte
     let lb = Instruction::LB(inst);
-    cpu.execute(lb).unwrap();
-    assert_eq!(cpu.x2, 0x0000007F,
-        "LB: Positive byte should be zero-extended");
-    
-    // Test negative byte
-    cpu.memory[1024] = 0x80; // Minimum negative signed byte
-    cpu.execute(lb).unwrap();
-    assert_eq!(cpu.x2, 0xFFFFFF80,
-        "LB: Negative byte should be sign-extended");
-    
-    // Test -1
-    cpu.memory[1024] = 0xFF;
-    cpu.execute(lb).unwrap();
-    assert_eq!(cpu.x2 as i32, -1,
-        "LB: 0xFF should be sign-extended to -1");
+
+    // Test cases: (byte_value, expected_result, description)
+    let test_cases = [
+        (0x00, 0x00000000, "zero byte"),
+        (0x7F, 0x0000007F, "max positive byte (+127)"),
+        (0x80, 0xFFFFFF80, "min negative byte (-128)"),
+        (0xFF, 0xFFFFFFFF, "negative one (-1)"),
+        (0x01, 0x00000001, "positive one"),
+    ];
+
+    for (byte_val, expected, desc) in test_cases {
+        cpu.memory[values::TEST_ADDR as usize] = byte_val;
+        cpu.execute_expect(lb, desc);
+        cpu.assert_register(Register::X2, expected, desc);
+    }
 }
 
 #[test]
 fn test_lbu_zero_extension() {
-    let mut cpu = CPU::default();
+    // LBU: Load byte unsigned (zero-extended)
+    // Always fills upper 24 bits with zeros
+    let mut cpu = CpuBuilder::new()
+        .with_register(Register::X1, values::TEST_ADDR)
+        .with_memory_byte(values::TEST_ADDR, 0xFF)
+        .build();
+
     let mut inst = IType::default();
-    
-    cpu.x1 = 1024;
     inst.rs1 = Register::X1;
     inst.rd = Register::X2;
     inst.imm.set_unsigned(0).unwrap();
-    
-    // Test byte that would be negative if sign-extended
-    cpu.memory[1024] = 0xFF;
+
     let lbu = Instruction::LBU(inst);
-    cpu.execute(lbu).unwrap();
-    assert_eq!(cpu.x2, 0x000000FF,
-        "LBU: Should zero-extend to 255, not -1");
+    cpu.execute_expect(lbu, "LBU with 0xFF");
+    cpu.assert_register(
+        Register::X2,
+        0x000000FF,
+        "LBU zero-extends 0xFF to 255 (not -1)",
+    );
 }
 
 #[test]
 fn test_sw_basic() {
-    let mut cpu = CPU::default();
+    // SW: Store word to memory
+    // memory[rs1 + sign_extend(immediate)] = rs2
+    // Stores in little-endian byte order
+    let mut cpu = CpuBuilder::new()
+        .with_register(Register::X1, 100) // Base address
+        .with_register(Register::X2, 0x12345678) // Value to store
+        .build();
+
     let mut inst = SType::default();
-    
-    cpu.x1 = 100; // Base address
-    cpu.x2 = 0x12345678; // Value to store
-    
     inst.rs1 = Register::X1;
     inst.rs2 = Register::X2;
     inst.imm.set_unsigned(0).unwrap();
-    
+
     let sw = Instruction::SW(inst);
-    cpu.execute(sw).unwrap();
-    
-    // Check little-endian storage
-    assert_eq!(cpu.memory[100], 0x78, "SW: LSB at lowest address");
-    assert_eq!(cpu.memory[101], 0x56, "SW: Byte 1");
-    assert_eq!(cpu.memory[102], 0x34, "SW: Byte 2");
-    assert_eq!(cpu.memory[103], 0x12, "SW: MSB at highest address");
+    cpu.execute_expect(sw, "SW to memory");
+
+    // Verify little-endian storage
+    cpu.assert_memory_bytes(
+        100,
+        &[0x78, 0x56, 0x34, 0x12],
+        "SW stores word in little-endian order",
+    );
 }
 
 #[test]
 fn test_sh_truncation() {
-    let mut cpu = CPU::default();
+    // SH: Store halfword (lower 16 bits only)
+    // Upper 16 bits of source register are ignored
+    let mut cpu = CpuBuilder::new()
+        .with_register(Register::X1, 200)
+        .with_register(Register::X2, 0xFFFF1234)
+        .with_memory_pattern(200, &[0, 0, 0xFF, 0xFF]) // Pre-fill to verify
+        .build();
+
     let mut inst = SType::default();
-    
-    cpu.x1 = 200;
-    cpu.x2 = 0xFFFF1234; // Only lower 16 bits should be stored
-    
     inst.rs1 = Register::X1;
     inst.rs2 = Register::X2;
     inst.imm.set_unsigned(0).unwrap();
-    
+
     let sh = Instruction::SH(inst);
-    cpu.execute(sh).unwrap();
-    
-    assert_eq!(cpu.memory[200], 0x34, "SH: Store low byte of halfword");
-    assert_eq!(cpu.memory[201], 0x12, "SH: Store high byte of halfword");
-    assert_eq!(cpu.memory[202], 0, "SH: Should not modify beyond halfword");
+    cpu.execute_expect(sh, "SH truncates to 16 bits");
+
+    cpu.assert_memory_bytes(
+        200,
+        &[0x34, 0x12, 0xFF, 0xFF],
+        "SH stores only lower 16 bits, preserves other memory",
+    );
 }
 
 #[test]
 fn test_sb_truncation() {
-    let mut cpu = CPU::default();
+    // SB: Store byte (lower 8 bits only)
+    // Upper 24 bits of source register are ignored
+    let mut cpu = CpuBuilder::new()
+        .with_register(Register::X1, 300)
+        .with_register(Register::X2, 0xFFFFFF78)
+        .with_memory_pattern(300, &[0xFF, 0xFF]) // Pre-fill to verify
+        .build();
+
     let mut inst = SType::default();
-    
-    cpu.x1 = 300;
-    cpu.x2 = 0xFFFFFF78; // Only lowest byte should be stored
-    
     inst.rs1 = Register::X1;
     inst.rs2 = Register::X2;
     inst.imm.set_unsigned(0).unwrap();
-    
+
     let sb = Instruction::SB(inst);
-    cpu.execute(sb).unwrap();
-    
-    assert_eq!(cpu.memory[300], 0x78, "SB: Store only lowest byte");
-    assert_eq!(cpu.memory[301], 0, "SB: Should not modify next byte");
+    cpu.execute_expect(sb, "SB truncates to 8 bits");
+
+    cpu.assert_memory_bytes(
+        300,
+        &[0x78, 0xFF],
+        "SB stores only lowest 8 bits, preserves other memory",
+    );
 }
 
 #[test]
 fn test_sw_lw_roundtrip() {
-    let mut cpu = CPU::default();
-    
-    cpu.x1 = 100; // Base address
-    cpu.x2 = 0xDEADBEEF; // Test value
-    
+    // Test that SW followed by LW preserves the full 32-bit value
+    let test_value = 0xDEADBEEF;
+    let mut cpu = CpuBuilder::new()
+        .with_register(Register::X1, 100) // Base address
+        .with_register(Register::X2, test_value) // Value to store
+        .build();
+
     // Store word
     let mut store_inst = SType::default();
     store_inst.rs1 = Register::X1;
     store_inst.rs2 = Register::X2;
     let sw = Instruction::SW(store_inst);
-    cpu.execute(sw).unwrap();
-    
-    // Load word back
+    cpu.execute_expect(sw, "SW test value");
+
+    // Load word back into different register
     let mut load_inst = IType::default();
     load_inst.rs1 = Register::X1;
     load_inst.rd = Register::X3;
     let lw = Instruction::LW(load_inst);
-    cpu.execute(lw).unwrap();
-    
-    assert_eq!(cpu.x3, cpu.x2, "SW/LW: Round trip should preserve value");
+    cpu.execute_expect(lw, "LW test value back");
+
+    cpu.assert_register(
+        Register::X3,
+        test_value,
+        "SW/LW roundtrip preserves 32-bit value",
+    );
 }
 
 #[test]
 fn test_sh_lh_roundtrip() {
-    let mut cpu = CPU::default();
-    
-    cpu.x1 = 100;
-    cpu.x2 = 0xFFFF8765; // Test with sign bit set
-    
-    // Store halfword
+    // Test SH truncation and LH sign extension together
+    let mut cpu = CpuBuilder::new()
+        .with_register(Register::X1, 100)
+        .with_register(Register::X2, 0xFFFF8765) // Negative when viewed as 16-bit
+        .build();
+
+    // Store halfword (truncates to 0x8765)
     let mut store_inst = SType::default();
     store_inst.rs1 = Register::X1;
     store_inst.rs2 = Register::X2;
     let sh = Instruction::SH(store_inst);
-    cpu.execute(sh).unwrap();
-    
-    // Load halfword back (signed)
+    cpu.execute_expect(sh, "SH negative halfword");
+
+    // Load halfword back with sign extension
     let mut load_inst = IType::default();
     load_inst.rs1 = Register::X1;
     load_inst.rd = Register::X3;
     let lh = Instruction::LH(load_inst);
-    cpu.execute(lh).unwrap();
-    
-    assert_eq!(cpu.x3, 0xFFFF8765,
-        "SH/LH: Should preserve signed 16-bit value with sign extension");
+    cpu.execute_expect(lh, "LH negative halfword");
+
+    cpu.assert_register(
+        Register::X3,
+        0xFFFF8765,
+        "SH/LH roundtrip: 16-bit value preserved with sign extension",
+    );
 }
 
 #[test]
 fn test_sb_lb_roundtrip() {
-    let mut cpu = CPU::default();
-    
-    cpu.x1 = 100;
-    cpu.x2 = 0xFFFFFF81; // Test with sign bit set
-    
-    // Store byte
+    // Test SB truncation and LB sign extension together
+    let mut cpu = CpuBuilder::new()
+        .with_register(Register::X1, 100)
+        .with_register(Register::X2, 0xFFFFFF81) // Negative when viewed as 8-bit
+        .build();
+
+    // Store byte (truncates to 0x81)
     let mut store_inst = SType::default();
     store_inst.rs1 = Register::X1;
     store_inst.rs2 = Register::X2;
     let sb = Instruction::SB(store_inst);
-    cpu.execute(sb).unwrap();
-    
-    // Load byte back (signed)
+    cpu.execute_expect(sb, "SB negative byte");
+
+    // Load byte back with sign extension
     let mut load_inst = IType::default();
     load_inst.rs1 = Register::X1;
     load_inst.rd = Register::X3;
     let lb = Instruction::LB(load_inst);
-    cpu.execute(lb).unwrap();
-    
-    assert_eq!(cpu.x3, 0xFFFFFF81,
-        "SB/LB: Should preserve signed 8-bit value with sign extension");
+    cpu.execute_expect(lb, "LB negative byte");
+
+    cpu.assert_register(
+        Register::X3,
+        0xFFFFFF81,
+        "SB/LB roundtrip: 8-bit value preserved with sign extension",
+    );
 }
 
 #[test]
 fn test_load_store_with_negative_offset() {
-    let mut cpu = CPU::default();
-    
-    // Set up memory
-    cpu.memory[96] = 0xAB;
-    cpu.memory[97] = 0xCD;
-    cpu.memory[98] = 0xEF;
-    cpu.memory[99] = 0x12;
-    
-    cpu.x1 = 100; // Base address
-    
+    // Test that negative immediates work correctly for addressing
+    // Common pattern: accessing stack-allocated locals
+    let mut cpu = CpuBuilder::new()
+        .with_register(Register::X1, 100) // Base pointer
+        .with_memory_word_le(96, 0x12EFCDAB) // Word at base-4
+        .build();
+
     // Load with negative offset
     let mut load_inst = IType::default();
     load_inst.rs1 = Register::X1;
     load_inst.rd = Register::X2;
     load_inst.imm.set_signed(-4).unwrap(); // Access address 96
-    
+
     let lw = Instruction::LW(load_inst);
-    cpu.execute(lw).unwrap();
-    
-    assert_eq!(cpu.x2, 0x12EFCDAB,
-        "LW: Should correctly handle negative offset");
+    cpu.execute_expect(lw, "LW with negative offset");
+
+    cpu.assert_register(
+        Register::X2,
+        0x12EFCDAB,
+        "LW correctly calculates address with negative offset",
+    );
 }
 
 #[test]
 fn test_misaligned_access_behavior() {
-    // Note: The current implementation doesn't enforce alignment
-    // This test documents the current behavior
-    let mut cpu = CPU::default();
-    
-    // Set up memory
-    cpu.memory[1001] = 0x11;
-    cpu.memory[1002] = 0x22;
-    cpu.memory[1003] = 0x33;
-    cpu.memory[1004] = 0x44;
-    
-    cpu.x1 = 1001; // Misaligned address
-    
+    // RISC-V spec allows implementations to support misaligned access
+    // This implementation currently allows it - document the behavior
+    let mut cpu = CpuBuilder::new()
+        .with_register(Register::X1, 1001) // Misaligned address (not multiple of 4)
+        .with_memory_pattern(1001, &[0x11, 0x22, 0x33, 0x44])
+        .build();
+
     let mut inst = IType::default();
     inst.rs1 = Register::X1;
     inst.rd = Register::X2;
     inst.imm.set_unsigned(0).unwrap();
-    
+
     let lw = Instruction::LW(inst);
-    let result = cpu.execute(lw);
-    
-    // Document current behavior (no alignment enforcement)
-    assert!(result.is_ok(), 
-        "Current implementation allows misaligned access");
-    assert_eq!(cpu.x2, 0x44332211,
-        "Misaligned LW loads bytes in little-endian order");
+    cpu.execute_expect(lw, "LW from misaligned address");
+
+    cpu.assert_register(
+        Register::X2,
+        0x44332211,
+        "Misaligned LW succeeds (implementation choice)",
+    );
 }

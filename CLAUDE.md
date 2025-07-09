@@ -23,6 +23,7 @@ The implementation follows the official RISC-V ISA specification, available as A
 - `cargo test --test unit_components` - Run component unit tests
 - `cargo test --test unit_instructions` - Run instruction unit tests
 - `cargo test --test parser` - Run parser integration tests
+- `cargo test --test pseudo_instructions` - Run pseudo-instruction tests
 
 ### Code Quality
 - `cargo fmt` - Format code according to Rust standards
@@ -43,6 +44,7 @@ The codebase is organized as both a library and binary application:
    - `instructions.rs` - RV32I instruction definitions and opcode decoding
    - `formats.rs` - Instruction encoding formats (R, I, S, B, U, J types)
    - `registers.rs` - Register definitions with ABI names (x0-x31, zero, ra, sp, etc.)
+   - `pseudo_instructions.rs` - RV32I-specific pseudo-instructions (MV, NOT, LI, etc.)
 
 2. **REPL Interface (`src/`)**
    - `interpreter.rs` - REPL command parsing and execution engine
@@ -59,13 +61,19 @@ The codebase is organized as both a library and binary application:
 - The interpreter handles both assembly instruction parsing and REPL commands
 - Comprehensive unit tests in `rv32_i/mod.rs` validate instruction implementations
 
-### Current Limitations
+### Current Features
 
-- Implements RV32I except EBREAK, ECALL, and FENCE instructions
-- Memory is limited to 1 MiB
+- Complete RV32I instruction set implementation
+- System instructions: FENCE, ECALL, EBREAK  
+- Common pseudo-instructions: MV, NOT, SEQZ, SNEZ, J, JR, RET, LI
+- Support for hex (0x), binary (0b), and decimal immediate values
+- Memory limited to 1 MiB
+
+### Limitations
+
 - No support for other RISC-V extensions (M, A, F, D, etc.)
 - REPL is in early development with basic parsing capabilities
-- Parser cannot handle negative immediate values
+- Parser cannot handle negative immediate values in assembly
 
 ## Testing Approach
 
@@ -77,10 +85,10 @@ Tests have been reorganized into a structured hierarchy under the `tests/` direc
   - `instructions/` - Comprehensive tests for each instruction category
 - **Integration Tests** (`tests/`)
   - `parser.rs` - Tests for the REPL parser and interpreter
+  - `pseudo_instructions.rs` - Tests for pseudo-instruction parsing and expansion
 
-### Known Test Issues
-- **Sign Extension**: LB/LH instructions don't implement sign extension (4 failing tests)
-- **Negative Immediates**: Parser can't handle negative immediate values properly
+### Known Issues
+- **Negative Immediates**: Parser can't handle negative immediate values in assembly syntax (e.g., "ADDI x1, x0, -5" won't parse, but "LI x1, -5" works)
 
 For detailed testing goals and coverage status, see `TESTING_GOALS.md` and `tests/TEST_COVERAGE.md`.
 

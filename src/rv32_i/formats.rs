@@ -33,9 +33,9 @@ impl IType {
 
     pub fn new() -> Self {
         Self {
-            opcode: 0, // TODO
+            opcode: 0,
             rd: Register::default(),
-            funct3: 0, // TODO
+            funct3: 0,
             rs1: Register::default(),
             imm: Immediate::new(Self::IMM_BITS),
         }
@@ -62,9 +62,9 @@ impl SType {
 
     pub fn new() -> Self {
         Self {
-            opcode: 0, // TODO
+            opcode: 0,
             imm: Immediate::new(Self::IMM_BITS),
-            funct3: 0, // TODO
+            funct3: 0,
             rs1: Register::default(),
             rs2: Register::default(),
         }
@@ -118,7 +118,7 @@ impl UType {
 
     pub fn new() -> Self {
         Self {
-            opcode: 0, // TODO
+            opcode: 0,
             rd: Register::default(),
             imm: Immediate::new(Self::IMM_BITS),
         }
@@ -143,7 +143,7 @@ impl JType {
 
     pub fn new() -> Self {
         Self {
-            opcode: 0, // TODO
+            opcode: 0,
             rd: Register::default(),
             imm: Immediate::new(Self::IMM_BITS),
         }

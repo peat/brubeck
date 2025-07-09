@@ -23,13 +23,14 @@
 //! processor (single hardware thread, one mebibyte of memory).
 //!
 //! To see the contents of a register, just type in it's name (eg: `x2` or
-//! `sp` if you prefer the [ABI](crate::rv32_i::ABI) name). To examine a
-//! region in memory ... well, that's TBD.
+//! `sp` if you prefer the [ABI](crate::rv32_i::ABI) name). Memory examination
+//! is not yet available through the REPL interface.
 //!
 //! To execute an instruction, type in its name and arguments (eg: `nop` or `addi x2, x0, 5`).
 //!
-//! The majority of the RV32I instruction set is implemented, with a couple of
-//! exceptions (eg: EBREAK, ECALL, EFENCE).
+//! The complete RV32I instruction set is implemented, including system
+//! instructions (FENCE, ECALL, EBREAK). Common pseudo-instructions are also
+//! supported (MV, NOT, SEQZ, SNEZ, J, JR, RET, LI).
 //!
 //! For information about the implementation, see the [Interpreter](crate::interpreter).
 //!
@@ -122,3 +123,4 @@ pub mod rv32_i;
 
 pub use immediate::Immediate;
 pub use interpreter::Interpreter;
+pub use rv32_i::PseudoInstruction;

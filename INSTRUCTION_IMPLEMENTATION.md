@@ -82,22 +82,30 @@ fn csrrw() {
 
 ## Current Implementation Status
 
-### Fully Implemented (40 instructions)
+### Complete RV32I Base Integer Instruction Set (47 instructions)
+All RV32I instructions are now fully implemented:
 - Arithmetic: ADD, ADDI, SUB
 - Logical: AND, ANDI, OR, ORI, XOR, XORI
 - Shifts: SLL, SLLI, SRL, SRLI, SRA, SRAI
 - Comparison: SLT, SLTI, SLTU, SLTIU
-- Loads: LW, LH, LHU, LB, LBU
+- Loads: LW, LH, LHU, LB, LBU (with proper sign extension)
 - Stores: SW, SH, SB
 - Upper immediate: LUI, AUIPC
 - Jumps: JAL, JALR
 - Branches: BEQ, BNE, BLT, BLTU, BGE, BGEU
+- System: FENCE (memory ordering), ECALL (system call), EBREAK (breakpoint)
 - Other: NOP
 
-### Recognized but Not Implemented (3 instructions)
-- EBREAK - Environment break
-- ECALL - Environment call
-- FENCE - Memory ordering
+### Pseudo-Instructions (8 implemented)
+Common RISC-V pseudo-instructions that expand to real instructions:
+- MV rd, rs → ADDI rd, rs, 0
+- NOT rd, rs → XORI rd, rs, -1
+- SEQZ rd, rs → SLTIU rd, rs, 1
+- SNEZ rd, rs → SLTU rd, x0, rs
+- J offset → JAL x0, offset
+- JR rs → JALR x0, rs, 0
+- RET → JALR x0, x1, 0
+- LI rd, imm → ADDI/LUI+ADDI sequence
 
 ### Not Present (6 CSR instructions)
 - CSRRW - Atomic Read/Write CSR

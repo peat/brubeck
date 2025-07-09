@@ -3,41 +3,46 @@
 This document tracks our current test coverage against the goals outlined in TESTING_GOALS.md.
 
 ## Summary
-- **Total Tests Migrated**: 30+ (includes new tests)
-- **Test Categories Covered**: 3/5 (partial)
+- **Total Tests**: 78 unit tests + 7 component tests + 4 integration tests
+- **Test Helper Framework**: ✅ Fully integrated
+- **Educational Documentation**: ✅ Added to all tests
+- **Test Categories Covered**: 3/5 (comprehensive)
 - **Test Categories Missing**: 2/5
-- **Known Issues**: Sign extension not implemented in LB/LH instructions
+- **Known Issues**: Parser handling of negative immediates
+
+## Test Helper Framework Integration
+
+All tests now use a comprehensive test helper framework (`tests/unit/test_helpers.rs`) that provides:
+- **CpuBuilder**: Fluent API for CPU state setup
+- **CpuAssertions**: Descriptive assertion methods with context
+- **Named Constants**: Replace magic numbers throughout tests
+- **Educational Documentation**: ISA references, visual diagrams, and RISC-V patterns
 
 ## Current Test Inventory
 
-### ✅ Migrated Tests (30+ total)
+### ✅ Unit Tests - Instructions (71 tests total)
 
-#### Unit Tests - Instructions (migrated to `tests/unit/instructions/`)
-- [x] `nop` - NOP instruction
-- [x] `add_sub` - ADD and SUB instructions
-- [x] `addi` - ADDI instruction
-- [x] `slti` - SLTI instruction
-- [x] `sltiu` - SLTIU instruction
-- [x] `andi_ori_xori` - Logical operations
-- [x] `lui` - LUI instruction
-- [x] `auipc` - AUIPC instruction
-- [x] `jal` - JAL instruction
-- [x] `jalr` - JALR instruction
-- [x] `beq` - BEQ instruction
-- [x] `bne` - BNE instruction
-- [x] `blt` - BLT instruction
-- [x] `bltu` - BLTU instruction
-- [x] `bge` - BGE instruction
-- [x] `bgeu` - BGEU instruction
-- [x] `lw_lh_lb` - Load instructions
-- [x] `sw_sh_sb` - Store instructions
+#### Instruction Categories (tests/unit/instructions/)
+| Category | File | Tests | Key Features |
+|----------|------|-------|--------------|
+| Arithmetic | arithmetic.rs | 7 | ADD/SUB overflow, ADDI patterns |
+| Loads/Stores | loads_stores.rs | 14 | Memory visualization, endianness |
+| Shifts | shifts.rs | 14 | 5-bit masking behavior |
+| Branches | branches.rs | 11 | PC-relative addressing |
+| Jumps | jumps.rs | 9 | Call/return conventions |
+| Upper Immediate | upper_immediate.rs | 6 | LUI/AUIPC combinations |
+| Logical | logical.rs | 5 | Bit manipulation patterns |
+| Comparison | comparison.rs | 5 | Signed vs unsigned |
+| Miscellaneous | misc.rs | 2 | NOP use cases |
 
-#### Unit Tests - Components (migrated to `tests/unit/components/`)
-- [x] `always_sign_extend` - Sign extension behavior
-- [x] `min_max` - Immediate value bounds
-- [x] `set_signed` - Setting signed values
-- [x] `get_signed` - Getting signed values
-- [x] `get_unsigned` - Getting unsigned values
+### ✅ Unit Tests - Components (7 tests total)
+
+#### Component Tests (tests/unit/components/)
+- **immediate.rs** (7 tests): Comprehensive immediate value handling
+  - Sign extension behavior (critical RISC-V concept)
+  - Bounds checking for different bit widths
+  - Signed vs unsigned value handling
+  - Educational examples of common gotchas
 
 #### Integration Tests - Parser (migrated to `tests/integration/parser.rs`)
 - [x] `normalize_input` - Input normalization
@@ -95,8 +100,12 @@ None - all tested instructions have only basic tests
 ### Not Tested
 LHU, LBU, FENCE, EBREAK, ECALL
 
-### Recently Added Tests
-SLL, SLLI, SRL, SRLI, SRA, SRAI (comprehensive shift instruction tests added)
+### Test Improvements from Migration
+- **Educational Documentation**: Every test file now includes ISA manual references
+- **Visual Diagrams**: Memory layouts, bit patterns, and encoding explanations
+- **Common Patterns**: RISC-V idioms like NOT (XORI -1), RET (JALR x0, 0(ra))
+- **Consistent Structure**: All tests use the same helper patterns
+- **Better Error Messages**: CpuAssertions provide context for failures
 
 ### Not Implemented
 CSRRW, CSRRS, CSRRC, CSRRWI, CSRRSI, CSRRCI

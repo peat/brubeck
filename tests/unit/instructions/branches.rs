@@ -2,289 +2,340 @@
 //!
 //! These tests verify conditional branching behavior, PC updates,
 //! and the proper handling of signed vs unsigned comparisons.
+//!
+//! Reference: RISC-V ISA Manual, Volume I: Unprivileged ISA, Version 20191213
+//! Section 2.5 - Control Transfer Instructions
+//!
+//! Key concepts:
+//! - PC-relative addressing: target = PC + sign_extend(immediate)
+//! - Branch immediates encode multiples of 2 (bit 0 always 0)
+//! - The immediate in the instruction is already shifted left by 1
+//! - Branches do NOT have a delay slot
+//!
+//! Branch offset encoding visualization:
+//! ```
+//! Immediate value: -64 to +63 (in instruction encoding)
+//! Actual offset:   -128 to +126 (after left shift by 1)
+//! Target address:  PC + actual_offset
+//! ```
 
-use brubeck::rv32_i::{
-    cpu::CPU,
-    formats::BType,
-    instructions::Instruction,
-    registers::Register,
-};
+use brubeck::rv32_i::{formats::BType, instructions::Instruction, registers::Register};
+
+// Import test helpers
+use crate::unit::test_helpers::{values, CpuAssertions, CpuBuilder, ExecuteWithContext};
 
 #[test]
 fn test_beq_equal() {
-    let mut cpu = CPU::default();
+    // BEQ: Branch if Equal
+    // if (rs1 == rs2) PC = PC + sign_extend(immediate)
+    let mut cpu = CpuBuilder::new()
+        .with_register(Register::X1, 24)
+        .with_register(Register::X2, 24) // Equal values
+        .with_pc(0)
+        .build();
+
     let mut inst = BType::default();
-    
-    cpu.x1 = 24;
-    cpu.x2 = 24; // Equal values
-    cpu.pc = 0;
-    
     inst.rs1 = Register::X1;
     inst.rs2 = Register::X2;
-    inst.imm.set_signed(64).unwrap(); // Branch offset (will be doubled)
-    
+    inst.imm.set_signed(64).unwrap(); // Encoded offset (actual: 64*2 = 128)
+
     let beq = Instruction::BEQ(inst);
-    let result = cpu.execute(beq);
-    assert!(result.is_ok());
-    assert_eq!(cpu.pc, 128, "BEQ: Should branch when equal (0 + 64*2 = 128)");
+    cpu.execute_expect(beq, "BEQ with equal values");
+
+    cpu.assert_pc(128, "BEQ taken: PC = 0 + 128");
 }
 
 #[test]
 fn test_beq_not_equal() {
-    let mut cpu = CPU::default();
+    // BEQ not taken: PC advances to next instruction
+    let mut cpu = CpuBuilder::new()
+        .with_register(Register::X1, 24)
+        .with_register(Register::X2, 25) // Not equal
+        .with_pc(0)
+        .build();
+
     let mut inst = BType::default();
-    
-    cpu.x1 = 24;
-    cpu.x2 = 25; // Not equal
-    cpu.pc = 0;
-    
     inst.rs1 = Register::X1;
     inst.rs2 = Register::X2;
     inst.imm.set_signed(64).unwrap();
-    
+
     let beq = Instruction::BEQ(inst);
-    let result = cpu.execute(beq);
-    assert!(result.is_ok());
-    assert_eq!(cpu.pc, Instruction::LENGTH, 
-        "BEQ: Should not branch when not equal (PC advances by 4)");
+    cpu.execute_expect(beq, "BEQ with unequal values");
+
+    cpu.assert_pc(
+        Instruction::LENGTH,
+        "BEQ not taken: PC advances by 4 (instruction size)",
+    );
 }
 
 #[test]
 fn test_beq_backward_branch() {
-    let mut cpu = CPU::default();
+    // Backward branches are common in loops
+    // Example: for(i=0; i<10; i++) { ... } jumps back to loop start
+    let mut cpu = CpuBuilder::new()
+        .with_register(Register::X1, 100)
+        .with_register(Register::X2, 100) // Equal values
+        .with_pc(256)
+        .build();
+
     let mut inst = BType::default();
-    
-    cpu.x1 = 100;
-    cpu.x2 = 100;
-    cpu.pc = 256;
-    
     inst.rs1 = Register::X1;
     inst.rs2 = Register::X2;
-    inst.imm.set_signed(-64).unwrap(); // Negative offset
-    
+    inst.imm.set_signed(-64).unwrap(); // Negative offset for backward branch
+
     let beq = Instruction::BEQ(inst);
-    cpu.execute(beq).unwrap();
-    assert_eq!(cpu.pc, 128, "BEQ: Should branch backward (256 + (-64*2) = 128)");
+    cpu.execute_expect(beq, "BEQ backward branch");
+
+    cpu.assert_pc(128, "Backward branch: 256 + (-64*2) = 128");
 }
 
 #[test]
 fn test_bne_not_equal() {
-    let mut cpu = CPU::default();
+    // BNE: Branch if Not Equal
+    // if (rs1 != rs2) PC = PC + sign_extend(immediate)
+    let mut cpu = CpuBuilder::new()
+        .with_register(Register::X1, 23)
+        .with_register(Register::X2, 24) // Not equal
+        .with_pc(0)
+        .build();
+
     let mut inst = BType::default();
-    
-    cpu.x1 = 23;
-    cpu.x2 = 24; // Not equal
-    cpu.pc = 0;
-    
     inst.rs1 = Register::X1;
     inst.rs2 = Register::X2;
     inst.imm.set_signed(64).unwrap();
-    
+
     let bne = Instruction::BNE(inst);
-    cpu.execute(bne).unwrap();
-    assert_eq!(cpu.pc, 128, "BNE: Should branch when not equal");
+    cpu.execute_expect(bne, "BNE with unequal values");
+
+    cpu.assert_pc(128, "BNE taken: values differ");
 }
 
 #[test]
 fn test_bne_equal() {
-    let mut cpu = CPU::default();
+    // BNE not taken when values are equal
+    let mut cpu = CpuBuilder::new()
+        .with_register(Register::X1, 24)
+        .with_register(Register::X2, 24) // Equal
+        .with_pc(0)
+        .build();
+
     let mut inst = BType::default();
-    
-    cpu.x1 = 24;
-    cpu.x2 = 24; // Equal
-    cpu.pc = 0;
-    
     inst.rs1 = Register::X1;
     inst.rs2 = Register::X2;
     inst.imm.set_signed(64).unwrap();
-    
+
     let bne = Instruction::BNE(inst);
-    cpu.execute(bne).unwrap();
-    assert_eq!(cpu.pc, Instruction::LENGTH, 
-        "BNE: Should not branch when equal");
+    cpu.execute_expect(bne, "BNE with equal values");
+
+    cpu.assert_pc(Instruction::LENGTH, "BNE not taken: PC advances by 4");
 }
 
 #[test]
 fn test_blt_signed_comparison() {
-    let mut cpu = CPU::default();
+    // BLT: Branch if Less Than (signed)
+    // Uses two's complement signed comparison
+    let mut cpu = CpuBuilder::new().with_pc(0).build();
+
     let mut inst = BType::default();
-    
     inst.rs1 = Register::X1;
     inst.rs2 = Register::X2;
     inst.imm.set_signed(64).unwrap();
-    
-    // Test positive less than
-    cpu.x1 = 23;
-    cpu.x2 = 24;
-    cpu.pc = 0;
-    
     let blt = Instruction::BLT(inst);
-    cpu.execute(blt).unwrap();
-    assert_eq!(cpu.pc, 128, "BLT: 23 < 24 should branch");
-    
-    // Test negative less than positive
-    cpu.x1 = -1i32 as u32;
-    cpu.x2 = 1;
-    cpu.pc = 0;
-    
-    cpu.execute(blt).unwrap();
-    assert_eq!(cpu.pc, 128, "BLT: -1 < 1 should branch (signed)");
-    
-    // Test equal values
-    cpu.x1 = 24;
-    cpu.x2 = 24;
-    cpu.pc = 0;
-    
-    cpu.execute(blt).unwrap();
-    assert_eq!(cpu.pc, Instruction::LENGTH, "BLT: 24 < 24 should not branch");
+
+    // Test cases for signed comparison
+    let test_cases = [
+        (23, 24, true, "positive < positive"),
+        (values::NEG_ONE, 1, true, "-1 < 1 (signed)"),
+        (24, 24, false, "equal values"),
+        (24, 23, false, "greater than"),
+    ];
+
+    for (val1, val2, should_branch, desc) in test_cases {
+        cpu.set_register(Register::X1, val1);
+        cpu.set_register(Register::X2, val2);
+        cpu.pc = 0;
+
+        cpu.execute_expect(blt, desc);
+
+        let expected_pc = if should_branch {
+            128
+        } else {
+            Instruction::LENGTH
+        };
+        cpu.assert_pc(expected_pc, desc);
+    }
 }
 
 #[test]
 fn test_bltu_unsigned_comparison() {
-    let mut cpu = CPU::default();
+    // BLTU: Branch if Less Than Unsigned
+    // All values treated as unsigned integers
+    let mut cpu = CpuBuilder::new().with_pc(0).build();
+
     let mut inst = BType::default();
-    
     inst.rs1 = Register::X1;
     inst.rs2 = Register::X2;
     inst.imm.set_unsigned(64).unwrap();
-    
-    // Test simple unsigned comparison
-    cpu.x1 = 23;
-    cpu.x2 = 24;
-    cpu.pc = 0;
-    
     let bltu = Instruction::BLTU(inst);
-    cpu.execute(bltu).unwrap();
-    assert_eq!(cpu.pc, 128, "BLTU: 23 < 24 should branch");
-    
-    // Test unsigned comparison with "negative" number
-    cpu.x1 = 1;
-    cpu.x2 = -1i32 as u32; // 0xFFFFFFFF in unsigned
-    cpu.pc = 0;
-    
-    cpu.execute(bltu).unwrap();
-    assert_eq!(cpu.pc, 128, "BLTU: 1 < 0xFFFFFFFF should branch (unsigned)");
+
+    // Test cases highlighting signed vs unsigned difference
+    let test_cases = [
+        (23, 24, true, "simple unsigned comparison"),
+        (1, values::NEG_ONE, true, "1 < 0xFFFFFFFF (unsigned)"),
+        (values::NEG_ONE, 1, false, "0xFFFFFFFF > 1 (unsigned)"),
+    ];
+
+    for (val1, val2, should_branch, desc) in test_cases {
+        cpu.set_register(Register::X1, val1);
+        cpu.set_register(Register::X2, val2);
+        cpu.pc = 0;
+
+        cpu.execute_expect(bltu, desc);
+
+        let expected_pc = if should_branch {
+            128
+        } else {
+            Instruction::LENGTH
+        };
+        cpu.assert_pc(expected_pc, desc);
+    }
 }
 
 #[test]
 fn test_bge_signed_comparison() {
-    let mut cpu = CPU::default();
+    // BGE: Branch if Greater or Equal (signed)
+    // Branches when rs1 >= rs2 using signed comparison
+    let mut cpu = CpuBuilder::new().with_pc(0).build();
+
     let mut inst = BType::default();
-    
     inst.rs1 = Register::X1;
     inst.rs2 = Register::X2;
     inst.imm.set_signed(64).unwrap();
-    
-    // Test greater than
-    cpu.x1 = 24;
-    cpu.x2 = 23;
-    cpu.pc = 0;
-    
     let bge = Instruction::BGE(inst);
-    cpu.execute(bge).unwrap();
-    assert_eq!(cpu.pc, 128, "BGE: 24 >= 23 should branch");
-    
-    // Test equal
-    cpu.x1 = 24;
-    cpu.x2 = 24;
-    cpu.pc = 0;
-    
-    cpu.execute(bge).unwrap();
-    assert_eq!(cpu.pc, 128, "BGE: 24 >= 24 should branch (equal)");
-    
-    // Test less than
-    cpu.x1 = 23;
-    cpu.x2 = 24;
-    cpu.pc = 0;
-    
-    cpu.execute(bge).unwrap();
-    assert_eq!(cpu.pc, Instruction::LENGTH, "BGE: 23 >= 24 should not branch");
+
+    // Test cases for >= comparison
+    let test_cases = [
+        (24, 23, true, "greater than"),
+        (24, 24, true, "equal (boundary case)"),
+        (23, 24, false, "less than"),
+        (values::NEG_ONE, values::NEG_TWO, true, "-1 >= -2 (signed)"),
+    ];
+
+    for (val1, val2, should_branch, desc) in test_cases {
+        cpu.set_register(Register::X1, val1);
+        cpu.set_register(Register::X2, val2);
+        cpu.pc = 0;
+
+        cpu.execute_expect(bge, desc);
+
+        let expected_pc = if should_branch {
+            128
+        } else {
+            Instruction::LENGTH
+        };
+        cpu.assert_pc(expected_pc, desc);
+    }
 }
 
 #[test]
 fn test_bgeu_unsigned_comparison() {
-    let mut cpu = CPU::default();
+    // BGEU: Branch if Greater or Equal Unsigned
+    // All values treated as unsigned integers
+    let mut cpu = CpuBuilder::new().with_pc(0).build();
+
     let mut inst = BType::default();
-    
     inst.rs1 = Register::X1;
     inst.rs2 = Register::X2;
     inst.imm.set_unsigned(64).unwrap();
-    
-    // Test simple unsigned comparison
-    cpu.x1 = 24;
-    cpu.x2 = 23;
-    cpu.pc = 0;
-    
     let bgeu = Instruction::BGEU(inst);
-    cpu.execute(bgeu).unwrap();
-    assert_eq!(cpu.pc, 128, "BGEU: 24 >= 23 should branch");
-    
-    // Test unsigned comparison with "negative" number
-    cpu.x1 = -1i32 as u32; // 0xFFFFFFFF
-    cpu.x2 = 1;
-    cpu.pc = 0;
-    
-    cpu.execute(bgeu).unwrap();
-    assert_eq!(cpu.pc, 128, "BGEU: 0xFFFFFFFF >= 1 should branch (unsigned)");
+
+    // Test cases for unsigned >= comparison
+    let test_cases = [
+        (24, 23, true, "simple unsigned >="),
+        (values::NEG_ONE, 1, true, "0xFFFFFFFF >= 1 (unsigned)"),
+        (1, values::NEG_ONE, false, "1 < 0xFFFFFFFF (unsigned)"),
+    ];
+
+    for (val1, val2, should_branch, desc) in test_cases {
+        cpu.set_register(Register::X1, val1);
+        cpu.set_register(Register::X2, val2);
+        cpu.pc = 0;
+
+        cpu.execute_expect(bgeu, desc);
+
+        let expected_pc = if should_branch {
+            128
+        } else {
+            Instruction::LENGTH
+        };
+        cpu.assert_pc(expected_pc, desc);
+    }
 }
 
 #[test]
 fn test_branch_offset_encoding() {
-    // Branch offsets are encoded in multiples of 2
-    let mut cpu = CPU::default();
+    // RISC-V branch encoding: immediate represents multiples of 2
+    // This allows branches to any halfword-aligned address
+    // Actual offset = encoded_immediate * 2
+    let mut cpu = CpuBuilder::new()
+        .with_register(Register::X1, 100)
+        .with_register(Register::X2, 100) // Equal for BEQ
+        .build();
+
     let mut inst = BType::default();
-    
-    cpu.x1 = 100;
-    cpu.x2 = 100; // Equal for BEQ
-    
     inst.rs1 = Register::X1;
     inst.rs2 = Register::X2;
-    
-    // Test various offsets
+
+    // Test various offsets (encoded_imm, actual_offset)
     let test_cases = [
-        (0, 0),       // No branch offset
-        (2, 4),       // Minimum forward branch
-        (4, 8),       // Small forward branch
-        (-2, -4),     // Minimum backward branch
-        (-4, -8),     // Small backward branch
-        (2047, 4094), // Maximum positive offset (12-bit signed)
-        (-2048, -4096), // Maximum negative offset
+        (0, 0),         // No branch
+        (2, 4),         // Forward by 4 bytes (1 instruction)
+        (4, 8),         // Forward by 8 bytes (2 instructions)
+        (-2, -4),       // Backward by 4 bytes
+        (-4, -8),       // Backward by 8 bytes
+        (2047, 4094),   // Max positive (12-bit signed)
+        (-2048, -4096), // Max negative
     ];
-    
-    for (imm, expected_offset) in test_cases {
+
+    for (encoded_imm, actual_offset, desc) in
+        test_cases.map(|(i, o)| (i, o, format!("offset {} -> PC+{}", i, o)))
+    {
         cpu.pc = 1000; // Start from non-zero PC
-        inst.imm.set_signed(imm).unwrap();
-        
+        inst.imm.set_signed(encoded_imm).unwrap();
+
         let beq = Instruction::BEQ(inst);
-        cpu.execute(beq).unwrap();
-        
-        let expected_pc = (1000i32 + expected_offset) as u32;
-        assert_eq!(cpu.pc, expected_pc, 
-            "Branch offset {} should result in PC = {}", imm, expected_pc);
+        cpu.execute_expect(beq, &desc);
+
+        let expected_pc = (1000i32 + actual_offset) as u32;
+        cpu.assert_pc(expected_pc, &desc);
     }
 }
 
 #[test]
 fn test_branch_with_x0() {
-    // Common pattern: comparing against zero register
-    let mut cpu = CPU::default();
+    // Common RISC-V patterns using x0 (always zero):
+    // - BEQ rs, x0: branch if rs == 0
+    // - BNE rs, x0: branch if rs != 0
+    // - BLT x0, rs: branch if rs > 0 (signed)
+    // - BGE rs, x0: branch if rs >= 0 (signed)
+    let mut cpu = CpuBuilder::new().with_pc(0).build();
+
     let mut inst = BType::default();
-    
     inst.rs1 = Register::X1;
-    inst.rs2 = Register::X0; // Always zero
+    inst.rs2 = Register::X0; // x0 always reads as 0
     inst.imm.set_signed(64).unwrap();
-    
-    // BEQ x1, x0, offset - branch if x1 == 0
-    cpu.x1 = 0;
+
+    // Pattern 1: BEQ x1, x0 - branch if x1 == 0
+    cpu.set_register(Register::X1, 0);
     cpu.pc = 0;
     let beq = Instruction::BEQ(inst);
-    cpu.execute(beq).unwrap();
-    assert_eq!(cpu.pc, 128, "BEQ x1, x0: Should branch when x1 is zero");
-    
-    // BNE x1, x0, offset - branch if x1 != 0
-    cpu.x1 = 42;
+    cpu.execute_expect(beq, "BEQ with x0");
+    cpu.assert_pc(128, "BEQ x1, x0: branches when x1 is zero");
+
+    // Pattern 2: BNE x1, x0 - branch if x1 != 0
+    cpu.set_register(Register::X1, 42);
     cpu.pc = 0;
     let bne = Instruction::BNE(inst);
-    cpu.execute(bne).unwrap();
-    assert_eq!(cpu.pc, 128, "BNE x1, x0: Should branch when x1 is non-zero");
+    cpu.execute_expect(bne, "BNE with x0");
+    cpu.assert_pc(128, "BNE x1, x0: branches when x1 is non-zero");
 }

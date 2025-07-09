@@ -3,15 +3,16 @@
 This document tracks our current test coverage against the goals outlined in TESTING_GOALS.md.
 
 ## Summary
-- **Total Existing Tests**: 26 (all inline with source code)
-- **Test Categories Covered**: 2/5 (partial)
-- **Test Categories Missing**: 3/5
+- **Total Tests Migrated**: 30+ (includes new tests)
+- **Test Categories Covered**: 3/5 (partial)
+- **Test Categories Missing**: 2/5
+- **Known Issues**: Sign extension not implemented in LB/LH instructions
 
 ## Current Test Inventory
 
-### ✅ Existing Tests (26 total)
+### ✅ Migrated Tests (30+ total)
 
-#### Unit Tests - Instructions (17 tests in `src/rv32_i/mod.rs`)
+#### Unit Tests - Instructions (migrated to `tests/unit/instructions/`)
 - [x] `nop` - NOP instruction
 - [x] `add_sub` - ADD and SUB instructions
 - [x] `addi` - ADDI instruction
@@ -31,14 +32,14 @@ This document tracks our current test coverage against the goals outlined in TES
 - [x] `lw_lh_lb` - Load instructions
 - [x] `sw_sh_sb` - Store instructions
 
-#### Unit Tests - Components (5 tests in `src/immediate.rs`)
+#### Unit Tests - Components (migrated to `tests/unit/components/`)
 - [x] `always_sign_extend` - Sign extension behavior
 - [x] `min_max` - Immediate value bounds
 - [x] `set_signed` - Setting signed values
 - [x] `get_signed` - Getting signed values
 - [x] `get_unsigned` - Getting unsigned values
 
-#### Integration Tests - Parser (4 tests in `src/interpreter.rs`)
+#### Integration Tests - Parser (migrated to `tests/integration/parser.rs`)
 - [x] `normalize_input` - Input normalization
 - [x] `tokenize_input` - Tokenization
 - [x] `parse_command` - Command parsing
@@ -92,7 +93,10 @@ LUI, AUIPC, JAL, JALR, BEQ, BNE, BLT, BLTU, BGE, BGEU, LW, LH, LB, SW, SH, SB, N
 None - all tested instructions have only basic tests
 
 ### Not Tested
-SLL, SLLI, SRL, SRLI, SRA, SRAI, LHU, LBU, FENCE, EBREAK, ECALL
+LHU, LBU, FENCE, EBREAK, ECALL
+
+### Recently Added Tests
+SLL, SLLI, SRL, SRLI, SRA, SRAI (comprehensive shift instruction tests added)
 
 ### Not Implemented
 CSRRW, CSRRS, CSRRC, CSRRWI, CSRRSI, CSRRCI
@@ -100,9 +104,10 @@ CSRRW, CSRRS, CSRRC, CSRRWI, CSRRSI, CSRRCI
 ## Priority Actions
 
 ### High Priority
-1. **Create format encoding/decoding tests** - Foundation for correctness
-2. **Add error handling tests** - Critical for educational use
-3. **Expand instruction tests** - Add edge cases and spec compliance
+1. **Fix sign extension in LB/LH instructions** - Currently failing tests
+2. **Create format encoding/decoding tests** - Foundation for correctness
+3. **Add error handling tests** - Critical for educational use
+4. **Expand instruction tests** - Add edge cases and spec compliance
 
 ### Medium Priority
 1. **Create multi-instruction sequence tests** - Real program behavior
@@ -114,10 +119,25 @@ CSRRW, CSRRS, CSRRC, CSRRWI, CSRRSI, CSRRCI
 2. **Add educational quality tests** - Polish user experience
 3. **Create property-based tests** - Advanced testing
 
-## Test Migration Plan
+## Test Migration Status
 
-1. **Phase 1**: Create test helpers and utilities
-2. **Phase 2**: Migrate existing inline tests to new structure
-3. **Phase 3**: Fill gaps in high-priority categories
-4. **Phase 4**: Implement medium-priority tests
-5. **Phase 5**: Add advanced testing capabilities
+1. **Phase 1**: ✅ Test structure created
+2. **Phase 2**: ✅ All existing tests migrated
+3. **Phase 3**: 🔄 In progress - added shift tests, found LB/LH issues
+4. **Phase 4**: ⏳ Pending
+5. **Phase 5**: ⏳ Pending
+
+## Implementation Issues Found
+
+### Sign Extension in Load Instructions ✅ FIXED
+- **Issue**: LB and LH instructions were not performing sign extension
+- **Impact**: 4 tests were failing in loads_stores.rs
+- **Expected**: LB/LH should sign-extend, LBU/LHU should zero-extend
+- **Fix**: Updated LB to use `u8 as i8 as i32 as u32` and LH to use `u16 as i16 as i32 as u32`
+- **Status**: Fixed - all tests now pass
+
+### Parser Handling of Negative Immediates
+- **Issue**: Parser uses set_unsigned for all immediates, fails on negative values
+- **Impact**: Cannot parse instructions like "ADDI x1, zero, -1"
+- **Expected**: Parser should use set_signed for immediates that can be negative
+- **Status**: Documented with test workaround

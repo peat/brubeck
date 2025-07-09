@@ -759,7 +759,8 @@ impl CPU {
         let mut value_buf = [0u8; 2];
         value_buf.clone_from_slice(&self.memory[index..index + 2]);
         let u16_value = u16::from_le_bytes(value_buf);
-        let value = u16_value as u32;
+        // Sign-extend from 16-bit to 32-bit
+        let value = u16_value as i16 as i32 as u32;
 
         self.set_register(instruction.rd, value);
         self.increment_pc()
@@ -782,7 +783,7 @@ impl CPU {
         value_buf.clone_from_slice(&self.memory[index..index + 2]);
         let u16_value = u16::from_le_bytes(value_buf);
 
-        let value = 0b0000_0000_0000_0000_1111_1111_1111_1111 & u16_value as u32;
+        let value = u16_value as u32;
 
         self.set_register(instruction.rd, value);
         self.increment_pc()
@@ -801,8 +802,9 @@ impl CPU {
             return Err(Error::AccessViolation(rs1));
         }
 
-        let i8_value = self.memory[index];
-        let value = i8_value as u32;
+        let u8_value = self.memory[index];
+        // Sign-extend from 8-bit to 32-bit
+        let value = u8_value as i8 as i32 as u32;
 
         self.set_register(instruction.rd, value);
         self.increment_pc()
@@ -822,7 +824,7 @@ impl CPU {
         }
 
         let u8_value = self.memory[index];
-        let value = 0b0000_0000_0000_0000_0000_0000_1111_1111 & u8_value as u32;
+        let value = u8_value as u32;
 
         self.set_register(instruction.rd, value);
         self.increment_pc()

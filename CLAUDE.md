@@ -20,6 +20,9 @@ The implementation follows the official RISC-V ISA specification, available as A
 - `cargo test` - Run all unit tests
 - `cargo test -- --nocapture` - Run tests with println! output visible
 - `cargo test test_name` - Run a specific test by name
+- `cargo test --test unit_components` - Run component unit tests
+- `cargo test --test unit_instructions` - Run instruction unit tests
+- `cargo test --test parser` - Run parser integration tests
 
 ### Code Quality
 - `cargo fmt` - Format code according to Rust standards
@@ -62,16 +65,24 @@ The codebase is organized as both a library and binary application:
 - Memory is limited to 1 MiB
 - No support for other RISC-V extensions (M, A, F, D, etc.)
 - REPL is in early development with basic parsing capabilities
+- Parser cannot handle negative immediate values
 
 ## Testing Approach
 
-Tests are embedded in source files using `#[cfg(test)]` modules. The main test suite in `src/rv32_i/mod.rs` validates:
-- Individual instruction execution
-- Register operations
-- Memory access patterns
-- Edge cases and error conditions
+Tests have been reorganized into a structured hierarchy under the `tests/` directory:
 
-Run tests frequently during development to ensure instruction semantics remain correct.
+### Test Organization
+- **Unit Tests** (`tests/unit/`)
+  - `components/` - Tests for core components like immediates
+  - `instructions/` - Comprehensive tests for each instruction category
+- **Integration Tests** (`tests/`)
+  - `parser.rs` - Tests for the REPL parser and interpreter
+
+### Known Test Issues
+- **Sign Extension**: LB/LH instructions don't implement sign extension (4 failing tests)
+- **Negative Immediates**: Parser can't handle negative immediate values properly
+
+For detailed testing goals and coverage status, see `TESTING_GOALS.md` and `tests/TEST_COVERAGE.md`.
 
 ## Implementing New Instructions
 

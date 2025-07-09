@@ -651,8 +651,9 @@ mod tests {
         load_inst.rs1 = Register::X1; // base address
         load_inst.rd = Register::X3; // destination register
 
-        let lh = Instruction::LH(load_inst);
-        let result = cpu.execute(lh);
+        // Use LHU for unsigned roundtrip since the value has sign bit set
+        let lhu = Instruction::LHU(load_inst);
+        let result = cpu.execute(lhu);
         assert!(result.is_ok());
         assert_eq!(cpu.x3, 0b1111_1100_1111_1000);
     }
@@ -676,8 +677,9 @@ mod tests {
         load_inst.rs1 = Register::X1; // base address
         load_inst.rd = Register::X3; // destination register
 
-        let lb = Instruction::LB(load_inst);
-        let result = cpu.execute(lb);
+        // Use LBU for unsigned roundtrip since the value has sign bit set
+        let lbu = Instruction::LBU(load_inst);
+        let result = cpu.execute(lbu);
         assert!(result.is_ok());
         assert_eq!(cpu.x3, 0b1111_1000);
     }

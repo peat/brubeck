@@ -11,3 +11,4 @@ mod loads_stores;
 mod branches;
 mod jumps;
 mod upper_immediate;
+mod misc;

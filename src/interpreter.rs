@@ -109,13 +109,32 @@ pub enum Token {
     Register(Register),
     Instruction(Instruction),
     PseudoInstruction(PseudoInstruction),
-    Value32(u32),
+    Value32(i32),
+    OffsetRegister { offset: i32, register: Register },
 }
 
 #[derive(Debug)]
 pub enum Error {
     Generic(String),
     UnrecognizedToken(String),
+    UnknownInstruction {
+        instruction: String,
+        suggestion: Option<String>,
+    },
+    InvalidRegister {
+        register: String,
+        help: String,
+    },
+    WrongArgumentCount {
+        instruction: String,
+        expected: String,
+        found: usize,
+    },
+    ImmediateOutOfRange {
+        instruction: String,
+        value: i32,
+        range: String,
+    },
 }
 
 impl Display for Error {
@@ -123,6 +142,22 @@ impl Display for Error {
         let err_string = match self {
             Self::Generic(s) => s.to_owned(),
             Self::UnrecognizedToken(s) => format!("Unrecognized token: '{s}'"),
+            Self::UnknownInstruction { instruction, suggestion } => {
+                match suggestion {
+                    Some(s) => format!("Unknown instruction '{instruction}'. Did you mean '{s}'?"),
+                    None => format!("Unknown instruction '{instruction}'"),
+                }
+            },
+            Self::InvalidRegister { register, help } => {
+                format!("Invalid register '{register}'. {help}")
+            },
+            Self::WrongArgumentCount { instruction, expected, found } => {
+                format!("{instruction} expects {expected}, but {found} {} provided",
+                    if *found == 1 { "was" } else { "were" })
+            },
+            Self::ImmediateOutOfRange { instruction, value, range } => {
+                format!("Immediate value {value} out of range for {instruction} (valid range: {range})")
+            },
         };
 
         write!(f, "{err_string}")
@@ -132,6 +167,11 @@ impl Display for Error {
 fn parse(input: &str) -> Result<Command, Error> {
     // clean up whitespace, punctuation, capitalization, etc ...
     let normalized = normalize(input);
+    
+    // Handle empty input
+    if normalized.is_empty() {
+        return Err(Error::Generic("No input provided".to_owned()));
+    }
 
     // convert the normalized input into recognized tokens
     let mut tokens = tokenize(normalized)?;
@@ -154,6 +194,9 @@ fn build_command(tokens: &mut Vec<Token>) -> Result<Command, Error> {
         Token::PseudoInstruction(mut p) => Ok(Command::ExecPseudo(build_pseudo_instruction(
             &mut p, tokens,
         )?)),
+        Token::OffsetRegister { offset, register } => Err(Error::Generic(format!(
+            "Unexpected offset(register) syntax: {}({:?})", offset, register
+        ))),
     }
 }
 
@@ -161,46 +204,46 @@ fn build_instruction(instruction: &mut Instruction, args: &[Token]) -> Result<In
     let output = match instruction {
         // build instructions
         Instruction::ADD(mut rtype) => Instruction::ADD(build_rtype(&mut rtype, args)?),
-        Instruction::ADDI(mut itype) => Instruction::ADDI(build_itype(&mut itype, args)?),
+        Instruction::ADDI(mut itype) => Instruction::ADDI(build_itype(&mut itype, args, "ADDI")?),
         Instruction::AND(mut rtype) => Instruction::AND(build_rtype(&mut rtype, args)?),
-        Instruction::ANDI(mut itype) => Instruction::ANDI(build_itype(&mut itype, args)?),
-        Instruction::AUIPC(mut utype) => Instruction::AUIPC(build_utype(&mut utype, args)?),
-        Instruction::BEQ(mut btype) => Instruction::BEQ(build_btype(&mut btype, args)?),
-        Instruction::BGE(mut btype) => Instruction::BGE(build_btype(&mut btype, args)?),
-        Instruction::BGEU(mut btype) => Instruction::BGEU(build_btype(&mut btype, args)?),
-        Instruction::BLT(mut btype) => Instruction::BLT(build_btype(&mut btype, args)?),
-        Instruction::BLTU(mut btype) => Instruction::BLTU(build_btype(&mut btype, args)?),
-        Instruction::BNE(mut btype) => Instruction::BNE(build_btype(&mut btype, args)?),
-        Instruction::EBREAK(mut itype) => Instruction::EBREAK(build_itype(&mut itype, args)?),
-        Instruction::ECALL(mut itype) => Instruction::ECALL(build_itype(&mut itype, args)?),
-        Instruction::FENCE(mut itype) => Instruction::FENCE(build_itype(&mut itype, args)?),
-        Instruction::JAL(mut jtype) => Instruction::JAL(build_jtype(&mut jtype, args)?),
-        Instruction::JALR(mut itype) => Instruction::JALR(build_itype(&mut itype, args)?),
-        Instruction::LB(mut itype) => Instruction::LB(build_itype(&mut itype, args)?),
-        Instruction::LBU(mut itype) => Instruction::LBU(build_itype(&mut itype, args)?),
-        Instruction::LH(mut itype) => Instruction::LH(build_itype(&mut itype, args)?),
-        Instruction::LHU(mut itype) => Instruction::LHU(build_itype(&mut itype, args)?),
-        Instruction::LUI(mut utype) => Instruction::LUI(build_utype(&mut utype, args)?),
-        Instruction::LW(mut itype) => Instruction::LW(build_itype(&mut itype, args)?),
+        Instruction::ANDI(mut itype) => Instruction::ANDI(build_itype(&mut itype, args, "ANDI")?),
+        Instruction::AUIPC(mut utype) => Instruction::AUIPC(build_utype(&mut utype, args, "AUIPC")?),
+        Instruction::BEQ(mut btype) => Instruction::BEQ(build_btype(&mut btype, args, "BEQ")?),
+        Instruction::BGE(mut btype) => Instruction::BGE(build_btype(&mut btype, args, "BGE")?),
+        Instruction::BGEU(mut btype) => Instruction::BGEU(build_btype(&mut btype, args, "BGEU")?),
+        Instruction::BLT(mut btype) => Instruction::BLT(build_btype(&mut btype, args, "BLT")?),
+        Instruction::BLTU(mut btype) => Instruction::BLTU(build_btype(&mut btype, args, "BLTU")?),
+        Instruction::BNE(mut btype) => Instruction::BNE(build_btype(&mut btype, args, "BNE")?),
+        Instruction::EBREAK(mut itype) => Instruction::EBREAK(build_system_itype(&mut itype, args, "EBREAK")?),
+        Instruction::ECALL(mut itype) => Instruction::ECALL(build_system_itype(&mut itype, args, "ECALL")?),
+        Instruction::FENCE(mut itype) => Instruction::FENCE(build_system_itype(&mut itype, args, "FENCE")?),
+        Instruction::JAL(mut jtype) => Instruction::JAL(build_jtype(&mut jtype, args, "JAL")?),
+        Instruction::JALR(mut itype) => Instruction::JALR(build_itype(&mut itype, args, "JALR")?),
+        Instruction::LB(mut itype) => Instruction::LB(build_load_itype(&mut itype, args)?),
+        Instruction::LBU(mut itype) => Instruction::LBU(build_load_itype(&mut itype, args)?),
+        Instruction::LH(mut itype) => Instruction::LH(build_load_itype(&mut itype, args)?),
+        Instruction::LHU(mut itype) => Instruction::LHU(build_load_itype(&mut itype, args)?),
+        Instruction::LUI(mut utype) => Instruction::LUI(build_utype(&mut utype, args, "LUI")?),
+        Instruction::LW(mut itype) => Instruction::LW(build_load_itype(&mut itype, args)?),
         Instruction::NOP => Instruction::NOP,
         Instruction::OR(mut rtype) => Instruction::OR(build_rtype(&mut rtype, args)?),
-        Instruction::ORI(mut itype) => Instruction::ORI(build_itype(&mut itype, args)?),
-        Instruction::SB(mut stype) => Instruction::SB(build_stype(&mut stype, args)?),
-        Instruction::SH(mut stype) => Instruction::SH(build_stype(&mut stype, args)?),
+        Instruction::ORI(mut itype) => Instruction::ORI(build_itype(&mut itype, args, "ORI")?),
+        Instruction::SB(mut stype) => Instruction::SB(build_store_stype(&mut stype, args)?),
+        Instruction::SH(mut stype) => Instruction::SH(build_store_stype(&mut stype, args)?),
         Instruction::SLL(mut rtype) => Instruction::SLL(build_rtype(&mut rtype, args)?),
-        Instruction::SLLI(mut itype) => Instruction::SLLI(build_itype(&mut itype, args)?),
+        Instruction::SLLI(mut itype) => Instruction::SLLI(build_shift_itype(&mut itype, args, "SLLI")?),
         Instruction::SLT(mut rtype) => Instruction::SLT(build_rtype(&mut rtype, args)?),
-        Instruction::SLTI(mut itype) => Instruction::SLTI(build_itype(&mut itype, args)?),
-        Instruction::SLTIU(mut itype) => Instruction::SLTIU(build_itype(&mut itype, args)?),
+        Instruction::SLTI(mut itype) => Instruction::SLTI(build_itype(&mut itype, args, "SLTI")?),
+        Instruction::SLTIU(mut itype) => Instruction::SLTIU(build_itype(&mut itype, args, "SLTIU")?),
         Instruction::SLTU(mut rtype) => Instruction::SLTU(build_rtype(&mut rtype, args)?),
         Instruction::SRA(mut rtype) => Instruction::SRA(build_rtype(&mut rtype, args)?),
-        Instruction::SRAI(mut itype) => Instruction::SRAI(build_itype(&mut itype, args)?),
+        Instruction::SRAI(mut itype) => Instruction::SRAI(build_shift_itype(&mut itype, args, "SRAI")?),
         Instruction::SRL(mut rtype) => Instruction::SRL(build_rtype(&mut rtype, args)?),
-        Instruction::SRLI(mut itype) => Instruction::SRLI(build_itype(&mut itype, args)?),
+        Instruction::SRLI(mut itype) => Instruction::SRLI(build_shift_itype(&mut itype, args, "SRLI")?),
         Instruction::SUB(mut rtype) => Instruction::SUB(build_rtype(&mut rtype, args)?),
-        Instruction::SW(mut stype) => Instruction::SW(build_stype(&mut stype, args)?),
+        Instruction::SW(mut stype) => Instruction::SW(build_store_stype(&mut stype, args)?),
         Instruction::XOR(mut rtype) => Instruction::XOR(build_rtype(&mut rtype, args)?),
-        Instruction::XORI(mut itype) => Instruction::XORI(build_itype(&mut itype, args)?),
+        Instruction::XORI(mut itype) => Instruction::XORI(build_itype(&mut itype, args, "XORI")?),
     };
 
     Ok(output)
@@ -279,7 +322,7 @@ fn build_pseudo_instruction(
             if let [Token::Register(dest), Token::Value32(val)] = args {
                 PseudoInstruction::LI {
                     rd: *dest,
-                    imm: *val as i32,
+                    imm: *val,
                 }
             } else {
                 return Err(Error::Generic(format!("Invalid LI arguments: {args:?}")));
@@ -295,76 +338,165 @@ fn build_pseudo_instruction(
     Ok(output)
 }
 
-fn build_utype(utype: &mut UType, args: &[Token]) -> Result<UType, Error> {
+fn build_utype(utype: &mut UType, args: &[Token], instruction_name: &str) -> Result<UType, Error> {
     if let [Token::Register(rd), Token::Value32(imm)] = args {
+        // PC cannot be used as destination in U-type instructions
+        // AUIPC reads PC implicitly but doesn't allow PC as destination
+        validate_not_pc(*rd, "destination")?;
+        
+        // Validate immediate is in 20-bit signed range
+        if *imm < -524288 || *imm > 524287 {
+            return Err(Error::ImmediateOutOfRange {
+                instruction: instruction_name.to_string(),
+                value: *imm,
+                range: "-524288 to 524287".to_string(),
+            });
+        }
+        
         utype.rd = *rd;
         utype
             .imm
-            .set_unsigned(*imm)
+            .set_signed(*imm)
             .map_err(|e| Error::Generic(format!("{e:?}")))?;
         Ok(*utype)
     } else {
-        Err(Error::Generic(format!("Invalid UType arguments: {args:?}")))
+        Err(Error::WrongArgumentCount {
+            instruction: instruction_name.to_string(),
+            expected: "2 arguments (rd, immediate)".to_string(),
+            found: args.len(),
+        })
     }
 }
 
-fn build_jtype(jtype: &mut JType, args: &[Token]) -> Result<JType, Error> {
+fn build_jtype(jtype: &mut JType, args: &[Token], instruction_name: &str) -> Result<JType, Error> {
     if let [Token::Register(rd), Token::Value32(imm)] = args {
+        // PC cannot be used as destination register
+        validate_not_pc(*rd, "destination")?;
+        
+        // Validate immediate is in 20-bit signed range (actually 21-bit with bit 0 always 0)
+        if *imm < -1048576 || *imm > 1048574 {
+            return Err(Error::ImmediateOutOfRange {
+                instruction: instruction_name.to_string(),
+                value: *imm,
+                range: "-1048576 to 1048574 (even values only)".to_string(),
+            });
+        }
+        
+        // Check alignment - must be even
+        if *imm % 2 != 0 {
+            return Err(Error::Generic(format!(
+                "{}: Jump offset {} must be even (2-byte aligned)",
+                instruction_name, imm
+            )));
+        }
+        
         jtype.rd = *rd;
         jtype
             .imm
-            .set_unsigned(*imm)
+            .set_signed(*imm)
             .map_err(|e| Error::Generic(format!("{e:?}")))?;
         Ok(*jtype)
     } else {
-        Err(Error::Generic(format!("Invalid JType arguments: {args:?}")))
+        Err(Error::WrongArgumentCount {
+            instruction: instruction_name.to_string(),
+            expected: "2 arguments (rd, offset)".to_string(),
+            found: args.len(),
+        })
     }
 }
 
-fn build_btype(btype: &mut BType, args: &[Token]) -> Result<BType, Error> {
+fn build_btype(btype: &mut BType, args: &[Token], instruction_name: &str) -> Result<BType, Error> {
     if let [Token::Register(rs1), Token::Register(rs2), Token::Value32(imm)] = args {
+        // PC cannot be used as source in branch comparisons
+        validate_not_pc(*rs1, "source 1")?;
+        validate_not_pc(*rs2, "source 2")?;
+        
+        // Validate immediate is in 12-bit signed range (actually 13-bit with bit 0 always 0)
+        if *imm < -4096 || *imm > 4094 {
+            return Err(Error::ImmediateOutOfRange {
+                instruction: instruction_name.to_string(),
+                value: *imm,
+                range: "-4096 to 4094 (even values only)".to_string(),
+            });
+        }
+        
+        // Check alignment - must be even
+        if *imm % 2 != 0 {
+            return Err(Error::Generic(format!(
+                "{}: Branch offset {} must be even (2-byte aligned)",
+                instruction_name, imm
+            )));
+        }
+        
         btype.rs1 = *rs1;
         btype.rs2 = *rs2;
         btype
             .imm
-            .set_unsigned(*imm)
+            .set_signed(*imm)
             .map_err(|e| Error::Generic(format!("{e:?}")))?;
         Ok(*btype)
     } else {
-        Err(Error::Generic(format!("Invalid BType arguments: {args:?}")))
+        Err(Error::WrongArgumentCount {
+            instruction: instruction_name.to_string(),
+            expected: "3 arguments (rs1, rs2, offset)".to_string(),
+            found: args.len(),
+        })
     }
 }
 
-fn build_stype(stype: &mut SType, args: &[Token]) -> Result<SType, Error> {
-    if let [Token::Register(rs1), Token::Register(rs2), Token::Value32(imm)] = args {
-        stype.rs1 = *rs1;
-        stype.rs2 = *rs2;
-        stype
-            .imm
-            .set_unsigned(*imm)
-            .map_err(|e| Error::Generic(format!("{e:?}")))?;
-        Ok(*stype)
-    } else {
-        Err(Error::Generic(format!("Invalid SType arguments: {args:?}")))
-    }
-}
 
-fn build_itype(itype: &mut IType, args: &[Token]) -> Result<IType, Error> {
+fn build_itype(itype: &mut IType, args: &[Token], instruction_name: &str) -> Result<IType, Error> {
     if let [Token::Register(rd), Token::Register(rs1), Token::Value32(imm)] = args {
+        // PC validation - most I-type instructions cannot use PC
+        // Exception: JALR can have PC as implicit destination (updates PC)
+        if instruction_name != "JALR" {
+            validate_not_pc(*rd, "destination")?;
+        }
+        validate_not_pc(*rs1, "source")?;
+        
+        // Validate immediate is in 12-bit signed range
+        if *imm < -2048 || *imm > 2047 {
+            return Err(Error::ImmediateOutOfRange {
+                instruction: instruction_name.to_string(),
+                value: *imm,
+                range: "-2048 to 2047".to_string(),
+            });
+        }
+        
         itype.rd = *rd;
         itype.rs1 = *rs1;
         itype
             .imm
-            .set_unsigned(*imm)
+            .set_signed(*imm)
             .map_err(|e| Error::Generic(format!("{e:?}")))?;
         Ok(*itype)
     } else {
-        Err(Error::Generic(format!("Invalid IType arguments: {args:?}")))
+        Err(Error::WrongArgumentCount {
+            instruction: instruction_name.to_string(),
+            expected: "3 arguments (rd, rs1, immediate)".to_string(),
+            found: args.len(),
+        })
+    }
+}
+
+fn validate_not_pc(reg: Register, position: &str) -> Result<(), Error> {
+    if reg == Register::PC {
+        Err(Error::Generic(format!(
+            "PC register cannot be used as {} in this instruction. PC is only accessible via AUIPC or as an implicit operand in jumps.",
+            position
+        )))
+    } else {
+        Ok(())
     }
 }
 
 fn build_rtype(rtype: &mut RType, args: &[Token]) -> Result<RType, Error> {
     if let [Token::Register(rd), Token::Register(rs1), Token::Register(rs2)] = args {
+        // PC cannot be used in R-type instructions
+        validate_not_pc(*rd, "destination")?;
+        validate_not_pc(*rs1, "source 1")?;
+        validate_not_pc(*rs2, "source 2")?;
+        
         rtype.rd = *rd;
         rtype.rs1 = *rs1;
         rtype.rs2 = *rs2;
@@ -374,8 +506,143 @@ fn build_rtype(rtype: &mut RType, args: &[Token]) -> Result<RType, Error> {
     }
 }
 
+fn build_shift_itype(itype: &mut IType, args: &[Token], instruction_name: &str) -> Result<IType, Error> {
+    if let [Token::Register(rd), Token::Register(rs1), Token::Value32(imm)] = args {
+        // PC cannot be used in shift instructions
+        validate_not_pc(*rd, "destination")?;
+        validate_not_pc(*rs1, "source")?;
+        
+        // Validate shift amount is in range 0-31
+        if *imm < 0 || *imm > 31 {
+            return Err(Error::ImmediateOutOfRange {
+                instruction: instruction_name.to_string(),
+                value: *imm,
+                range: "0-31".to_string(),
+            });
+        }
+        
+        itype.rd = *rd;
+        itype.rs1 = *rs1;
+        itype
+            .imm
+            .set_signed(*imm)
+            .map_err(|e| Error::Generic(format!("{e:?}")))?;
+        Ok(*itype)
+    } else {
+        Err(Error::WrongArgumentCount {
+            instruction: instruction_name.to_string(),
+            expected: "3 arguments (rd, rs1, shift_amount)".to_string(),
+            found: args.len(),
+        })
+    }
+}
+
+fn build_system_itype(itype: &mut IType, args: &[Token], instruction_name: &str) -> Result<IType, Error> {
+    // System instructions (FENCE, ECALL, EBREAK) take no arguments
+    if !args.is_empty() {
+        return Err(Error::WrongArgumentCount {
+            instruction: instruction_name.to_string(),
+            expected: "no arguments".to_string(),
+            found: args.len(),
+        });
+    }
+    Ok(*itype)
+}
+
+fn build_load_itype(itype: &mut IType, args: &[Token]) -> Result<IType, Error> {
+    match args {
+        // Standard RISC-V syntax: LW rd, offset(rs1)
+        [Token::Register(rd), Token::OffsetRegister { offset, register }] => {
+            validate_not_pc(*rd, "destination")?;
+            validate_not_pc(*register, "base address")?;
+            
+            itype.rd = *rd;
+            itype.rs1 = *register;
+            itype
+                .imm
+                .set_signed(*offset)
+                .map_err(|e| Error::Generic(format!("{e:?}")))?;
+            Ok(*itype)
+        }
+        // Legacy syntax: LW rd, rs1, offset
+        [Token::Register(rd), Token::Register(rs1), Token::Value32(imm)] => {
+            validate_not_pc(*rd, "destination")?;
+            validate_not_pc(*rs1, "base address")?;
+            
+            itype.rd = *rd;
+            itype.rs1 = *rs1;
+            itype
+                .imm
+                .set_signed(*imm)
+                .map_err(|e| Error::Generic(format!("{e:?}")))?;
+            Ok(*itype)
+        }
+        _ => Err(Error::Generic(format!("Invalid load arguments: {args:?}"))),
+    }
+}
+
+fn build_store_stype(stype: &mut SType, args: &[Token]) -> Result<SType, Error> {
+    match args {
+        // Standard RISC-V syntax: SW rs2, offset(rs1)
+        [Token::Register(rs2), Token::OffsetRegister { offset, register }] => {
+            validate_not_pc(*register, "base address")?;
+            validate_not_pc(*rs2, "source")?;
+            
+            stype.rs1 = *register;
+            stype.rs2 = *rs2;
+            stype
+                .imm
+                .set_signed(*offset)
+                .map_err(|e| Error::Generic(format!("{e:?}")))?;
+            Ok(*stype)
+        }
+        // Legacy syntax: SW rs1, rs2, offset (note: this seems backwards!)
+        [Token::Register(rs1), Token::Register(rs2), Token::Value32(imm)] => {
+            validate_not_pc(*rs1, "base address")?;
+            validate_not_pc(*rs2, "source")?;
+            
+            stype.rs1 = *rs1;
+            stype.rs2 = *rs2;
+            stype
+                .imm
+                .set_signed(*imm)
+                .map_err(|e| Error::Generic(format!("{e:?}")))?;
+            Ok(*stype)
+        }
+        _ => Err(Error::Generic(format!("Invalid store arguments: {args:?}"))),
+    }
+}
+
 fn tokenize(input: Vec<String>) -> Result<Vec<Token>, Error> {
     input.into_iter().map(tokenize_one).collect()
+}
+
+fn suggest_instruction(unknown: &str) -> Option<String> {
+    let instructions = [
+        "ADD", "ADDI", "AND", "ANDI", "AUIPC", "BEQ", "BGE", "BGEU", "BLT", "BLTU", "BNE",
+        "EBREAK", "ECALL", "FENCE", "JAL", "JALR", "LB", "LBU", "LH", "LHU", "LUI", "LW",
+        "NOP", "OR", "ORI", "SB", "SH", "SLL", "SLLI", "SLT", "SLTI", "SLTIU", "SLTU",
+        "SRA", "SRAI", "SRL", "SRLI", "SUB", "SW", "XOR", "XORI",
+        // Pseudo-instructions
+        "MV", "NOT", "NEG", "SEQZ", "SNEZ", "J", "JR", "RET", "LI"
+    ];
+    
+    // Find the most similar instruction (simple case-insensitive check for now)
+    let unknown_upper = unknown.to_uppercase();
+    
+    // First check for exact match (case-insensitive)
+    if instructions.contains(&unknown_upper.as_str()) {
+        return Some(unknown_upper);
+    }
+    
+    // Check if it starts with any known instruction
+    for inst in instructions {
+        if unknown_upper.starts_with(inst) || inst.starts_with(&unknown_upper) {
+            return Some(inst.to_string());
+        }
+    }
+    
+    None
 }
 
 fn tokenize_one(input: String) -> Result<Token, Error> {
@@ -522,15 +789,52 @@ fn tokenize_one(input: String) -> Result<Token, Error> {
             imm: 0,
         }),
 
-        // everything else could be a value
-        _ => parse_value(input)?,
+        // everything else could be a value or offset(register)
+        _ => parse_value_or_offset(input)?,
     };
 
     Ok(token)
 }
 
-fn parse_value(input: String) -> Result<Token, Error> {
-    // it's gotta be a number; we might build something more NASM-complete later
+fn parse_value_or_offset(input: String) -> Result<Token, Error> {
+    // Check if it's offset(register) syntax
+    if let Some(paren_pos) = input.find('(') {
+        if input.ends_with(')') {
+            // Extract offset and register parts
+            let offset_str = &input[..paren_pos];
+            let register_str = &input[paren_pos + 1..input.len() - 1];
+            
+            // Parse the offset as a number
+            let offset = parse_number(offset_str).map_err(Error::Generic)?;
+            
+            // Parse the register
+            let register = match parse_register(register_str) {
+                Some(reg) => reg,
+                None => return Err(Error::InvalidRegister {
+                    register: register_str.to_string(),
+                    help: "Valid registers are x0-x31 or ABI names (zero, ra, sp, etc.)".to_string(),
+                }),
+            };
+            
+            return Ok(Token::OffsetRegister { offset, register });
+        }
+    }
+    
+    // Otherwise try to parse as a regular value
+    match parse_number(&input) {
+        Ok(v) => Ok(Token::Value32(v)),
+        Err(_) => {
+            // Could be an unknown instruction
+            let suggestion = suggest_instruction(&input);
+            Err(Error::UnknownInstruction {
+                instruction: input,
+                suggestion,
+            })
+        }
+    }
+}
+
+fn parse_number(input: &str) -> Result<i32, String> {
     // Support hex (0x), binary (0b), and decimal
     let value = if input.starts_with("0X") || input.starts_with("0x") {
         // Parse hex
@@ -542,10 +846,46 @@ fn parse_value(input: String) -> Result<Token, Error> {
         // Parse decimal
         input.parse::<i32>()
     };
+    
+    value.map_err(|_| format!("Invalid number: {}", input))
+}
 
-    match value {
-        Ok(v) => Ok(Token::Value32(v as u32)),
-        Err(_) => Err(Error::UnrecognizedToken(input)),
+fn parse_register(input: &str) -> Option<Register> {
+    match input {
+        "PC" => Some(Register::PC),
+        "X0" | "ZERO" => Some(Register::X0),
+        "X1" | "RA" => Some(Register::X1),
+        "X2" | "SP" => Some(Register::X2),
+        "X3" | "GP" => Some(Register::X3),
+        "X4" | "TP" => Some(Register::X4),
+        "X5" | "T0" => Some(Register::X5),
+        "X6" | "T1" => Some(Register::X6),
+        "X7" | "T2" => Some(Register::X7),
+        "X8" | "S0" | "FP" => Some(Register::X8),
+        "X9" | "S1" => Some(Register::X9),
+        "X10" | "A0" => Some(Register::X10),
+        "X11" | "A1" => Some(Register::X11),
+        "X12" | "A2" => Some(Register::X12),
+        "X13" | "A3" => Some(Register::X13),
+        "X14" | "A4" => Some(Register::X14),
+        "X15" | "A5" => Some(Register::X15),
+        "X16" | "A6" => Some(Register::X16),
+        "X17" | "A7" => Some(Register::X17),
+        "X18" | "S2" => Some(Register::X18),
+        "X19" | "S3" => Some(Register::X19),
+        "X20" | "S4" => Some(Register::X20),
+        "X21" | "S5" => Some(Register::X21),
+        "X22" | "S6" => Some(Register::X22),
+        "X23" | "S7" => Some(Register::X23),
+        "X24" | "S8" => Some(Register::X24),
+        "X25" | "S9" => Some(Register::X25),
+        "X26" | "S10" => Some(Register::X26),
+        "X27" | "S11" => Some(Register::X27),
+        "X28" | "T3" => Some(Register::X28),
+        "X29" | "T4" => Some(Register::X29),
+        "X30" | "T5" => Some(Register::X30),
+        "X31" | "T6" => Some(Register::X31),
+        _ => None,
     }
 }
 

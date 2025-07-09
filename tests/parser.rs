@@ -115,16 +115,17 @@ fn test_trivial_add() {
 fn test_parse_negative_immediates() {
     let mut i = Interpreter::new();
 
-    // Note: Current parser implementation has a bug with negative immediates
-    // It tries to use set_unsigned which fails for values like -1 (0xFFFFFFFF)
-    // This should be fixed by using set_signed for immediates that can be negative
-
-    // For now, test with a small negative value that fits in 12 bits when treated as positive
-    let result = i.interpret("ADDI x1, zero, 4095"); // Max 12-bit value
+    // Test that negative immediates now work correctly
+    let result = i.interpret("ADDI x1, zero, -1");
     assert!(result.is_ok());
 
     let result = i.interpret("X1");
-    assert!(result.unwrap().contains("0xfff"));
+    assert!(result.unwrap().contains("0xffffffff")); // -1 sign-extends to 32 bits
+
+    // Test that 4095 is correctly rejected (outside signed 12-bit range)
+    let result = i.interpret("ADDI x1, zero, 4095");
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("out of range"));
 }
 
 #[test]

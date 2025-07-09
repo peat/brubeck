@@ -72,3 +72,13 @@ Tests are embedded in source files using `#[cfg(test)]` modules. The main test s
 - Edge cases and error conditions
 
 Run tests frequently during development to ensure instruction semantics remain correct.
+
+## Implementing New Instructions
+
+When adding new RISC-V instructions, follow the systematic process documented in `INSTRUCTION_IMPLEMENTATION.md`. This guide provides:
+- Step-by-step implementation checklist
+- Code examples for each phase
+- Current implementation status
+- References to relevant specification sections
+
+The process ensures each instruction is correctly implemented across all layers: definition, decoding, execution, parsing, and testing.

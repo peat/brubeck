@@ -141,22 +141,61 @@ impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let err_string = match self {
             Self::Generic(s) => s.to_owned(),
-            Self::UnrecognizedToken(s) => format!("Unrecognized token: '{s}'"),
+            
+            Self::UnrecognizedToken(s) => {
+                format!("Unrecognized token: '{s}'\n💡 Tip: Check for typos in instruction names, register names, or number formats")
+            },
+            
             Self::UnknownInstruction { instruction, suggestion } => {
                 match suggestion {
-                    Some(s) => format!("Unknown instruction '{instruction}'. Did you mean '{s}'?"),
-                    None => format!("Unknown instruction '{instruction}'"),
+                    Some(s) => format!("Unknown instruction '{instruction}'. Did you mean '{s}'?\n💡 Tip: RISC-V instructions are case-insensitive. Use 'help' for a list of supported instructions"),
+                    None => format!("Unknown instruction '{instruction}'\n💡 Tip: Check the RISC-V ISA manual or use 'help' for supported instructions"),
                 }
             },
+            
             Self::InvalidRegister { register, help } => {
-                format!("Invalid register '{register}'. {help}")
+                format!("Invalid register '{register}'. {help}\n💡 Tip: Valid registers are x0-x31, or ABI names like zero, ra, sp, gp, tp, t0-t6, s0-s11, a0-a7")
             },
+            
             Self::WrongArgumentCount { instruction, expected, found } => {
-                format!("{instruction} expects {expected}, but {found} {} provided",
+                let tip = match instruction.as_str() {
+                    "ADD" | "SUB" | "AND" | "OR" | "XOR" | "SLL" | "SLT" | "SLTU" | "SRA" | "SRL" => 
+                        "💡 Tip: R-type instructions need 3 registers: rd, rs1, rs2 (e.g., ADD x1, x2, x3)",
+                    "ADDI" | "ANDI" | "ORI" | "XORI" | "SLTI" | "SLTIU" | "SLLI" | "SRAI" | "SRLI" => 
+                        "💡 Tip: I-type instructions need 2 registers + immediate: rd, rs1, imm (e.g., ADDI x1, x2, 100)",
+                    "LW" | "LH" | "LB" | "LHU" | "LBU" => 
+                        "💡 Tip: Load instructions: LW x1, offset(base) or LW x1, base, offset",
+                    "SW" | "SH" | "SB" => 
+                        "💡 Tip: Store instructions: SW rs2, offset(base) or SW rs2, base, offset",
+                    "BEQ" | "BNE" | "BLT" | "BGE" | "BLTU" | "BGEU" => 
+                        "💡 Tip: Branch instructions need 2 registers + offset: rs1, rs2, offset",
+                    "LUI" | "AUIPC" => 
+                        "💡 Tip: Upper immediate instructions need register + immediate: rd, imm",
+                    "JAL" => 
+                        "💡 Tip: JAL needs link register + offset: rd, offset",
+                    "JALR" => 
+                        "💡 Tip: JALR needs link register, base register + offset: rd, rs1, offset",
+                    _ => "💡 Tip: Check the RISC-V ISA manual for the correct instruction format",
+                };
+                format!("{instruction} expects {expected}, but {found} {} provided\n{tip}",
                     if *found == 1 { "was" } else { "were" })
             },
+            
             Self::ImmediateOutOfRange { instruction, value, range } => {
-                format!("Immediate value {value} out of range for {instruction} (valid range: {range})")
+                let tip = match instruction.as_str() {
+                    "ADDI" | "ANDI" | "ORI" | "XORI" | "SLTI" | "SLTIU" => 
+                        "💡 Tip: I-type immediates are 12-bit signed values. For larger values, use LUI + ADDI pattern",
+                    "LUI" | "AUIPC" => 
+                        "💡 Tip: Upper immediate instructions use 20-bit values that become the upper 20 bits of the result",
+                    "SLLI" | "SRAI" | "SRLI" => 
+                        "💡 Tip: Shift amounts must be 0-31 since RISC-V registers are 32 bits",
+                    "BEQ" | "BNE" | "BLT" | "BGE" | "BLTU" | "BGEU" => 
+                        "💡 Tip: Branch offsets are 12-bit signed values and must be even (word-aligned)",
+                    "JAL" => 
+                        "💡 Tip: JAL offsets are 20-bit signed values and must be even (word-aligned)",
+                    _ => "💡 Tip: Different instruction types have different immediate ranges - check the RISC-V ISA manual",
+                };
+                format!("Immediate value {value} out of range for {instruction} (valid range: {range})\n{tip}")
             },
         };
 
@@ -164,33 +203,97 @@ impl Display for Error {
     }
 }
 
+/// Parses a single line of RISC-V assembly into an executable command.
+///
+/// # The Four-Phase Parsing Process
+/// 
+/// This function implements a traditional compiler front-end with four distinct phases:
+/// 
+/// 1. **Normalize**: Clean up whitespace, convert to uppercase, handle punctuation
+/// 2. **Tokenize**: Split input into meaningful tokens (instructions, registers, values)
+/// 3. **Build Command**: Convert tokens into a structured command with validation
+/// 4. **Return Result**: Provide helpful error messages if parsing fails
+///
+/// # Supported Input Types
+/// 
+/// - **Instructions**: `ADDI x1, zero, 100`, `LW x1, 4(x2)`, `JAL x1, 8`
+/// - **Pseudo-instructions**: `MV x1, x2`, `LI x1, 0x1234`, `RET`
+/// - **Register inspection**: `x1`, `sp`, `PC`
+/// - **Multiple formats**: Hex (0x100), binary (0b1010), decimal (42)
+///
+/// # Examples
+/// ```
+/// let cmd = parse("ADDI x1, zero, 100")?;     // Immediate instruction
+/// let cmd = parse("LW x1, 4(x2)")?;           // Load with offset notation  
+/// let cmd = parse("MV x1, x2")?;              // Pseudo-instruction
+/// let cmd = parse("x1")?;                     // Register inspection
+/// ```
+///
+/// # Educational Notes
+/// 
+/// This parser follows RISC-V assembly conventions:
+/// - All immediates are sign-extended (even ANDI/ORI/XORI)
+/// - Supports both standard `LW x1, offset(base)` and legacy `LW x1, base, offset`
+/// - Validates instruction arguments and provides helpful error messages
+/// - Prevents common mistakes like using PC register inappropriately
 fn parse(input: &str) -> Result<Command, Error> {
-    // clean up whitespace, punctuation, capitalization, etc ...
+    // Phase 1: Normalize input (clean whitespace, convert case, handle punctuation)
     let normalized = normalize(input);
     
-    // Handle empty input
+    // Handle empty input - a common user mistake
     if normalized.is_empty() {
         return Err(Error::Generic("No input provided".to_owned()));
     }
 
-    // convert the normalized input into recognized tokens
+    // Phase 2: Convert normalized string into meaningful tokens
     let mut tokens = tokenize(normalized)?;
 
-    // build a command from those tokens
-    build_command(&mut tokens)
+    // Phase 3: Build a structured command from tokens with validation
+    create_command_from_tokens(&mut tokens)
 }
 
-fn build_command(tokens: &mut Vec<Token>) -> Result<Command, Error> {
+/// Creates a structured command from parsed tokens.
+///
+/// # Command Types
+/// 
+/// This function determines what type of command the user wants to execute based on 
+/// the first token in the input:
+/// 
+/// - **Register Inspection**: `x1`, `sp`, `PC` → `Command::Inspect(register)`
+/// - **Hardware Instructions**: `ADDI`, `LW`, `JAL` → `Command::Exec(instruction)`
+/// - **Pseudo-instructions**: `MV`, `LI`, `RET` → `Command::ExecPseudo(pseudo)`
+/// - **Invalid**: Raw numbers like `42` → Error (numbers need context)
+///
+/// # Token Processing
+/// 
+/// The function uses a "consume-first" pattern where it removes the first token
+/// to determine the command type, then passes the remaining tokens to specialized
+/// builders for validation and construction.
+/// 
+/// # Educational Notes
+/// 
+/// This demonstrates a common compiler pattern: dispatching based on the first
+/// token to specialized handlers. Each handler knows how to validate and build
+/// its specific command type.
+fn create_command_from_tokens(tokens: &mut Vec<Token>) -> Result<Command, Error> {
     if tokens.is_empty() {
         return Err(Error::Generic("Empty tokens in build!".to_owned()));
     }
 
+    // Remove and examine the first token to determine command type
     let first_token = tokens.remove(0);
 
     match first_token {
+        // Single register = inspect that register's value
         Token::Register(register) => Ok(Command::Inspect(register)),
+        
+        // Raw number without context = error (user probably meant something else)
         Token::Value32(value) => Err(Error::Generic(format!("Value: {value}"))),
+        
+        // Hardware instruction = build and validate the full instruction
         Token::Instruction(mut i) => Ok(Command::Exec(build_instruction(&mut i, tokens)?)),
+        
+        // Pseudo-instruction = expand to real instruction(s)
         Token::PseudoInstruction(mut p) => Ok(Command::ExecPseudo(build_pseudo_instruction(
             &mut p, tokens,
         )?)),
@@ -200,58 +303,94 @@ fn build_command(tokens: &mut Vec<Token>) -> Result<Command, Error> {
     }
 }
 
+/// Builds a validated hardware instruction from tokens.
+///
+/// # RISC-V Instruction Format Dispatch
+/// 
+/// This function demonstrates how RISC-V instructions are organized by format:
+/// - **R-type**: Register-register operations (ADD, SUB, AND, OR, etc.)
+/// - **I-type**: Immediate operations (ADDI, ANDI, loads, JALR, etc.)
+/// - **S-type**: Store operations (SB, SH, SW)
+/// - **B-type**: Branch operations (BEQ, BNE, BLT, etc.)
+/// - **U-type**: Upper immediate operations (LUI, AUIPC)
+/// - **J-type**: Jump operations (JAL)
+///
+/// # Educational Notes
+/// 
+/// Each instruction type has its own builder function that knows how to validate
+/// and construct that specific format. This demonstrates the "dispatch to specialist"
+/// pattern common in compilers.
 fn build_instruction(instruction: &mut Instruction, args: &[Token]) -> Result<Instruction, Error> {
     let output = match instruction {
-        // build instructions
+        // R-type instructions: register-register operations
         Instruction::ADD(mut rtype) => Instruction::ADD(build_rtype(&mut rtype, args)?),
-        Instruction::ADDI(mut itype) => Instruction::ADDI(build_itype(&mut itype, args, "ADDI")?),
         Instruction::AND(mut rtype) => Instruction::AND(build_rtype(&mut rtype, args)?),
+        Instruction::OR(mut rtype) => Instruction::OR(build_rtype(&mut rtype, args)?),
+        Instruction::SLL(mut rtype) => Instruction::SLL(build_rtype(&mut rtype, args)?),
+        Instruction::SLT(mut rtype) => Instruction::SLT(build_rtype(&mut rtype, args)?),
+        Instruction::SLTU(mut rtype) => Instruction::SLTU(build_rtype(&mut rtype, args)?),
+        Instruction::SRA(mut rtype) => Instruction::SRA(build_rtype(&mut rtype, args)?),
+        Instruction::SRL(mut rtype) => Instruction::SRL(build_rtype(&mut rtype, args)?),
+        Instruction::SUB(mut rtype) => Instruction::SUB(build_rtype(&mut rtype, args)?),
+        Instruction::XOR(mut rtype) => Instruction::XOR(build_rtype(&mut rtype, args)?),
+        
+        // I-type instructions: immediate operations
+        Instruction::ADDI(mut itype) => Instruction::ADDI(build_itype(&mut itype, args, "ADDI")?),
         Instruction::ANDI(mut itype) => Instruction::ANDI(build_itype(&mut itype, args, "ANDI")?),
-        Instruction::AUIPC(mut utype) => Instruction::AUIPC(build_utype(&mut utype, args, "AUIPC")?),
+        Instruction::ORI(mut itype) => Instruction::ORI(build_itype(&mut itype, args, "ORI")?),
+        Instruction::SLTI(mut itype) => Instruction::SLTI(build_itype(&mut itype, args, "SLTI")?),
+        Instruction::SLTIU(mut itype) => Instruction::SLTIU(build_itype(&mut itype, args, "SLTIU")?),
+        Instruction::XORI(mut itype) => Instruction::XORI(build_itype(&mut itype, args, "XORI")?),
+        Instruction::JALR(mut itype) => Instruction::JALR(build_itype(&mut itype, args, "JALR")?),
+        
+        // I-type shifts: special validation for 5-bit shift amounts
+        Instruction::SLLI(mut itype) => Instruction::SLLI(build_shift_itype(&mut itype, args, "SLLI")?),
+        Instruction::SRAI(mut itype) => Instruction::SRAI(build_shift_itype(&mut itype, args, "SRAI")?),
+        Instruction::SRLI(mut itype) => Instruction::SRLI(build_shift_itype(&mut itype, args, "SRLI")?),
+        
+        // I-type loads: support both standard and legacy syntax
+        Instruction::LB(mut itype) => Instruction::LB(build_load_itype(&mut itype, args)?),
+        Instruction::LBU(mut itype) => Instruction::LBU(build_load_itype(&mut itype, args)?),
+        Instruction::LH(mut itype) => Instruction::LH(build_load_itype(&mut itype, args)?),
+        Instruction::LHU(mut itype) => Instruction::LHU(build_load_itype(&mut itype, args)?),
+        Instruction::LW(mut itype) => Instruction::LW(build_load_itype(&mut itype, args)?),
+        
+        // S-type instructions: store operations
+        Instruction::SB(mut stype) => Instruction::SB(build_store_stype(&mut stype, args)?),
+        Instruction::SH(mut stype) => Instruction::SH(build_store_stype(&mut stype, args)?),
+        Instruction::SW(mut stype) => Instruction::SW(build_store_stype(&mut stype, args)?),
+        
+        // B-type instructions: branch operations
         Instruction::BEQ(mut btype) => Instruction::BEQ(build_btype(&mut btype, args, "BEQ")?),
         Instruction::BGE(mut btype) => Instruction::BGE(build_btype(&mut btype, args, "BGE")?),
         Instruction::BGEU(mut btype) => Instruction::BGEU(build_btype(&mut btype, args, "BGEU")?),
         Instruction::BLT(mut btype) => Instruction::BLT(build_btype(&mut btype, args, "BLT")?),
         Instruction::BLTU(mut btype) => Instruction::BLTU(build_btype(&mut btype, args, "BLTU")?),
         Instruction::BNE(mut btype) => Instruction::BNE(build_btype(&mut btype, args, "BNE")?),
+        
+        // U-type instructions: upper immediate operations  
+        Instruction::AUIPC(mut utype) => Instruction::AUIPC(build_utype(&mut utype, args, "AUIPC")?),
+        Instruction::LUI(mut utype) => Instruction::LUI(build_utype(&mut utype, args, "LUI")?),
+        
+        // J-type instructions: jump operations
+        Instruction::JAL(mut jtype) => Instruction::JAL(build_jtype(&mut jtype, args, "JAL")?),
+        
+        // System instructions: no arguments required
         Instruction::EBREAK(mut itype) => Instruction::EBREAK(build_system_itype(&mut itype, args, "EBREAK")?),
         Instruction::ECALL(mut itype) => Instruction::ECALL(build_system_itype(&mut itype, args, "ECALL")?),
         Instruction::FENCE(mut itype) => Instruction::FENCE(build_system_itype(&mut itype, args, "FENCE")?),
-        Instruction::JAL(mut jtype) => Instruction::JAL(build_jtype(&mut jtype, args, "JAL")?),
-        Instruction::JALR(mut itype) => Instruction::JALR(build_itype(&mut itype, args, "JALR")?),
-        Instruction::LB(mut itype) => Instruction::LB(build_load_itype(&mut itype, args)?),
-        Instruction::LBU(mut itype) => Instruction::LBU(build_load_itype(&mut itype, args)?),
-        Instruction::LH(mut itype) => Instruction::LH(build_load_itype(&mut itype, args)?),
-        Instruction::LHU(mut itype) => Instruction::LHU(build_load_itype(&mut itype, args)?),
-        Instruction::LUI(mut utype) => Instruction::LUI(build_utype(&mut utype, args, "LUI")?),
-        Instruction::LW(mut itype) => Instruction::LW(build_load_itype(&mut itype, args)?),
-        Instruction::NOP => Instruction::NOP,
-        Instruction::OR(mut rtype) => Instruction::OR(build_rtype(&mut rtype, args)?),
-        Instruction::ORI(mut itype) => Instruction::ORI(build_itype(&mut itype, args, "ORI")?),
-        Instruction::SB(mut stype) => Instruction::SB(build_store_stype(&mut stype, args)?),
-        Instruction::SH(mut stype) => Instruction::SH(build_store_stype(&mut stype, args)?),
-        Instruction::SLL(mut rtype) => Instruction::SLL(build_rtype(&mut rtype, args)?),
-        Instruction::SLLI(mut itype) => Instruction::SLLI(build_shift_itype(&mut itype, args, "SLLI")?),
-        Instruction::SLT(mut rtype) => Instruction::SLT(build_rtype(&mut rtype, args)?),
-        Instruction::SLTI(mut itype) => Instruction::SLTI(build_itype(&mut itype, args, "SLTI")?),
-        Instruction::SLTIU(mut itype) => Instruction::SLTIU(build_itype(&mut itype, args, "SLTIU")?),
-        Instruction::SLTU(mut rtype) => Instruction::SLTU(build_rtype(&mut rtype, args)?),
-        Instruction::SRA(mut rtype) => Instruction::SRA(build_rtype(&mut rtype, args)?),
-        Instruction::SRAI(mut itype) => Instruction::SRAI(build_shift_itype(&mut itype, args, "SRAI")?),
-        Instruction::SRL(mut rtype) => Instruction::SRL(build_rtype(&mut rtype, args)?),
-        Instruction::SRLI(mut itype) => Instruction::SRLI(build_shift_itype(&mut itype, args, "SRLI")?),
-        Instruction::SUB(mut rtype) => Instruction::SUB(build_rtype(&mut rtype, args)?),
-        Instruction::SW(mut stype) => Instruction::SW(build_store_stype(&mut stype, args)?),
-        Instruction::XOR(mut rtype) => Instruction::XOR(build_rtype(&mut rtype, args)?),
-        Instruction::XORI(mut itype) => Instruction::XORI(build_itype(&mut itype, args, "XORI")?),
         
-        // CSR Instructions (TODO: implement proper parsing)
-        Instruction::CSRRW(mut itype) => Instruction::CSRRW(build_itype(&mut itype, args, "CSRRW")?),
-        Instruction::CSRRS(mut itype) => Instruction::CSRRS(build_itype(&mut itype, args, "CSRRS")?),
-        Instruction::CSRRC(mut itype) => Instruction::CSRRC(build_itype(&mut itype, args, "CSRRC")?),
-        Instruction::CSRRWI(mut itype) => Instruction::CSRRWI(build_itype(&mut itype, args, "CSRRWI")?),
-        Instruction::CSRRSI(mut itype) => Instruction::CSRRSI(build_itype(&mut itype, args, "CSRRSI")?),
-        Instruction::CSRRCI(mut itype) => Instruction::CSRRCI(build_itype(&mut itype, args, "CSRRCI")?),
+        // Special case: NOP has no arguments or variants
+        Instruction::NOP => Instruction::NOP,
+        
+        // CSR Instructions: Control and Status Register operations
+        // These provide access to processor state and control registers
+        Instruction::CSRRW(mut itype) => Instruction::CSRRW(build_csr_itype(&mut itype, args, "CSRRW")?),
+        Instruction::CSRRS(mut itype) => Instruction::CSRRS(build_csr_itype(&mut itype, args, "CSRRS")?),
+        Instruction::CSRRC(mut itype) => Instruction::CSRRC(build_csr_itype(&mut itype, args, "CSRRC")?),
+        Instruction::CSRRWI(mut itype) => Instruction::CSRRWI(build_csr_itype_imm(&mut itype, args, "CSRRWI")?),
+        Instruction::CSRRSI(mut itype) => Instruction::CSRRSI(build_csr_itype_imm(&mut itype, args, "CSRRSI")?),
+        Instruction::CSRRCI(mut itype) => Instruction::CSRRCI(build_csr_itype_imm(&mut itype, args, "CSRRCI")?),
     };
 
     Ok(output)
@@ -487,6 +626,61 @@ fn build_itype(itype: &mut IType, args: &[Token], instruction_name: &str) -> Res
     }
 }
 
+/// Validates that the correct number of arguments are provided for an instruction.
+///
+/// # Educational Notes
+/// 
+/// This is a common compiler validation pattern - checking that the user provided
+/// the right number of arguments before trying to process them. This prevents
+/// confusing errors later in the parsing process.
+fn validate_argument_count(instruction: &str, expected: usize, found: usize) -> Result<(), Error> {
+    if found != expected {
+        Err(Error::WrongArgumentCount {
+            instruction: instruction.to_string(),
+            expected: format!("{expected} arguments"),
+            found,
+        })
+    } else {
+        Ok(())
+    }
+}
+
+/// Validates that an immediate value is within the specified range.
+///
+/// # Educational Notes
+/// 
+/// Different RISC-V instruction types have different immediate field sizes:
+/// - I-type: 12 bits signed (-2048 to 2047)
+/// - U-type: 20 bits signed (-524288 to 524287)
+/// - J-type: 20 bits signed, even values only
+/// - Shifts: 5 bits unsigned (0 to 31)
+/// 
+/// This function provides a centralized place to validate these ranges.
+fn validate_immediate_range(instruction: &str, value: i32, min: i32, max: i32) -> Result<(), Error> {
+    if value < min || value > max {
+        Err(Error::ImmediateOutOfRange {
+            instruction: instruction.to_string(),
+            value,
+            range: format!("{min} to {max}"),
+        })
+    } else {
+        Ok(())
+    }
+}
+
+/// Validates that a register is not the PC register.
+///
+/// # PC Register Rules
+/// 
+/// In RISC-V, the PC (Program Counter) register has special handling:
+/// - It cannot be used as a general-purpose register operand
+/// - It's only accessible via AUIPC (implicitly) or as a jump target
+/// - Using PC incorrectly can lead to undefined behavior
+///
+/// # Educational Notes
+/// 
+/// This demonstrates architecture-specific validation - some registers have
+/// special meanings and cannot be used in normal operations.
 fn validate_not_pc(reg: Register, position: &str) -> Result<(), Error> {
     if reg == Register::PC {
         Err(Error::Generic(format!(
@@ -495,6 +689,79 @@ fn validate_not_pc(reg: Register, position: &str) -> Result<(), Error> {
         )))
     } else {
         Ok(())
+    }
+}
+
+/// Build CSR instruction with register operand (CSRRW, CSRRS, CSRRC)
+/// Syntax: CSRRW rd, csr, rs1
+fn build_csr_itype(itype: &mut IType, args: &[Token], instruction_name: &str) -> Result<IType, Error> {
+    if let [Token::Register(rd), Token::Value32(csr_addr), Token::Register(rs1)] = args {
+        // Validate CSR address is in valid range (12-bit unsigned)
+        if *csr_addr < 0 || *csr_addr > 4095 {
+            return Err(Error::ImmediateOutOfRange {
+                instruction: instruction_name.to_string(),
+                value: *csr_addr,
+                range: "0 to 4095 (12-bit unsigned CSR address)".to_string(),
+            });
+        }
+        
+        // PC register validation
+        validate_not_pc(*rd, "destination")?;
+        validate_not_pc(*rs1, "source")?;
+        
+        itype.rd = *rd;
+        itype.rs1 = *rs1;
+        itype.imm.set_unsigned(*csr_addr as u32)
+            .map_err(|e| Error::Generic(format!("CSR address error: {e:?}")))?;
+        
+        Ok(*itype)
+    } else {
+        Err(Error::WrongArgumentCount {
+            instruction: instruction_name.to_string(),
+            expected: "3 arguments (rd, csr, rs1)".to_string(),
+            found: args.len(),
+        })
+    }
+}
+
+/// Build CSR immediate instruction (CSRRWI, CSRRSI, CSRRCI)
+/// Syntax: CSRRWI rd, csr, uimm5
+fn build_csr_itype_imm(itype: &mut IType, args: &[Token], instruction_name: &str) -> Result<IType, Error> {
+    if let [Token::Register(rd), Token::Value32(csr_addr), Token::Value32(uimm)] = args {
+        // Validate CSR address is in valid range (12-bit unsigned)
+        if *csr_addr < 0 || *csr_addr > 4095 {
+            return Err(Error::ImmediateOutOfRange {
+                instruction: instruction_name.to_string(),
+                value: *csr_addr,
+                range: "0 to 4095 (12-bit unsigned CSR address)".to_string(),
+            });
+        }
+        
+        // Validate immediate is 5-bit unsigned
+        if *uimm < 0 || *uimm > 31 {
+            return Err(Error::ImmediateOutOfRange {
+                instruction: instruction_name.to_string(),
+                value: *uimm,
+                range: "0 to 31 (5-bit unsigned immediate)".to_string(),
+            });
+        }
+        
+        // PC register validation
+        validate_not_pc(*rd, "destination")?;
+        
+        itype.rd = *rd;
+        // For CSR immediate instructions, the immediate value goes in the rs1 field
+        itype.rs1 = Register::from_u32(*uimm as u32);
+        itype.imm.set_unsigned(*csr_addr as u32)
+            .map_err(|e| Error::Generic(format!("CSR address error: {e:?}")))?;
+        
+        Ok(*itype)
+    } else {
+        Err(Error::WrongArgumentCount {
+            instruction: instruction_name.to_string(),
+            expected: "3 arguments (rd, csr, uimm5)".to_string(),
+            found: args.len(),
+        })
     }
 }
 
@@ -514,20 +781,31 @@ fn build_rtype(rtype: &mut RType, args: &[Token]) -> Result<RType, Error> {
     }
 }
 
+/// Builds a shift instruction (SLLI, SRLI, SRAI) with validation.
+///
+/// # Shift Instruction Rules
+/// 
+/// RISC-V shift instructions have special validation requirements:
+/// - Shift amount must be 0-31 (5 bits unsigned)
+/// - PC register cannot be used as source or destination
+/// - Shift amount is encoded in the lower 5 bits of the immediate field
+///
+/// # Educational Notes
+/// 
+/// This demonstrates instruction-specific validation - shift instructions have
+/// tighter constraints than general I-type instructions because the hardware
+/// shift unit only supports 5-bit shift amounts.
 fn build_shift_itype(itype: &mut IType, args: &[Token], instruction_name: &str) -> Result<IType, Error> {
+    // Validate we have exactly 3 arguments
+    validate_argument_count(instruction_name, 3, args.len())?;
+    
     if let [Token::Register(rd), Token::Register(rs1), Token::Value32(imm)] = args {
         // PC cannot be used in shift instructions
         validate_not_pc(*rd, "destination")?;
         validate_not_pc(*rs1, "source")?;
         
-        // Validate shift amount is in range 0-31
-        if *imm < 0 || *imm > 31 {
-            return Err(Error::ImmediateOutOfRange {
-                instruction: instruction_name.to_string(),
-                value: *imm,
-                range: "0-31".to_string(),
-            });
-        }
+        // RISC-V shift instructions only support 5-bit shift amounts (0-31)
+        validate_immediate_range(instruction_name, *imm, 0, 31)?;
         
         itype.rd = *rd;
         itype.rs1 = *rs1;
@@ -621,8 +899,30 @@ fn build_store_stype(stype: &mut SType, args: &[Token]) -> Result<SType, Error> 
     }
 }
 
+/// Converts normalized strings into typed tokens.
+///
+/// # Token Types
+/// 
+/// Each string is classified into one of these token types:
+/// - **Instruction**: Hardware RISC-V instructions (ADD, ADDI, LW, etc.)
+/// - **PseudoInstruction**: Assembly conveniences (MV, LI, RET, etc.)
+/// - **Register**: Register names (x1, sp, zero, etc.)
+/// - **Value32**: Numeric values (42, 0x100, 0b1010, etc.)
+/// - **OffsetRegister**: Load/store notation (4(x2), -8(sp), etc.)
+///
+/// # Error Handling
+/// 
+/// If any string cannot be tokenized, the entire process fails with a descriptive
+/// error message. This "fail-fast" approach prevents partially-parsed commands
+/// from executing incorrectly.
+///
+/// # Educational Notes
+/// 
+/// This function demonstrates the `collect()` method with `Result` types - if any
+/// `parse_single_token()` call returns an error, the entire `collect()` fails. This is
+/// a common Rust pattern for "all or nothing" operations.
 fn tokenize(input: Vec<String>) -> Result<Vec<Token>, Error> {
-    input.into_iter().map(tokenize_one).collect()
+    input.into_iter().map(parse_single_token).collect()
 }
 
 fn suggest_instruction(unknown: &str) -> Option<String> {
@@ -631,6 +931,8 @@ fn suggest_instruction(unknown: &str) -> Option<String> {
         "EBREAK", "ECALL", "FENCE", "JAL", "JALR", "LB", "LBU", "LH", "LHU", "LUI", "LW",
         "NOP", "OR", "ORI", "SB", "SH", "SLL", "SLLI", "SLT", "SLTI", "SLTIU", "SLTU",
         "SRA", "SRAI", "SRL", "SRLI", "SUB", "SW", "XOR", "XORI",
+        // CSR Instructions
+        "CSRRW", "CSRRS", "CSRRC", "CSRRWI", "CSRRSI", "CSRRCI",
         // Pseudo-instructions
         "MV", "NOT", "NEG", "SEQZ", "SNEZ", "J", "JR", "RET", "LI"
     ];
@@ -653,7 +955,23 @@ fn suggest_instruction(unknown: &str) -> Option<String> {
     None
 }
 
-fn tokenize_one(input: String) -> Result<Token, Error> {
+/// Parses a single normalized string into a typed token.
+///
+/// # Token Recognition Process
+/// 
+/// This function examines a string and determines what type of token it represents:
+/// 1. **Offset(register) patterns**: `4(x2)`, `-8(sp)` → `OffsetRegister`
+/// 2. **Hardware instructions**: `ADD`, `ADDI`, `LW` → `Instruction`
+/// 3. **Pseudo-instructions**: `MV`, `LI`, `RET` → `PseudoInstruction`
+/// 4. **Registers**: `x1`, `sp`, `zero` → `Register`
+/// 5. **Numeric values**: `42`, `0x100`, `0b1010` → `Value32`
+/// 6. **CSR names**: `MSTATUS`, `CYCLE` → `Value32` (with CSR address)
+///
+/// # Educational Notes
+/// 
+/// This function demonstrates pattern matching on string prefixes and suffixes
+/// to classify tokens. It's a common technique in lexical analysis.
+fn parse_single_token(input: String) -> Result<Token, Error> {
     let token = match input.as_str() {
         // registers
         "PC" => Token::Register(Register::PC),
@@ -767,6 +1085,28 @@ fn tokenize_one(input: String) -> Result<Token, Error> {
         "SW" => Token::Instruction(Instruction::SW(SType::default())),
         "XOR" => Token::Instruction(Instruction::XOR(RType::default())),
         "XORI" => Token::Instruction(Instruction::XORI(IType::default())),
+        
+        // CSR Instructions
+        "CSRRW" => Token::Instruction(Instruction::CSRRW(IType::default())),
+        "CSRRS" => Token::Instruction(Instruction::CSRRS(IType::default())),
+        "CSRRC" => Token::Instruction(Instruction::CSRRC(IType::default())),
+        "CSRRWI" => Token::Instruction(Instruction::CSRRWI(IType::default())),
+        "CSRRSI" => Token::Instruction(Instruction::CSRRSI(IType::default())),
+        "CSRRCI" => Token::Instruction(Instruction::CSRRCI(IType::default())),
+        
+        // CSR Names (Control and Status Registers)
+        "CYCLE" => Token::Value32(0xC00),      // Cycle counter (read-only)
+        "TIME" => Token::Value32(0xC01),       // Timer (read-only)
+        "INSTRET" => Token::Value32(0xC02),    // Instructions retired (read-only)
+        "MSTATUS" => Token::Value32(0x300),    // Machine status register
+        "MISA" => Token::Value32(0x301),       // Machine ISA register
+        "MIE" => Token::Value32(0x304),        // Machine interrupt enable
+        "MTVEC" => Token::Value32(0x305),      // Machine trap vector base address
+        "MSCRATCH" => Token::Value32(0x340),   // Machine scratch register
+        "MEPC" => Token::Value32(0x341),       // Machine exception program counter
+        "MCAUSE" => Token::Value32(0x342),     // Machine trap cause
+        "MTVAL" => Token::Value32(0x343),      // Machine trap value
+        "MIP" => Token::Value32(0x344),        // Machine interrupt pending
 
         // Pseudo-instructions - these expand to real instructions
         "MV" => Token::PseudoInstruction(PseudoInstruction::MV {
@@ -897,13 +1237,36 @@ fn parse_register(input: &str) -> Option<Register> {
     }
 }
 
+/// Normalizes raw input into a clean, tokenizable format.
+///
+/// # Normalization Process
+/// 
+/// This function prepares user input for tokenization by:
+/// 1. **Converting to uppercase**: RISC-V mnemonics are case-insensitive
+/// 2. **Splitting on whitespace**: Handles spaces, tabs, newlines uniformly
+/// 3. **Splitting on commas**: Supports both `ADD x1, x2, x3` and `ADD x1 x2 x3`
+/// 4. **Removing empty tokens**: Filters out extra spaces and empty comma-separated fields
+///
+/// # Input Flexibility
+/// 
+/// The parser accepts various input formats:
+/// - `"ADDI x1, zero, 100"`     → `["ADDI", "x1", "zero", "100"]`
+/// - `"addi  x1    zero  100"`  → `["ADDI", "x1", "zero", "100"]`
+/// - `"LW x1, 4(x2)"`          → `["LW", "x1", "4(x2)"]`
+/// - `"mov x1,x2"`             → `["MOV", "x1", "x2"]`
+///
+/// # Educational Notes
+/// 
+/// This demonstrates lexical analysis - the first phase of most compilers.
+/// We're converting unstructured text into a normalized sequence of strings
+/// that can be more easily processed by the tokenizer.
 fn normalize(input: &str) -> Vec<String> {
     let mut output = vec![];
 
-    // split on whitespace and commas, uppercase
+    // Split on whitespace first, then commas - handles mixed formats gracefully
     for ws in input.to_uppercase().split_whitespace() {
         for t in ws.split(',') {
-            // ignore empty tokens
+            // Skip empty tokens (from extra spaces or trailing commas)
             if t.is_empty() {
                 continue;
             }

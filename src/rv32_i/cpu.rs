@@ -1338,7 +1338,7 @@ mod tests {
         // Try to read non-existent CSR
         let result = cpu.read_csr(0x999);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), Error::IllegalInstruction));
+        assert!(matches!(result.unwrap_err(), Error::IllegalInstruction(_)));
         
         // Try to read at boundary
         let result = cpu.read_csr(0xFFF);
@@ -1369,7 +1369,7 @@ mod tests {
         // Try to write to read-only CSRs
         let result = cpu.write_csr(0xC00, 0x1234); // cycle is read-only
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), Error::IllegalInstruction));
+        assert!(matches!(result.unwrap_err(), Error::IllegalInstruction(_)));
         
         let result = cpu.write_csr(0x301, 0x5678); // misa is read-only
         assert!(result.is_err());
@@ -1386,7 +1386,7 @@ mod tests {
         // Try to write to non-existent CSR
         let result = cpu.write_csr(0x999, 0x1234);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), Error::IllegalInstruction));
+        assert!(matches!(result.unwrap_err(), Error::IllegalInstruction(_)));
     }
 
     #[test]
@@ -1679,39 +1679,39 @@ mod tests {
         // Non-existent CSR
         assert!(matches!(
             cpu.read_csr(0x999),
-            Err(Error::IllegalInstruction)
+            Err(Error::IllegalInstruction(_))
         ));
         assert!(matches!(
             cpu.write_csr(0x999, 0),
-            Err(Error::IllegalInstruction)
+            Err(Error::IllegalInstruction(_))
         ));
         assert!(matches!(
             cpu.set_csr_bits(0x999, 1),
-            Err(Error::IllegalInstruction)
+            Err(Error::IllegalInstruction(_))
         ));
         assert!(matches!(
             cpu.clear_csr_bits(0x999, 1),
-            Err(Error::IllegalInstruction)
+            Err(Error::IllegalInstruction(_))
         ));
         
         // Out of bounds CSR address
         assert!(matches!(
             cpu.read_csr(0x1000),
-            Err(Error::IllegalInstruction)
+            Err(Error::IllegalInstruction(_))
         ));
         
         // Read-only CSR writes (with non-zero mask/value)
         assert!(matches!(
             cpu.write_csr(0x301, 0x12345678), // misa is read-only
-            Err(Error::IllegalInstruction)
+            Err(Error::IllegalInstruction(_))
         ));
         assert!(matches!(
             cpu.set_csr_bits(0x301, 0xFF), // non-zero mask
-            Err(Error::IllegalInstruction)
+            Err(Error::IllegalInstruction(_))
         ));
         assert!(matches!(
             cpu.clear_csr_bits(0x301, 0xFF), // non-zero mask
-            Err(Error::IllegalInstruction)
+            Err(Error::IllegalInstruction(_))
         ));
     }
 

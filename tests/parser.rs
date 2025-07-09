@@ -296,3 +296,128 @@ fn test_pc_advancement() {
     let result = i.interpret("PC");
     assert!(result.unwrap().contains("0x8"));
 }
+
+#[test]
+fn test_parse_csr_instructions() {
+    let mut i = Interpreter::new();
+
+    // Initialize registers for CSR operations
+    i.interpret("ADDI x1, zero, 100").unwrap();
+    i.interpret("ADDI x2, zero, 200").unwrap();
+
+    // Test CSR register instructions with numeric addresses
+    let csr_reg_instructions = [
+        "CSRRW x1, 0x340, x2",  // CSRRW rd, csr, rs1
+        "CSRRS x1, 0x340, x2",  // CSRRS rd, csr, rs1
+        "CSRRC x1, 0x340, x2",  // CSRRC rd, csr, rs1
+    ];
+
+    for inst in &csr_reg_instructions {
+        let result = i.interpret(inst);
+        assert!(result.is_ok(), "Failed to parse: {}", inst);
+    }
+
+    // Test CSR immediate instructions with numeric addresses
+    let csr_imm_instructions = [
+        "CSRRWI x1, 0x340, 15",  // CSRRWI rd, csr, uimm5
+        "CSRRSI x1, 0x340, 15",  // CSRRSI rd, csr, uimm5
+        "CSRRCI x1, 0x340, 15",  // CSRRCI rd, csr, uimm5
+    ];
+
+    for inst in &csr_imm_instructions {
+        let result = i.interpret(inst);
+        assert!(result.is_ok(), "Failed to parse: {}", inst);
+    }
+}
+
+#[test]
+fn test_parse_csr_names() {
+    let mut i = Interpreter::new();
+
+    // Initialize registers for CSR operations
+    i.interpret("ADDI x1, zero, 100").unwrap();
+    i.interpret("ADDI x2, zero, 200").unwrap();
+
+    // Test CSR instructions with named CSRs
+    let csr_named_instructions = [
+        "CSRRW x1, MSCRATCH, x2",  // Machine scratch register
+        "CSRRS x1, MSTATUS, x2",   // Machine status register
+        "CSRRC x1, MIE, x2",       // Machine interrupt enable
+        "CSRRWI x1, MSCRATCH, 15", // Immediate variant
+        "CSRRSI x1, MSTATUS, 8",   // Set bits with immediate
+        "CSRRCI x1, MIE, 4",       // Clear bits with immediate
+    ];
+
+    for inst in &csr_named_instructions {
+        let result = i.interpret(inst);
+        assert!(result.is_ok(), "Failed to parse: {}", inst);
+    }
+}
+
+#[test]
+fn test_parse_csr_read_only() {
+    let mut i = Interpreter::new();
+
+    // Test read-only CSRs (should succeed when only reading)
+    let read_only_instructions = [
+        "CSRRS x1, CYCLE, x0",    // Read cycle counter
+        "CSRRS x1, TIME, x0",     // Read timer
+        "CSRRS x1, INSTRET, x0",  // Read instruction retired counter
+        "CSRRSI x1, CYCLE, 0",    // Read with immediate=0
+    ];
+
+    for inst in &read_only_instructions {
+        let result = i.interpret(inst);
+        assert!(result.is_ok(), "Failed to parse read-only CSR: {}", inst);
+    }
+}
+
+#[test]
+fn test_parse_csr_errors() {
+    let mut i = Interpreter::new();
+
+    // Test invalid CSR addresses (out of range)
+    let invalid_addr_tests = [
+        "CSRRW x1, 4096, x2",     // CSR address too large
+        "CSRRW x1, -1, x2",       // CSR address negative
+    ];
+
+    for inst in &invalid_addr_tests {
+        let result = i.interpret(inst);
+        assert!(result.is_err(), "Should fail on invalid CSR address: {}", inst);
+    }
+
+    // Test invalid immediate values for CSR*I instructions
+    let invalid_imm_tests = [
+        "CSRRWI x1, 0x340, 32",   // Immediate too large (max 31)
+        "CSRRWI x1, 0x340, -1",   // Immediate negative
+    ];
+
+    for inst in &invalid_imm_tests {
+        let result = i.interpret(inst);
+        assert!(result.is_err(), "Should fail on invalid immediate: {}", inst);
+    }
+
+    // Test wrong argument count
+    let wrong_arg_tests = [
+        "CSRRW x1, 0x340",        // Missing rs1
+        "CSRRW x1",               // Missing csr and rs1
+        "CSRRW x1, 0x340, x2, x3", // Too many arguments
+    ];
+
+    for inst in &wrong_arg_tests {
+        let result = i.interpret(inst);
+        assert!(result.is_err(), "Should fail on wrong argument count: {}", inst);
+    }
+
+    // Test PC register usage (should be prohibited)
+    let pc_tests = [
+        "CSRRW PC, 0x340, x1",    // PC as destination
+        "CSRRW x1, 0x340, PC",    // PC as source
+    ];
+
+    for inst in &pc_tests {
+        let result = i.interpret(inst);
+        assert!(result.is_err(), "Should fail when using PC register: {}", inst);
+    }
+}

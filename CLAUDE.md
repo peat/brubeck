@@ -105,6 +105,27 @@ The parser is designed as an educational resource demonstrating compiler front-e
 - No support for labels or assembler directives
 - REPL lacks advanced features like command history or tab completion
 
+## Current Work: REPL Usability Improvements
+
+**Status**: In progress based on user feedback from hands-on testing
+
+We are currently working on significant REPL usability improvements to make Brubeck more beginner-friendly and educational. Key findings from user testing:
+
+### Critical Issues Identified
+1. **Missing visual prompt** - No indication of where to type
+2. **Cryptic debug output** - Shows internal structures instead of human explanations
+3. **No register state overview** - Must inspect registers individually
+4. **No command system** - Missing essential learning commands
+
+### Planned Improvements
+- **PC address prompt**: `[0x00000000]> ` to show execution flow
+- **Human-readable output**: "Added 42 to x0 (0) and stored the result in x1 (42)" 
+- **Command system**: `/regs`, `/memory`, `/help`, `/reset` with "/" prefix
+- **Flexible syntax**: Support both spaces and commas in commands
+- **Safety confirmations**: Prevent accidental state loss
+
+See `REPL_USABILITY_FEEDBACK.md` for complete analysis and implementation plan.
+
 ## Testing Approach
 
 Tests have been reorganized into a structured hierarchy under the `tests/` directory:

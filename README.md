@@ -10,6 +10,7 @@ Please follow this repo if you're interested in the project! I'm also very keen 
 
 * Emulator covers the RV32I instruction set, except for `EBREAK`, `ECALL`, and `FENCE` instructions.
 * Interpreter can evaluate instructions (eg: `ADD x1, x2, x3`) and inspect registers.
+* Implementation follows the RISC-V ISA specification (see `riscv-isa-manual/src/rv32.adoc`).
 
 ## Example
 

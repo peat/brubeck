@@ -55,7 +55,15 @@ pub enum Instruction {
     SUB(RType),
     SW(SType),
     XOR(RType),
-    XORI(IType)
+    XORI(IType),
+    
+    // CSR Instructions (Control and Status Register)
+    CSRRW(IType),
+    CSRRS(IType),
+    CSRRC(IType),
+    CSRRWI(IType),
+    CSRRSI(IType),
+    CSRRCI(IType)
 }
 
 impl Instruction {

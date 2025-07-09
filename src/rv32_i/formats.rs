@@ -40,6 +40,14 @@ impl IType {
             imm: Immediate::new(Self::IMM_BITS),
         }
     }
+    
+    pub fn new_with_imm(rd: Register, rs1: Register, imm: u16) -> Self {
+        let mut instruction = Self::new();
+        instruction.rd = rd;
+        instruction.rs1 = rs1;
+        instruction.imm.set_unsigned(imm as u32);
+        instruction
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]

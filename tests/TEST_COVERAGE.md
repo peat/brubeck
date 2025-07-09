@@ -8,7 +8,7 @@ This document tracks our current test coverage against the goals outlined in TES
 - **Educational Documentation**: ✅ Added to all tests
 - **Test Categories Covered**: 3/5 (comprehensive)
 - **Test Categories Missing**: 2/5
-- **Known Issues**: Parser handling of negative immediates
+- **Known Issues**: None currently
 
 ## Test Helper Framework Integration
 
@@ -145,8 +145,9 @@ CSRRW, CSRRS, CSRRC, CSRRWI, CSRRSI, CSRRCI
 - **Fix**: Updated LB to use `u8 as i8 as i32 as u32` and LH to use `u16 as i16 as i32 as u32`
 - **Status**: Fixed - all tests now pass
 
-### Parser Handling of Negative Immediates
-- **Issue**: Parser uses set_unsigned for all immediates, fails on negative values
-- **Impact**: Cannot parse instructions like "ADDI x1, zero, -1"
+### Parser Handling of Negative Immediates ✅ FIXED
+- **Issue**: Parser used set_unsigned for all immediates, failed on negative values
+- **Impact**: Could not parse instructions like "ADDI x1, zero, -1"
 - **Expected**: Parser should use set_signed for immediates that can be negative
-- **Status**: Documented with test workaround
+- **Fix**: Changed Token::Value32 to hold i32, updated all instruction builders to use set_signed
+- **Status**: Fixed in Session 2 - all parser tests now pass with negative immediates

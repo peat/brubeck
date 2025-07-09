@@ -40,7 +40,7 @@ The codebase is organized as both a library and binary application:
 ### Core Components
 
 1. **CPU Emulation (`src/rv32_i/`)**
-   - `cpu.rs` - Main CPU emulator with 32 general-purpose registers and 1 MiB memory
+   - `cpu.rs` - Main CPU emulator with 32 general-purpose registers, 1 MiB memory, and CSR (Control and Status Register) support
    - `instructions.rs` - RV32I instruction definitions and opcode decoding
    - `formats.rs` - Instruction encoding formats (R, I, S, B, U, J types)
    - `registers.rs` - Register definitions with ABI names (x0-x31, zero, ra, sp, etc.)
@@ -68,12 +68,14 @@ The codebase is organized as both a library and binary application:
 - Common pseudo-instructions: MV, NOT, SEQZ, SNEZ, J, JR, RET, LI
 - Support for hex (0x), binary (0b), and decimal immediate values
 - Memory limited to 1 MiB
+- CSR (Control and Status Register) infrastructure with standard CSRs
+- Parser improvements: PC register validation, proper load/store syntax, negative immediates
 
 ### Limitations
 
 - No support for other RISC-V extensions (M, A, F, D, etc.)
+- CSR instructions not yet implemented (infrastructure ready)
 - REPL is in early development with basic parsing capabilities
-- Parser cannot handle negative immediate values in assembly
 
 ## Testing Approach
 
@@ -88,7 +90,7 @@ Tests have been reorganized into a structured hierarchy under the `tests/` direc
   - `pseudo_instructions.rs` - Tests for pseudo-instruction parsing and expansion
 
 ### Known Issues
-- **Negative Immediates**: Parser can't handle negative immediate values in assembly syntax (e.g., "ADDI x1, x0, -5" won't parse, but "LI x1, -5" works)
+- CSR instructions (CSRRW, CSRRS, CSRRC, CSRRWI, CSRRSI, CSRRCI) are not yet parsed or executed
 
 For detailed testing goals and coverage status, see `TESTING_GOALS.md` and `tests/TEST_COVERAGE.md`.
 

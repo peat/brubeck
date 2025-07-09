@@ -6,6 +6,7 @@
 mod arithmetic;
 mod branches;
 mod comparison;
+mod csr;
 mod jumps;
 mod loads_stores;
 mod logical;

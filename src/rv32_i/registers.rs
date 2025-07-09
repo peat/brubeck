@@ -161,3 +161,45 @@ impl ABI {
         }
     }
 }
+
+impl Register {
+    /// Create a Register from a u32 value (for CSR immediate instructions)
+    /// This is used for the 5-bit immediate in CSR instructions
+    pub fn from_u32(value: u32) -> Self {
+        match value & 0x1F {  // Mask to 5 bits
+            0 => Register::X0,
+            1 => Register::X1,
+            2 => Register::X2,
+            3 => Register::X3,
+            4 => Register::X4,
+            5 => Register::X5,
+            6 => Register::X6,
+            7 => Register::X7,
+            8 => Register::X8,
+            9 => Register::X9,
+            10 => Register::X10,
+            11 => Register::X11,
+            12 => Register::X12,
+            13 => Register::X13,
+            14 => Register::X14,
+            15 => Register::X15,
+            16 => Register::X16,
+            17 => Register::X17,
+            18 => Register::X18,
+            19 => Register::X19,
+            20 => Register::X20,
+            21 => Register::X21,
+            22 => Register::X22,
+            23 => Register::X23,
+            24 => Register::X24,
+            25 => Register::X25,
+            26 => Register::X26,
+            27 => Register::X27,
+            28 => Register::X28,
+            29 => Register::X29,
+            30 => Register::X30,
+            31 => Register::X31,
+            _ => unreachable!("Value masked to 5 bits"),
+        }
+    }
+}

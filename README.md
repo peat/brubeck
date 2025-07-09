@@ -8,8 +8,9 @@ Please follow this repo if you're interested in the project! I'm also very keen 
 
 ## Current State
 
-* Emulator covers the RV32I instruction set, except for `EBREAK`, `ECALL`, and `FENCE` instructions.
-* Interpreter can evaluate instructions (eg: `ADD x1, x2, x3`) and inspect registers.
+* Emulator covers the complete RV32I instruction set, including `EBREAK`, `ECALL`, and `FENCE` instructions.
+* Interpreter can evaluate instructions (eg: `ADD x1, x2, x3`), pseudo-instructions (eg: `LI x1, -5`), and inspect registers.
+* Parser supports hex (0x), binary (0b), and decimal immediate values.
 * Implementation follows the RISC-V ISA specification (see `riscv-isa-manual/src/rv32.adoc`).
 
 ## Example
@@ -38,9 +39,9 @@ x3
 
 ## TODO
 
-* Finish plumbing through RV32I instructions in `interpreter.rs`
-* Add memory inspection
-* Add parsing for octal, hex, binary values
+* Add CSR (Control and Status Register) instructions
+* Add memory inspection commands
+* Improve parser error messages and validation
 
 ## Contact
 

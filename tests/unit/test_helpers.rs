@@ -108,6 +108,12 @@ impl CpuBuilder {
         self
     }
 
+    /// Set a CSR value
+    pub fn with_csr(mut self, csr: u16, value: u32) -> Self {
+        self.cpu.write_csr(csr, value).expect("Failed to set CSR in test");
+        self
+    }
+
     pub fn build(self) -> CPU {
         self.cpu
     }

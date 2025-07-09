@@ -246,7 +246,7 @@ impl CPU {
     /// Read a CSR value
     pub fn read_csr(&self, addr: u16) -> Result<u32, Error> {
         if addr >= 4096 || !self.csr_exists[addr as usize] {
-            return Err(Error::IllegalInstruction);
+            return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} does not exist", addr)));
         }
         
         // Special handling for dynamic CSRs
@@ -273,11 +273,11 @@ impl CPU {
     /// Write a CSR value (returns old value like CSRRW instruction)
     pub fn write_csr(&mut self, addr: u16, value: u32) -> Result<u32, Error> {
         if addr >= 4096 || !self.csr_exists[addr as usize] {
-            return Err(Error::IllegalInstruction);
+            return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} does not exist", addr)));
         }
         
         if self.csr_readonly[addr as usize] {
-            return Err(Error::IllegalInstruction);
+            return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} is read-only", addr)));
         }
         
         // Read old value first (atomic read-modify-write)
@@ -1047,6 +1047,229 @@ impl CPU {
         // For educational purposes, we'll return a specific error
         Err(Error::Breakpoint)
     }
+
+    /// CSR Instructions - Control and Status Register Operations
+    /// Reference: RISC-V ISA Manual, Chapter 9 "Zicsr" Extension
+
+    /// CSRRW (Atomic Read/Write CSR)
+    /// Atomically swaps values in the CSRs and integer registers.
+    /// Old CSR value → rd, rs1 → CSR
+    /// If rd=x0, then the instruction shall not read the CSR (avoids side effects)
+    fn rv32i_csrrw(&mut self, instruction: IType) -> Result<(), Error> {
+        // For CSR instructions, the immediate field contains the CSR address (12 bits, unsigned)
+        // We need to mask off the sign extension that was applied during parsing
+        let csr_addr = (instruction.imm.as_u32() & 0xFFF) as u16;
+        let rs1_value = self.get_register(instruction.rs1);
+        
+        // Check if CSR exists
+        if csr_addr >= 4096 || !self.csr_exists[csr_addr as usize] {
+            return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} does not exist", csr_addr)));
+        }
+        
+        // Check if writing to read-only CSR
+        if self.csr_readonly[csr_addr as usize] {
+            return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} is read-only", csr_addr)));
+        }
+        
+        // Read old value only if rd != x0 (to avoid side effects)
+        let old_value = if instruction.rd != Register::X0 {
+            self.read_csr(csr_addr)?
+        } else {
+            0 // Don't actually read, just use dummy value
+        };
+        
+        // Write new value
+        self.write_csr(csr_addr, rs1_value)?;
+        
+        // Write old value to rd (only if rd != x0)
+        if instruction.rd != Register::X0 {
+            self.set_register(instruction.rd, old_value);
+        }
+        
+        Ok(())
+    }
+
+    /// CSRRS (Atomic Read and Set Bits in CSR)
+    /// Reads the value of the CSR, then sets bits based on rs1.
+    /// Old CSR value → rd, CSR | rs1 → CSR
+    /// If rs1=x0, then the instruction will not write to the CSR (avoids side effects)
+    fn rv32i_csrrs(&mut self, instruction: IType) -> Result<(), Error> {
+        // For CSR instructions, the immediate field contains the CSR address (12 bits, unsigned)
+        // We need to mask off the sign extension that was applied during parsing
+        let csr_addr = (instruction.imm.as_u32() & 0xFFF) as u16;
+        let rs1_value = self.get_register(instruction.rs1);
+        
+        // Check if CSR exists
+        if csr_addr >= 4096 || !self.csr_exists[csr_addr as usize] {
+            return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} does not exist", csr_addr)));
+        }
+        
+        // Always read the CSR value
+        let old_value = self.read_csr(csr_addr)?;
+        
+        // Write old value to rd
+        self.set_register(instruction.rd, old_value);
+        
+        // Set bits only if rs1 != x0 (to avoid side effects)
+        if instruction.rs1 != Register::X0 {
+            // Check if writing to read-only CSR
+            if self.csr_readonly[csr_addr as usize] {
+                return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} is read-only", csr_addr)));
+            }
+            
+            let new_value = old_value | rs1_value;
+            self.write_csr(csr_addr, new_value)?;
+        }
+        
+        Ok(())
+    }
+
+    /// CSRRC (Atomic Read and Clear Bits in CSR)
+    /// Reads the value of the CSR, then clears bits based on rs1.
+    /// Old CSR value → rd, CSR & ~rs1 → CSR
+    /// If rs1=x0, then the instruction will not write to the CSR (avoids side effects)
+    fn rv32i_csrrc(&mut self, instruction: IType) -> Result<(), Error> {
+        // For CSR instructions, the immediate field contains the CSR address (12 bits, unsigned)
+        // We need to mask off the sign extension that was applied during parsing
+        let csr_addr = (instruction.imm.as_u32() & 0xFFF) as u16;
+        let rs1_value = self.get_register(instruction.rs1);
+        
+        // Check if CSR exists
+        if csr_addr >= 4096 || !self.csr_exists[csr_addr as usize] {
+            return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} does not exist", csr_addr)));
+        }
+        
+        // Always read the CSR value
+        let old_value = self.read_csr(csr_addr)?;
+        
+        // Write old value to rd
+        self.set_register(instruction.rd, old_value);
+        
+        // Clear bits only if rs1 != x0 (to avoid side effects)
+        if instruction.rs1 != Register::X0 {
+            // Check if writing to read-only CSR
+            if self.csr_readonly[csr_addr as usize] {
+                return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} is read-only", csr_addr)));
+            }
+            
+            let new_value = old_value & !rs1_value;
+            self.write_csr(csr_addr, new_value)?;
+        }
+        
+        Ok(())
+    }
+
+    /// CSRRWI (Atomic Read/Write CSR Immediate)
+    /// Atomically writes a zero-extended 5-bit immediate to a CSR.
+    /// Old CSR value → rd, zero-extended uimm → CSR
+    /// If rd=x0, then the instruction shall not read the CSR (avoids side effects)
+    fn rv32i_csrrwi(&mut self, instruction: IType) -> Result<(), Error> {
+        // For CSR instructions, the immediate field contains the CSR address (12 bits, unsigned)
+        // We need to mask off the sign extension that was applied during parsing
+        let csr_addr = (instruction.imm.as_u32() & 0xFFF) as u16;
+        // Extract 5-bit immediate from rs1 field (bits 19-15 of instruction)
+        // For CSR immediate instructions, rs1 contains the immediate value, not a register
+        let uimm = instruction.rs1.to_u32() & 0x1F;
+        
+        // Check if CSR exists
+        if csr_addr >= 4096 || !self.csr_exists[csr_addr as usize] {
+            return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} does not exist", csr_addr)));
+        }
+        
+        // Check if writing to read-only CSR
+        if self.csr_readonly[csr_addr as usize] {
+            return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} is read-only", csr_addr)));
+        }
+        
+        // Read old value only if rd != x0 (to avoid side effects)
+        let old_value = if instruction.rd != Register::X0 {
+            self.read_csr(csr_addr)?
+        } else {
+            0 // Don't actually read, just use dummy value
+        };
+        
+        // Write immediate value (zero-extended)
+        self.write_csr(csr_addr, uimm)?;
+        
+        // Write old value to rd (only if rd != x0)
+        if instruction.rd != Register::X0 {
+            self.set_register(instruction.rd, old_value);
+        }
+        
+        Ok(())
+    }
+
+    /// CSRRSI (Atomic Read and Set Bits in CSR Immediate)
+    /// Reads the value of the CSR, then sets bits based on 5-bit immediate.
+    /// Old CSR value → rd, CSR | zero-extended uimm → CSR
+    /// If uimm=0, then the instruction will not write to the CSR (avoids side effects)
+    fn rv32i_csrrsi(&mut self, instruction: IType) -> Result<(), Error> {
+        // For CSR instructions, the immediate field contains the CSR address (12 bits, unsigned)
+        // We need to mask off the sign extension that was applied during parsing
+        let csr_addr = (instruction.imm.as_u32() & 0xFFF) as u16;
+        // Extract 5-bit immediate from rs1 field
+        let uimm = instruction.rs1.to_u32() & 0x1F;
+        
+        // Check if CSR exists
+        if csr_addr >= 4096 || !self.csr_exists[csr_addr as usize] {
+            return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} does not exist", csr_addr)));
+        }
+        
+        // Always read the CSR value
+        let old_value = self.read_csr(csr_addr)?;
+        
+        // Write old value to rd
+        self.set_register(instruction.rd, old_value);
+        
+        // Set bits only if uimm != 0 (to avoid side effects)
+        if uimm != 0 {
+            // Check if writing to read-only CSR
+            if self.csr_readonly[csr_addr as usize] {
+                return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} is read-only", csr_addr)));
+            }
+            
+            let new_value = old_value | uimm;
+            self.write_csr(csr_addr, new_value)?;
+        }
+        
+        Ok(())
+    }
+
+    /// CSRRCI (Atomic Read and Clear Bits in CSR Immediate)
+    /// Reads the value of the CSR, then clears bits based on 5-bit immediate.
+    /// Old CSR value → rd, CSR & ~zero-extended uimm → CSR
+    /// If uimm=0, then the instruction will not write to the CSR (avoids side effects)
+    fn rv32i_csrrci(&mut self, instruction: IType) -> Result<(), Error> {
+        // For CSR instructions, the immediate field contains the CSR address (12 bits, unsigned)
+        // We need to mask off the sign extension that was applied during parsing
+        let csr_addr = (instruction.imm.as_u32() & 0xFFF) as u16;
+        // Extract 5-bit immediate from rs1 field
+        let uimm = instruction.rs1.to_u32() & 0x1F;
+        
+        // Check if CSR exists
+        if csr_addr >= 4096 || !self.csr_exists[csr_addr as usize] {
+            return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} does not exist", csr_addr)));
+        }
+        
+        // Always read the CSR value
+        let old_value = self.read_csr(csr_addr)?;
+        
+        // Write old value to rd
+        self.set_register(instruction.rd, old_value);
+        
+        // Clear bits only if uimm != 0 (to avoid side effects)
+        if uimm != 0 {
+            // Check if writing to read-only CSR
+            if self.csr_readonly[csr_addr as usize] {
+                return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} is read-only", csr_addr)));
+            }
+            
+            let new_value = old_value & !uimm;
+            self.write_csr(csr_addr, new_value)?;
+        }
+        
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -1055,7 +1278,7 @@ pub enum Error {
     AccessViolation(u32),
     EnvironmentCall,
     Breakpoint,
-    IllegalInstruction,
+    IllegalInstruction(String),
 }
 
 #[cfg(test)]

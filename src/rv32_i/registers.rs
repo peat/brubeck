@@ -163,6 +163,45 @@ impl ABI {
 }
 
 impl Register {
+    /// Convert Register to u32 value (for CSR immediate instructions)
+    pub fn to_u32(&self) -> u32 {
+        match self {
+            Register::X0 => 0,
+            Register::X1 => 1,
+            Register::X2 => 2,
+            Register::X3 => 3,
+            Register::X4 => 4,
+            Register::X5 => 5,
+            Register::X6 => 6,
+            Register::X7 => 7,
+            Register::X8 => 8,
+            Register::X9 => 9,
+            Register::X10 => 10,
+            Register::X11 => 11,
+            Register::X12 => 12,
+            Register::X13 => 13,
+            Register::X14 => 14,
+            Register::X15 => 15,
+            Register::X16 => 16,
+            Register::X17 => 17,
+            Register::X18 => 18,
+            Register::X19 => 19,
+            Register::X20 => 20,
+            Register::X21 => 21,
+            Register::X22 => 22,
+            Register::X23 => 23,
+            Register::X24 => 24,
+            Register::X25 => 25,
+            Register::X26 => 26,
+            Register::X27 => 27,
+            Register::X28 => 28,
+            Register::X29 => 29,
+            Register::X30 => 30,
+            Register::X31 => 31,
+            Register::PC => 32, // This shouldn't be used in CSR instructions
+        }
+    }
+
     /// Create a Register from a u32 value (for CSR immediate instructions)
     /// This is used for the 5-bit immediate in CSR instructions
     pub fn from_u32(value: u32) -> Self {

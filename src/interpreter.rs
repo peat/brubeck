@@ -244,6 +244,14 @@ fn build_instruction(instruction: &mut Instruction, args: &[Token]) -> Result<In
         Instruction::SW(mut stype) => Instruction::SW(build_store_stype(&mut stype, args)?),
         Instruction::XOR(mut rtype) => Instruction::XOR(build_rtype(&mut rtype, args)?),
         Instruction::XORI(mut itype) => Instruction::XORI(build_itype(&mut itype, args, "XORI")?),
+        
+        // CSR Instructions (TODO: implement proper parsing)
+        Instruction::CSRRW(mut itype) => Instruction::CSRRW(build_itype(&mut itype, args, "CSRRW")?),
+        Instruction::CSRRS(mut itype) => Instruction::CSRRS(build_itype(&mut itype, args, "CSRRS")?),
+        Instruction::CSRRC(mut itype) => Instruction::CSRRC(build_itype(&mut itype, args, "CSRRC")?),
+        Instruction::CSRRWI(mut itype) => Instruction::CSRRWI(build_itype(&mut itype, args, "CSRRWI")?),
+        Instruction::CSRRSI(mut itype) => Instruction::CSRRSI(build_itype(&mut itype, args, "CSRRSI")?),
+        Instruction::CSRRCI(mut itype) => Instruction::CSRRCI(build_itype(&mut itype, args, "CSRRCI")?),
     };
 
     Ok(output)

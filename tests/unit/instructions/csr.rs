@@ -12,9 +12,8 @@
 //! Reference: RISC-V ISA Manual, Chapter 9 "Zicsr" Extension
 //! https://github.com/riscv/riscv-isa-manual/blob/main/src/zicsr.adoc
 
-use crate::test_helpers::*;
-use brubeck::{CPU, Error, Register};
-use brubeck::rv32_i::{IType, Instruction};
+use crate::unit::test_helpers::*;
+use brubeck::rv32_i::{CPU, Error, Register, IType, Instruction};
 
 /// Tests for CSRRW (Atomic Read/Write CSR) instruction
 mod csrrw {
@@ -24,7 +23,7 @@ mod csrrw {
     fn basic_read_write() {
         /// CSRRW atomically swaps values between a CSR and integer register
         /// Old CSR value → rd, rs1 → CSR
-        let mut cpu = CpuBuilder::default()
+        let mut cpu = CpuBuilder::new()
             .with_csr(0x340, 0x12345678)  // mscratch = 0x12345678
             .with_register(Register::X1, 0xABCDEF00)
             .build();
@@ -44,7 +43,7 @@ mod csrrw {
     fn write_without_read() {
         /// When rd=x0, CSRRW should not read the CSR (avoiding side effects)
         /// Only rs1 → CSR
-        let mut cpu = CpuBuilder::default()
+        let mut cpu = CpuBuilder::new()
             .with_csr(0x340, 0x12345678)
             .with_register(Register::X1, 0xABCDEF00)
             .build();
@@ -63,7 +62,7 @@ mod csrrw {
     #[test]
     fn write_zero_from_x0() {
         /// CSRRW with rs1=x0 writes zero to the CSR
-        let mut cpu = CpuBuilder::default()
+        let mut cpu = CpuBuilder::new()
             .with_csr(0x340, 0x12345678)
             .build();
 
@@ -114,7 +113,7 @@ mod csrrs {
     fn basic_set_bits() {
         /// CSRRS atomically sets bits in a CSR based on rs1
         /// Old CSR value → rd, CSR | rs1 → CSR
-        let mut cpu = CpuBuilder::default()
+        let mut cpu = CpuBuilder::new()
             .with_csr(0x340, 0x12340000)  // mscratch = 0x12340000
             .with_register(Register::X1, 0x00005678)
             .build();
@@ -133,7 +132,7 @@ mod csrrs {
     #[test]
     fn read_without_write() {
         /// When rs1=x0, CSRRS should only read the CSR, not modify it
-        let mut cpu = CpuBuilder::default()
+        let mut cpu = CpuBuilder::new()
             .with_csr(0x340, 0x12345678)
             .build();
 
@@ -158,6 +157,9 @@ mod csrrs {
             IType::new_with_imm(Register::X1, Register::X0, 0xC00)
         ));
 
+        if let Err(e) = &result {
+            println!("Error: {:?}", e);
+        }
         assert!(result.is_ok());
         // We can't predict the exact cycle count, just verify it succeeded
     }
@@ -166,7 +168,7 @@ mod csrrs {
     fn warl_field_behavior() {
         /// WARL (Write Any Read Legal) fields should mask illegal bit writes
         /// mstatus has WARL behavior - only certain bits are writable
-        let mut cpu = CpuBuilder::default()
+        let mut cpu = CpuBuilder::new()
             .with_csr(0x300, 0x00000000)  // mstatus = 0
             .with_register(Register::X1, 0xFFFFFFFF)  // Try to set all bits
             .build();
@@ -190,7 +192,7 @@ mod csrrc {
     fn basic_clear_bits() {
         /// CSRRC atomically clears bits in a CSR based on rs1
         /// Old CSR value → rd, CSR & ~rs1 → CSR
-        let mut cpu = CpuBuilder::default()
+        let mut cpu = CpuBuilder::new()
             .with_csr(0x340, 0x12345678)  // mscratch = 0x12345678
             .with_register(Register::X1, 0x0000FF00)
             .build();
@@ -209,7 +211,7 @@ mod csrrc {
     #[test]
     fn read_without_clear() {
         /// When rs1=x0, CSRRC should only read the CSR, not modify it
-        let mut cpu = CpuBuilder::default()
+        let mut cpu = CpuBuilder::new()
             .with_csr(0x340, 0x12345678)
             .build();
 
@@ -233,7 +235,7 @@ mod csrrwi {
     fn basic_immediate_write() {
         /// CSRRWI atomically writes a 5-bit immediate to a CSR
         /// Old CSR value → rd, zero-extended uimm → CSR
-        let mut cpu = CpuBuilder::default()
+        let mut cpu = CpuBuilder::new()
             .with_csr(0x340, 0x12345678)
             .build();
 
@@ -251,7 +253,7 @@ mod csrrwi {
     #[test]
     fn immediate_write_without_read() {
         /// When rd=x0, CSRRWI should not read the CSR
-        let mut cpu = CpuBuilder::default()
+        let mut cpu = CpuBuilder::new()
             .with_csr(0x340, 0x12345678)
             .build();
 
@@ -268,7 +270,7 @@ mod csrrwi {
     #[test]
     fn five_bit_immediate_limit() {
         /// The immediate is only 5 bits, so values > 31 should be masked
-        let mut cpu = CpuBuilder::default()
+        let mut cpu = CpuBuilder::new()
             .with_csr(0x340, 0)
             .build();
 
@@ -291,7 +293,7 @@ mod csrrsi {
     #[test]
     fn basic_immediate_set() {
         /// CSRRSI atomically sets bits in a CSR based on a 5-bit immediate
-        let mut cpu = CpuBuilder::default()
+        let mut cpu = CpuBuilder::new()
             .with_csr(0x340, 0x12340000)
             .build();
 
@@ -308,7 +310,7 @@ mod csrrsi {
     #[test]
     fn read_without_set() {
         /// When uimm=0, CSRRSI should only read the CSR
-        let mut cpu = CpuBuilder::default()
+        let mut cpu = CpuBuilder::new()
             .with_csr(0x340, 0x12345678)
             .build();
 
@@ -343,7 +345,7 @@ mod csrrci {
     #[test]
     fn basic_immediate_clear() {
         /// CSRRCI atomically clears bits in a CSR based on a 5-bit immediate
-        let mut cpu = CpuBuilder::default()
+        let mut cpu = CpuBuilder::new()
             .with_csr(0x340, 0x1234567F)
             .build();
 
@@ -360,7 +362,7 @@ mod csrrci {
     #[test]
     fn read_without_clear() {
         /// When uimm=0, CSRRCI should only read the CSR
-        let mut cpu = CpuBuilder::default()
+        let mut cpu = CpuBuilder::new()
             .with_csr(0x340, 0x12345678)
             .build();
 
@@ -383,7 +385,7 @@ mod atomic_operations {
     fn csrrs_is_atomic() {
         /// Verify that CSRRS performs atomic read-modify-write
         /// The old value returned should be before any modification
-        let mut cpu = CpuBuilder::default()
+        let mut cpu = CpuBuilder::new()
             .with_csr(0x340, 0x00001234)
             .with_register(Register::X1, 0x00005678)
             .build();
@@ -395,13 +397,14 @@ mod atomic_operations {
 
         assert!(result.is_ok());
         assert_eq!(cpu.get_register(Register::X2), 0x00001234, "Should return value before modification");
-        assert_eq!(cpu.read_csr(0x340).unwrap(), 0x000057FC, "Should have bits set");
+        // 0x00001234 | 0x00005678 = 0x0000567C
+        assert_eq!(cpu.read_csr(0x340).unwrap(), 0x0000567C, "Should have bits set");
     }
 
     #[test]
     fn csrrc_is_atomic() {
         /// Verify that CSRRC performs atomic read-modify-write
-        let mut cpu = CpuBuilder::default()
+        let mut cpu = CpuBuilder::new()
             .with_csr(0x340, 0x0000FFFF)
             .with_register(Register::X1, 0x00000FF0)
             .build();
@@ -424,7 +427,7 @@ mod csr_patterns {
     #[test]
     fn read_csr_idiom() {
         /// Common pattern: CSRRS rd, csr, x0 to read a CSR
-        let mut cpu = CpuBuilder::default()
+        let mut cpu = CpuBuilder::new()
             .with_csr(0x340, 0xDEADBEEF)
             .build();
 
@@ -440,7 +443,7 @@ mod csr_patterns {
     #[test]
     fn write_csr_idiom() {
         /// Common pattern: CSRRW x0, csr, rs to write a CSR
-        let mut cpu = CpuBuilder::default()
+        let mut cpu = CpuBuilder::new()
             .with_register(Register::X5, 0xCAFEBABE)
             .build();
 
@@ -456,7 +459,7 @@ mod csr_patterns {
     #[test]
     fn swap_with_csr() {
         /// Swap a register value with a CSR value
-        let mut cpu = CpuBuilder::default()
+        let mut cpu = CpuBuilder::new()
             .with_csr(0x340, 0xAAAAAAAA)
             .with_register(Register::X10, 0x55555555)
             .build();

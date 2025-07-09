@@ -45,7 +45,7 @@ impl IType {
         let mut instruction = Self::new();
         instruction.rd = rd;
         instruction.rs1 = rs1;
-        instruction.imm.set_unsigned(imm as u32);
+        instruction.imm.set_unsigned(imm as u32).expect("CSR address should fit in 12 bits");
         instruction
     }
 }

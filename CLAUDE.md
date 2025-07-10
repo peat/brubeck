@@ -230,12 +230,64 @@ impl CPU {
 3. **Verify alignment**: Memory displays often need alignment
 4. **Test incrementally**: Build parser → formatter → executor → tests
 
+## Terminal and Binary Development
+
+### Module Organization
+
+1. **Binary-only features**: Keep terminal code in `src/bin/` subdirectories
+   ```
+   src/bin/repl/
+   ├── mod.rs       # Module exports
+   ├── history.rs   # Command history logic
+   └── input.rs     # Terminal input handling
+   ```
+
+2. **Feature separation**: Library stays pure, binary gets rich features
+   ```rust
+   #[cfg(feature = "repl")]
+   let mut history = repl::CommandHistory::new(history_size);
+   ```
+
+### Terminal Handling Patterns
+
+1. **Always restore terminal state**:
+   ```rust
+   terminal::enable_raw_mode()?;
+   let result = (|| -> io::Result<String> {
+       // ... terminal interaction ...
+   })();
+   terminal::disable_raw_mode()?;  // Always runs
+   result
+   ```
+
+2. **Use crossterm for consistency**: Avoid mixing print methods
+   ```rust
+   execute!(stdout, Print(prompt))?;  // Good
+   print!("{}", prompt);              // Avoid in raw mode
+   ```
+
+3. **Handle line endings explicitly**: Use `\r\n` for proper terminal behavior
+
+### CLI Configuration Best Practices
+
+1. **Validate at boundaries**: Convert CLI args to Config early
+2. **Use conflicts_with**: Prevent invalid flag combinations
+3. **Thread config through**: Pass only needed values, not entire CLI struct
+
+Example:
+```rust
+let history_size = if cli.no_history { 0 } else { cli.history_size };
+run_interactive(&mut interpreter, cli.quiet, history_size)
+```
+
 ## Common Pitfalls
 
 1. **Store instruction syntax**: Use `SB x2, 0(x1)` not `SB x2, x1, 0`
 2. **Option dereferencing**: Can't dereference `Option<T>` directly
 3. **Doc test format**: Use ` ```text` for non-code examples
 4. **Feature flag scope**: Remember what's gated by `#[cfg(feature = "repl")]`
+5. **Terminal state**: Always restore on all exit paths (success, error, panic)
+6. **Event loops**: Handle Ctrl+C gracefully with proper cleanup
 
 ## References
 

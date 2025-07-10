@@ -83,16 +83,16 @@ Making Brubeck more beginner-friendly and educational based on user feedback.
 - `/memory 0x1000-0x2000` - Memory range syntax
 
 #### 9. Command History with Arrow Keys ⏱️ ~8 hours
-**Status**: Not started  
+**Status**: ✅ Completed  
 **Why**: Essential REPL feature for productivity  
-**Specification**:
+**Implementation**:
 - Up/down arrows navigate command history
 - Escape cancels browsing
 - Automatic deduplication
-- Configurable history size
-- Event-based terminal input
+- Configurable via --history-size and --no-history flags
+- Event-based terminal input with crossterm
 - Feature-gated in binary only
-- Future: persist to `.brubeck_history` in working directory
+- Future enhancement: persist to `.brubeck_history` in working directory
 
 #### 10. Tab Completion ⏱️ ~6 hours
 **Status**: Not started  
@@ -118,6 +118,7 @@ Making Brubeck more beginner-friendly and educational based on user feedback.
 - [x] Modular interpreter architecture
 - [x] `/reset` command with confirmation
 - [x] `/memory` command for memory inspection
+- [x] Command history with arrow keys
 
 ### 🚧 In Progress
 - [ ] Phase 2 REPL improvements (see tasks above)

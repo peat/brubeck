@@ -272,6 +272,16 @@ Only proceed with marking a task complete if all three commands pass successfull
 
 4. **Never commit without testing** - Always run `cargo fmt`, `cargo clippy`, and `cargo test` before committing
 
+5. **Group related changes** - When making multiple related changes:
+   - Stage and commit related files together (e.g., code + tests)
+   - Keep documentation updates separate from code changes
+   - Use `git add -p` to review and stage specific changes
+
+6. **Documentation tone** - Keep language professional and concise:
+   - Avoid hyperbolic terms like "comprehensive", "robust", "production-grade"
+   - Focus on clarity and accuracy over enthusiasm
+   - Error messages should be helpful without being verbose
+
 Example workflow:
 ```bash
 # After making a small, focused change
@@ -286,3 +296,20 @@ git checkout -b feature/memory-inspection
 # ... make changes, commit frequently ...
 git push origin feature/memory-inspection
 ```
+
+## Task Management Best Practices
+
+1. **Always update PROJECT_STATUS.md** when completing tasks
+   - Mark tasks as completed with ✅
+   - Update the "Last Updated" date
+   - Keep task descriptions current
+
+2. **Use the TodoWrite tool** throughout development:
+   - Mark tasks as `in_progress` when starting
+   - Update to `completed` immediately when done
+   - Don't batch status updates
+
+3. **Follow the established workflow**:
+   - Start with easier/smaller tasks as warm-up
+   - Complete one task fully before moving to the next
+   - Run quality checks before marking complete

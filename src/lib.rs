@@ -1,7 +1,7 @@
 //! # Brubeck: A RISC-V REPL in Progress
 //!
 //! Brubeck provides a "read, evaluate, print, loop" interactive environment for
-//! RISC-V assembly language. What could be more fun?!
+//! RISC-V assembly language.
 //!
 //! From Wikipedia: _"[Dave Brubeck](https://en.wikipedia.org/wiki/Dave_Brubeck)
 //! was an American jazz pianist and composer. Often regarded as a foremost
@@ -14,8 +14,8 @@
 //! Don't expect this to work out of the box. There is a lot of nuance in the
 //! behavior of an ISA, particularly with error modes, addressing, etc.
 //!
-//! The very basic stuff works great. Go ahead and ADD and SUB to your hart's
-//! content. Don't rely on it for anything else quite yet.
+//! Basic arithmetic operations are functional. More complex features are still
+//! in development.
 //!
 //! ## Running
 //!
@@ -46,18 +46,17 @@
 //!
 //! let mut cpu = CPU::default();
 //!
-//! // NOP, or "No Operation" ... the simplest instruction!
+//! // NOP, or "No Operation"
 //! let nop = Instruction::NOP;
 //! let result = cpu.execute(nop);
 //!
-//! // successful execution is ok!
+//! // Check for successful execution
 //! assert!(result.is_ok());
 //!
 //! // PC should be incremented by the length of the NOP instruction
 //! assert_eq!(cpu.pc, Instruction::LENGTH);
 //!
-//! // Let's do something more exciting: set a register to a value, then
-//! // store it in memory!
+//! // Set a register to a value, then store it in memory
 //!
 //! // The xType formats represent the instruction data components.
 //! let mut addi_data = IType::default();
@@ -77,13 +76,13 @@
 //! // ... Create the instruction.
 //! let addi = Instruction::ADDI(addi_data);
 //!
-//! // ... Aaaaand execute it!
+//! // Execute the instruction
 //! let result = cpu.execute(addi);
 //!
 //! // ... Any execution errors will be caught.
 //! assert!(result.is_ok());
 //!
-//! // ... The target register responds appropriately to ADDI!
+//! // Verify the register was updated
 //! assert_eq!(cpu.x1, 0b0000_0000_0000_0000_0000_0000_0000_0001);
 //!
 //! // And now we store it in memory ...
@@ -103,7 +102,7 @@
 //! // ... Create the instruction.
 //! let sw = Instruction::SW(sw_data);
 //!
-//! // ... Aaaaand execute it!
+//! // Execute the instruction
 //! let result = cpu.execute(sw);
 //!
 //! // ... Any execution errors will be caught.

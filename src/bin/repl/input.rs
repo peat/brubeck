@@ -32,8 +32,8 @@ pub fn read_line_with_history(prompt: &str, history: &mut CommandHistory) -> io:
     // Enable raw mode for direct key handling
     terminal::enable_raw_mode()?;
 
-    // Print the prompt
-    print!("{prompt}");
+    // Print the prompt using crossterm for consistency
+    execute!(stdout, Print(prompt))?;
     stdout.flush()?;
 
     let result = (|| -> io::Result<String> {
@@ -44,11 +44,18 @@ pub fn read_line_with_history(prompt: &str, history: &mut CommandHistory) -> io:
             {
                 match code {
                     KeyCode::Enter => {
-                        println!(); // New line after input
+                        // Move to end of line and print newline
+                        execute!(
+                            stdout,
+                            cursor::MoveToColumn((prompt.len() + input.len()) as u16),
+                            Print("\r\n")
+                        )?;
+                        stdout.flush()?;
                         return Ok(input);
                     }
                     KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => {
-                        println!("^C");
+                        execute!(stdout, Print("\r\n"))?;
+                        stdout.flush()?;
                         return Err(io::Error::new(io::ErrorKind::Interrupted, "Ctrl+C"));
                     }
                     KeyCode::Char(c) => {

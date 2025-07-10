@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Important Instructions
 
 1. **Always use PROJECT_STATUS.md** to track current work and planned tasks. Do not create multiple tracking files - consolidate everything in PROJECT_STATUS.md.
-2. **Always write comprehensive tests first** before implementing new features or making changes. Follow TDD (Test-Driven Development) practices.
+2. **Always write tests first** before implementing new features or making changes. Follow TDD (Test-Driven Development) practices.
 
 ## Project Overview
 
@@ -113,9 +113,9 @@ The parser is designed as an educational resource demonstrating compiler front-e
 - **System instructions**: FENCE, ECALL, EBREAK  
 - **Common pseudo-instructions**: MV, NOT, SEQZ, SNEZ, J, JR, RET, LI
 - **Multiple immediate formats**: Hex (0x), binary (0b), and decimal values
-- **Production-grade parser** with comprehensive validation and educational error messages
+- **Parser** with validation and helpful error messages
 - **Standard RISC-V assembly syntax**: Both `LW x1, 4(x2)` and legacy `LW x1, x2, 4` formats
-- **Robust validation**: PC register protection, immediate range checking, argument validation
+- **Validation**: PC register protection, immediate range checking, argument validation
 - **Memory**: Configurable size (default 1 MiB) with proper load/store operations
 - **Command system**: `/regs`, `/help`, `/undo`, `/redo` with aliases
 - **CLI support**: Script files, one-liners, memory configuration
@@ -154,7 +154,7 @@ See `REFACTORING_SUMMARY.md` for complete details.
 
 **Status**: Completed
 
-Brubeck now has a comprehensive CLI using `clap`:
+Brubeck now has a CLI using `clap`:
 - **Memory configuration**: `-m, --memory <size>` (e.g., 1M, 256k)
 - **History configuration**: `--undo-limit <n>`, `--no-undo`
 - **Execution modes**: `-e, --execute <commands>`, `-s, --script <file>`
@@ -165,13 +165,13 @@ Brubeck now has a comprehensive CLI using `clap`:
 
 **Status**: Completed
 
-We have implemented a comprehensive undo/redo system for the REPL that:
+We have implemented an undo/redo system for the REPL that:
 - Allows users to undo instruction execution with `/undo` or `/u`
 - Supports redo with `/redo`
 - Uses efficient delta compression for memory changes
 - Maintains a configurable history (default: 1000 states)
 - Only tracks successfully executed instructions
-- Has comprehensive test coverage for all RV32I instructions
+- Has test coverage for all RV32I instructions
 
 Implementation uses `src/history.rs` for state management with efficient delta compression.
 
@@ -230,7 +230,7 @@ Tests have been reorganized into a structured hierarchy under the `tests/` direc
 - **Parser Features**: Comprehensive integration tests
 - **Edge Cases**: Extensive validation and error handling tests
 
-**Total Test Count**: 350+ tests across unit, integration, and comprehensive test suites.
+**Total Test Count**: 350+ tests across unit and integration test suites.
 
 For test coverage details, see `tests/TEST_COVERAGE.md`.
 

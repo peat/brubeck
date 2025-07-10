@@ -21,22 +21,22 @@ mod comprehensive_tests;
 #[cfg(feature = "repl")]
 pub mod helpers {
     pub use crate::common::*;
-    
+
     /// Extension trait for undo/redo specific operations
     pub trait UndoRedoExt {
         /// Undo N times
         fn undo_n(&mut self, n: usize) -> &mut Self;
-        
+
         /// Redo N times  
         fn redo_n(&mut self, n: usize) -> &mut Self;
-        
+
         /// Redo with expected content
         fn redo_expect(&mut self, expected: &str) -> &mut Self;
-        
+
         /// Check redo should fail
         fn redo_should_fail(&mut self) -> &mut Self;
     }
-    
+
     impl UndoRedoExt for TestContext<brubeck::interpreter::Interpreter> {
         fn undo_n(&mut self, n: usize) -> &mut Self {
             for _ in 0..n {
@@ -44,30 +44,32 @@ pub mod helpers {
             }
             self
         }
-        
+
         fn redo_n(&mut self, n: usize) -> &mut Self {
             for _ in 0..n {
                 self.redo();
             }
             self
         }
-        
+
         fn redo_expect(&mut self, expected: &str) -> &mut Self {
             let ctx = self.context("Redo");
-            let result = self.inner.interpret("/redo")
-                .unwrap_or_else(|e| panic!("{}: {:?}", ctx, e));
-            assert_contains_with_context(&result, expected, &ctx);
+            let result = self
+                .inner
+                .interpret("/redo")
+                .unwrap_or_else(|e| panic!("{ctx}: {e:?}"));
+            crate::common::assertions::assert_contains_with_context(&result, expected, &ctx);
             self
         }
-        
+
         fn redo_should_fail(&mut self) -> &mut Self {
             let ctx = self.context("Redo (expecting failure)");
             if self.inner.interpret("/redo").is_ok() {
-                panic!("{}: Expected redo to fail but it succeeded", ctx);
+                panic!("{ctx}: Expected redo to fail but it succeeded");
             }
             self
         }
     }
-    
+
     // Already imported via pub use crate::common::*;
 }

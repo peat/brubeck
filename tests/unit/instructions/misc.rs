@@ -83,7 +83,7 @@ fn test_nop_use_cases() {
     // Used in delay slots or for timing
     let start_pc = cpu.pc;
     for i in 0..4 {
-        cpu.execute_expect(nop, &format!("Timing NOP {}", i));
+        cpu.execute_expect(nop, &format!("Timing NOP {i}"));
     }
     cpu.assert_pc(start_pc + 16, "Four NOPs advance PC by 16");
 

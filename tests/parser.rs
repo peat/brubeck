@@ -46,13 +46,13 @@ fn test_parse_register_inspection() {
     let mut i = Interpreter::new();
 
     // Test register inspection
-    let result = i.interpret("PC");
+    let result = i.interpret("/regs PC");
     assert!(result.is_ok());
-    assert!(result.unwrap().contains("PC"));
+    assert!(result.unwrap().contains("pc: 0x"));
 
-    let result = i.interpret("X1");
+    let result = i.interpret("/regs X1");
     assert!(result.is_ok());
-    assert!(result.unwrap().contains("X1"));
+    assert!(result.unwrap().contains("x 1 ("));
 }
 
 #[test]
@@ -60,17 +60,17 @@ fn test_parse_abi_register_names() {
     let mut i = Interpreter::new();
 
     // Test ABI register names
-    let result = i.interpret("ZERO");
+    let result = i.interpret("/regs ZERO");
     assert!(result.is_ok());
-    assert!(result.unwrap().contains("X0"));
+    assert!(result.unwrap().contains("x 0 (zero):"));
 
-    let result = i.interpret("RA");
+    let result = i.interpret("/regs RA");
     assert!(result.is_ok());
-    assert!(result.unwrap().contains("X1"));
+    assert!(result.unwrap().contains("x 1 ("));
 
-    let result = i.interpret("SP");
+    let result = i.interpret("/regs SP");
     assert!(result.is_ok());
-    assert!(result.unwrap().contains("X2"));
+    assert!(result.unwrap().contains("x 2 (sp  ):"));
 }
 
 #[test]
@@ -86,8 +86,8 @@ fn test_parse_complete_instruction() {
     assert!(result.is_ok());
 
     // Verify result
-    let result = i.interpret("X1");
-    assert!(result.unwrap().contains("0x8"));
+    let result = i.interpret("/regs X1");
+    assert!(result.unwrap().contains("x 1 (ra  ): 0x00000008"));
 }
 
 #[test]
@@ -99,16 +99,16 @@ fn test_trivial_add() {
     i.interpret("ADDI x3, zero, 5").unwrap();
 
     // Verify initial state
-    let result = i.interpret("X1");
-    assert!(result.unwrap().contains("0x0"));
+    let result = i.interpret("/regs X1");
+    assert!(result.unwrap().contains("x 1 (ra  ): 0x00000000"));
 
     // Execute ADD
     let result = i.interpret("ADD x1, x2, x3");
     assert!(result.is_ok());
 
     // Verify result
-    let result = i.interpret("X1");
-    assert!(result.unwrap().contains("0x8"));
+    let result = i.interpret("/regs X1");
+    assert!(result.unwrap().contains("x 1 (ra  ): 0x00000008"));
 }
 
 #[test]
@@ -119,8 +119,8 @@ fn test_parse_negative_immediates() {
     let result = i.interpret("ADDI x1, zero, -1");
     assert!(result.is_ok());
 
-    let result = i.interpret("X1");
-    assert!(result.unwrap().contains("0xffffffff")); // -1 sign-extends to 32 bits
+    let result = i.interpret("/regs X1");
+    assert!(result.unwrap().contains("x 1 (ra  ): 0xffffffff")); // -1 sign-extends to 32 bits
 
     // Test that 4095 is correctly rejected (outside signed 12-bit range)
     let result = i.interpret("ADDI x1, zero, 4095");
@@ -137,8 +137,8 @@ fn test_parse_hex_immediates() {
     let result = i.interpret("ADDI x1, zero, 255");
     assert!(result.is_ok());
 
-    let result = i.interpret("X1");
-    assert!(result.unwrap().contains("0xff"));
+    let result = i.interpret("/regs X1");
+    assert!(result.unwrap().contains("x 1 (ra  ): 0x000000ff"));
 }
 
 #[test]
@@ -161,7 +161,7 @@ fn test_parse_all_instruction_types() {
 
     for inst in &instructions {
         let result = i.interpret(inst);
-        assert!(result.is_ok(), "Failed to parse: {}", inst);
+        assert!(result.is_ok(), "Failed to parse: {inst}");
     }
 
     // I-Type
@@ -180,7 +180,7 @@ fn test_parse_all_instruction_types() {
 
     for inst in &instructions {
         let result = i.interpret(inst);
-        assert!(result.is_ok(), "Failed to parse: {}", inst);
+        assert!(result.is_ok(), "Failed to parse: {inst}");
     }
 
     // U-Type
@@ -188,7 +188,7 @@ fn test_parse_all_instruction_types() {
 
     for inst in &instructions {
         let result = i.interpret(inst);
-        assert!(result.is_ok(), "Failed to parse: {}", inst);
+        assert!(result.is_ok(), "Failed to parse: {inst}");
     }
 
     // J-Type
@@ -218,7 +218,7 @@ fn test_parse_load_store_instructions() {
 
     for inst in &loads {
         let result = i.interpret(inst);
-        assert!(result.is_ok(), "Failed to parse: {}", inst);
+        assert!(result.is_ok(), "Failed to parse: {inst}");
     }
 
     // Store instructions
@@ -226,7 +226,7 @@ fn test_parse_load_store_instructions() {
 
     for inst in &stores {
         let result = i.interpret(inst);
-        assert!(result.is_ok(), "Failed to parse: {}", inst);
+        assert!(result.is_ok(), "Failed to parse: {inst}");
     }
 }
 
@@ -249,7 +249,7 @@ fn test_parse_branch_instructions() {
 
     for inst in &branches {
         let result = i.interpret(inst);
-        assert!(result.is_ok(), "Failed to parse: {}", inst);
+        assert!(result.is_ok(), "Failed to parse: {inst}");
     }
 }
 
@@ -279,22 +279,22 @@ fn test_pc_advancement() {
     let mut i = Interpreter::new();
 
     // Check initial PC
-    let result = i.interpret("PC");
-    assert!(result.unwrap().contains("0x0"));
+    let result = i.interpret("/regs PC");
+    assert!(result.unwrap().contains("pc: 0x00000000"));
 
     // Execute an instruction
     i.interpret("NOP").unwrap();
 
     // PC should advance by 4
-    let result = i.interpret("PC");
-    assert!(result.unwrap().contains("0x4"));
+    let result = i.interpret("/regs PC");
+    assert!(result.unwrap().contains("pc: 0x00000004"));
 
     // Execute another instruction
     i.interpret("NOP").unwrap();
 
     // PC should advance to 8
-    let result = i.interpret("PC");
-    assert!(result.unwrap().contains("0x8"));
+    let result = i.interpret("/regs PC");
+    assert!(result.unwrap().contains("pc: 0x00000008"));
 }
 
 #[test]
@@ -307,26 +307,26 @@ fn test_parse_csr_instructions() {
 
     // Test CSR register instructions with numeric addresses
     let csr_reg_instructions = [
-        "CSRRW x1, 0x340, x2",  // CSRRW rd, csr, rs1
-        "CSRRS x1, 0x340, x2",  // CSRRS rd, csr, rs1
-        "CSRRC x1, 0x340, x2",  // CSRRC rd, csr, rs1
+        "CSRRW x1, 0x340, x2", // CSRRW rd, csr, rs1
+        "CSRRS x1, 0x340, x2", // CSRRS rd, csr, rs1
+        "CSRRC x1, 0x340, x2", // CSRRC rd, csr, rs1
     ];
 
     for inst in &csr_reg_instructions {
         let result = i.interpret(inst);
-        assert!(result.is_ok(), "Failed to parse: {}", inst);
+        assert!(result.is_ok(), "Failed to parse: {inst}");
     }
 
     // Test CSR immediate instructions with numeric addresses
     let csr_imm_instructions = [
-        "CSRRWI x1, 0x340, 15",  // CSRRWI rd, csr, uimm5
-        "CSRRSI x1, 0x340, 15",  // CSRRSI rd, csr, uimm5
-        "CSRRCI x1, 0x340, 15",  // CSRRCI rd, csr, uimm5
+        "CSRRWI x1, 0x340, 15", // CSRRWI rd, csr, uimm5
+        "CSRRSI x1, 0x340, 15", // CSRRSI rd, csr, uimm5
+        "CSRRCI x1, 0x340, 15", // CSRRCI rd, csr, uimm5
     ];
 
     for inst in &csr_imm_instructions {
         let result = i.interpret(inst);
-        assert!(result.is_ok(), "Failed to parse: {}", inst);
+        assert!(result.is_ok(), "Failed to parse: {inst}");
     }
 }
 
@@ -350,7 +350,7 @@ fn test_parse_csr_names() {
 
     for inst in &csr_named_instructions {
         let result = i.interpret(inst);
-        assert!(result.is_ok(), "Failed to parse: {}", inst);
+        assert!(result.is_ok(), "Failed to parse: {inst}");
     }
 }
 
@@ -360,15 +360,15 @@ fn test_parse_csr_read_only() {
 
     // Test read-only CSRs (should succeed when only reading)
     let read_only_instructions = [
-        "CSRRS x1, CYCLE, x0",    // Read cycle counter
-        "CSRRS x1, TIME, x0",     // Read timer
-        "CSRRS x1, INSTRET, x0",  // Read instruction retired counter
-        "CSRRSI x1, CYCLE, 0",    // Read with immediate=0
+        "CSRRS x1, CYCLE, x0",   // Read cycle counter
+        "CSRRS x1, TIME, x0",    // Read timer
+        "CSRRS x1, INSTRET, x0", // Read instruction retired counter
+        "CSRRSI x1, CYCLE, 0",   // Read with immediate=0
     ];
 
     for inst in &read_only_instructions {
         let result = i.interpret(inst);
-        assert!(result.is_ok(), "Failed to parse read-only CSR: {}", inst);
+        assert!(result.is_ok(), "Failed to parse read-only CSR: {inst}");
     }
 }
 
@@ -378,46 +378,55 @@ fn test_parse_csr_errors() {
 
     // Test invalid CSR addresses (out of range)
     let invalid_addr_tests = [
-        "CSRRW x1, 4096, x2",     // CSR address too large
-        "CSRRW x1, -1, x2",       // CSR address negative
+        "CSRRW x1, 4096, x2", // CSR address too large
+        "CSRRW x1, -1, x2",   // CSR address negative
     ];
 
     for inst in &invalid_addr_tests {
         let result = i.interpret(inst);
-        assert!(result.is_err(), "Should fail on invalid CSR address: {}", inst);
+        assert!(
+            result.is_err(),
+            "Should fail on invalid CSR address: {inst}"
+        );
     }
 
     // Test invalid immediate values for CSR*I instructions
     let invalid_imm_tests = [
-        "CSRRWI x1, 0x340, 32",   // Immediate too large (max 31)
-        "CSRRWI x1, 0x340, -1",   // Immediate negative
+        "CSRRWI x1, 0x340, 32", // Immediate too large (max 31)
+        "CSRRWI x1, 0x340, -1", // Immediate negative
     ];
 
     for inst in &invalid_imm_tests {
         let result = i.interpret(inst);
-        assert!(result.is_err(), "Should fail on invalid immediate: {}", inst);
+        assert!(result.is_err(), "Should fail on invalid immediate: {inst}");
     }
 
     // Test wrong argument count
     let wrong_arg_tests = [
-        "CSRRW x1, 0x340",        // Missing rs1
-        "CSRRW x1",               // Missing csr and rs1
+        "CSRRW x1, 0x340",         // Missing rs1
+        "CSRRW x1",                // Missing csr and rs1
         "CSRRW x1, 0x340, x2, x3", // Too many arguments
     ];
 
     for inst in &wrong_arg_tests {
         let result = i.interpret(inst);
-        assert!(result.is_err(), "Should fail on wrong argument count: {}", inst);
+        assert!(
+            result.is_err(),
+            "Should fail on wrong argument count: {inst}"
+        );
     }
 
     // Test PC register usage (should be prohibited)
     let pc_tests = [
-        "CSRRW PC, 0x340, x1",    // PC as destination
-        "CSRRW x1, 0x340, PC",    // PC as source
+        "CSRRW PC, 0x340, x1", // PC as destination
+        "CSRRW x1, 0x340, PC", // PC as source
     ];
 
     for inst in &pc_tests {
         let result = i.interpret(inst);
-        assert!(result.is_err(), "Should fail when using PC register: {}", inst);
+        assert!(
+            result.is_err(),
+            "Should fail when using PC register: {inst}"
+        );
     }
 }

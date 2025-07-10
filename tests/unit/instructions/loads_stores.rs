@@ -38,9 +38,11 @@ fn test_lw_basic() {
         .with_memory_word_le(values::TEST_ADDR, 0x12345678)
         .build();
 
-    let mut inst = IType::default();
-    inst.rs1 = Register::X1;
-    inst.rd = Register::X2;
+    let mut inst = IType {
+        rs1: Register::X1,
+        rd: Register::X2,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(0).unwrap(); // Zero offset
 
     let lw = Instruction::LW(inst);
@@ -67,9 +69,11 @@ fn test_lw_with_offset() {
         )
         .build();
 
-    let mut inst = IType::default();
-    inst.rs1 = Register::X1;
-    inst.rd = Register::X2;
+    let mut inst = IType {
+        rs1: Register::X1,
+        rd: Register::X2,
+        ..Default::default()
+    };
 
     // Test positive offset
     inst.imm.set_signed(4).unwrap();
@@ -100,9 +104,11 @@ fn test_lh_sign_extension() {
         .with_register(Register::X1, values::TEST_ADDR)
         .build();
 
-    let mut inst = IType::default();
-    inst.rs1 = Register::X1;
-    inst.rd = Register::X2;
+    let mut inst = IType {
+        rs1: Register::X1,
+        rd: Register::X2,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(0).unwrap();
     let lh = Instruction::LH(inst);
 
@@ -135,9 +141,11 @@ fn test_lhu_zero_extension() {
         .with_register(Register::X1, values::TEST_ADDR)
         .build();
 
-    let mut inst = IType::default();
-    inst.rs1 = Register::X1;
-    inst.rd = Register::X2;
+    let mut inst = IType {
+        rs1: Register::X1,
+        rd: Register::X2,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(0).unwrap();
     let lhu = Instruction::LHU(inst);
 
@@ -161,9 +169,11 @@ fn test_lb_sign_extension() {
         .with_register(Register::X1, values::TEST_ADDR)
         .build();
 
-    let mut inst = IType::default();
-    inst.rs1 = Register::X1;
-    inst.rd = Register::X2;
+    let mut inst = IType {
+        rs1: Register::X1,
+        rd: Register::X2,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(0).unwrap();
     let lb = Instruction::LB(inst);
 
@@ -192,9 +202,11 @@ fn test_lbu_zero_extension() {
         .with_memory_byte(values::TEST_ADDR, 0xFF)
         .build();
 
-    let mut inst = IType::default();
-    inst.rs1 = Register::X1;
-    inst.rd = Register::X2;
+    let mut inst = IType {
+        rs1: Register::X1,
+        rd: Register::X2,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(0).unwrap();
 
     let lbu = Instruction::LBU(inst);
@@ -216,9 +228,11 @@ fn test_sw_basic() {
         .with_register(Register::X2, 0x12345678) // Value to store
         .build();
 
-    let mut inst = SType::default();
-    inst.rs1 = Register::X1;
-    inst.rs2 = Register::X2;
+    let mut inst = SType {
+        rs1: Register::X1,
+        rs2: Register::X2,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(0).unwrap();
 
     let sw = Instruction::SW(inst);
@@ -242,9 +256,11 @@ fn test_sh_truncation() {
         .with_memory_pattern(200, &[0, 0, 0xFF, 0xFF]) // Pre-fill to verify
         .build();
 
-    let mut inst = SType::default();
-    inst.rs1 = Register::X1;
-    inst.rs2 = Register::X2;
+    let mut inst = SType {
+        rs1: Register::X1,
+        rs2: Register::X2,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(0).unwrap();
 
     let sh = Instruction::SH(inst);
@@ -267,9 +283,11 @@ fn test_sb_truncation() {
         .with_memory_pattern(300, &[0xFF, 0xFF]) // Pre-fill to verify
         .build();
 
-    let mut inst = SType::default();
-    inst.rs1 = Register::X1;
-    inst.rs2 = Register::X2;
+    let mut inst = SType {
+        rs1: Register::X1,
+        rs2: Register::X2,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(0).unwrap();
 
     let sb = Instruction::SB(inst);
@@ -292,16 +310,20 @@ fn test_sw_lw_roundtrip() {
         .build();
 
     // Store word
-    let mut store_inst = SType::default();
-    store_inst.rs1 = Register::X1;
-    store_inst.rs2 = Register::X2;
+    let store_inst = SType {
+        rs1: Register::X1,
+        rs2: Register::X2,
+        ..Default::default()
+    };
     let sw = Instruction::SW(store_inst);
     cpu.execute_expect(sw, "SW test value");
 
     // Load word back into different register
-    let mut load_inst = IType::default();
-    load_inst.rs1 = Register::X1;
-    load_inst.rd = Register::X3;
+    let load_inst = IType {
+        rs1: Register::X1,
+        rd: Register::X3,
+        ..Default::default()
+    };
     let lw = Instruction::LW(load_inst);
     cpu.execute_expect(lw, "LW test value back");
 
@@ -321,16 +343,20 @@ fn test_sh_lh_roundtrip() {
         .build();
 
     // Store halfword (truncates to 0x8765)
-    let mut store_inst = SType::default();
-    store_inst.rs1 = Register::X1;
-    store_inst.rs2 = Register::X2;
+    let store_inst = SType {
+        rs1: Register::X1,
+        rs2: Register::X2,
+        ..Default::default()
+    };
     let sh = Instruction::SH(store_inst);
     cpu.execute_expect(sh, "SH negative halfword");
 
     // Load halfword back with sign extension
-    let mut load_inst = IType::default();
-    load_inst.rs1 = Register::X1;
-    load_inst.rd = Register::X3;
+    let load_inst = IType {
+        rs1: Register::X1,
+        rd: Register::X3,
+        ..Default::default()
+    };
     let lh = Instruction::LH(load_inst);
     cpu.execute_expect(lh, "LH negative halfword");
 
@@ -350,16 +376,20 @@ fn test_sb_lb_roundtrip() {
         .build();
 
     // Store byte (truncates to 0x81)
-    let mut store_inst = SType::default();
-    store_inst.rs1 = Register::X1;
-    store_inst.rs2 = Register::X2;
+    let store_inst = SType {
+        rs1: Register::X1,
+        rs2: Register::X2,
+        ..Default::default()
+    };
     let sb = Instruction::SB(store_inst);
     cpu.execute_expect(sb, "SB negative byte");
 
     // Load byte back with sign extension
-    let mut load_inst = IType::default();
-    load_inst.rs1 = Register::X1;
-    load_inst.rd = Register::X3;
+    let load_inst = IType {
+        rs1: Register::X1,
+        rd: Register::X3,
+        ..Default::default()
+    };
     let lb = Instruction::LB(load_inst);
     cpu.execute_expect(lb, "LB negative byte");
 
@@ -380,9 +410,11 @@ fn test_load_store_with_negative_offset() {
         .build();
 
     // Load with negative offset
-    let mut load_inst = IType::default();
-    load_inst.rs1 = Register::X1;
-    load_inst.rd = Register::X2;
+    let mut load_inst = IType {
+        rs1: Register::X1,
+        rd: Register::X2,
+        ..Default::default()
+    };
     load_inst.imm.set_signed(-4).unwrap(); // Access address 96
 
     let lw = Instruction::LW(load_inst);
@@ -404,9 +436,11 @@ fn test_misaligned_access_behavior() {
         .with_memory_pattern(1001, &[0x11, 0x22, 0x33, 0x44])
         .build();
 
-    let mut inst = IType::default();
-    inst.rs1 = Register::X1;
-    inst.rd = Register::X2;
+    let mut inst = IType {
+        rs1: Register::X1,
+        rd: Register::X2,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(0).unwrap();
 
     let lw = Instruction::LW(inst);

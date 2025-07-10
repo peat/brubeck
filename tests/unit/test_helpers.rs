@@ -94,7 +94,7 @@ impl CpuBuilder {
     /// Write a word to memory in little-endian format
     pub fn with_memory_word_le(mut self, addr: u32, value: u32) -> Self {
         let addr = addr as usize;
-        self.cpu.memory[addr + 0] = ((value >> 0) & 0xFF) as u8;
+        self.cpu.memory[addr] = (value & 0xFF) as u8;
         self.cpu.memory[addr + 1] = ((value >> 8) & 0xFF) as u8;
         self.cpu.memory[addr + 2] = ((value >> 16) & 0xFF) as u8;
         self.cpu.memory[addr + 3] = ((value >> 24) & 0xFF) as u8;
@@ -110,7 +110,9 @@ impl CpuBuilder {
 
     /// Set a CSR value
     pub fn with_csr(mut self, csr: u16, value: u32) -> Self {
-        self.cpu.write_csr(csr, value).expect("Failed to set CSR in test");
+        self.cpu
+            .write_csr(csr, value)
+            .expect("Failed to set CSR in test");
         self
     }
 
@@ -158,7 +160,7 @@ impl CpuAssertions for CPU {
 
     fn assert_registers(&self, expected: &[(Register, u32)]) {
         for (reg, val) in expected {
-            self.assert_register(*reg, *val, &format!("Register {:?} check", reg));
+            self.assert_register(*reg, *val, &format!("Register {reg:?} check"));
         }
     }
 
@@ -173,15 +175,14 @@ impl CpuAssertions for CPU {
     fn assert_memory_word_le(&self, addr: u32, expected: u32, context: &str) {
         let addr = addr as usize;
         let actual = u32::from_le_bytes([
-            self.memory[addr + 0],
+            self.memory[addr],
             self.memory[addr + 1],
             self.memory[addr + 2],
             self.memory[addr + 3],
         ]);
         assert_eq!(
             actual, expected,
-            "{}: Memory[{:#x}] = {:#010x} (expected {:#010x})",
-            context, addr, actual, expected
+            "{context}: Memory[{addr:#x}] = {actual:#010x} (expected {expected:#010x})"
         );
     }
 
@@ -208,7 +209,7 @@ pub trait ExecuteWithContext {
 impl ExecuteWithContext for CPU {
     fn execute_expect(&mut self, inst: Instruction, context: &str) {
         if let Err(e) = self.execute(inst) {
-            panic!("{}: Execution failed with {:?}", context, e);
+            panic!("{context}: Execution failed with {e:?}");
         }
     }
 
@@ -242,15 +243,15 @@ macro_rules! test_cases {
 
 /// Helper for documenting instruction encoding
 pub fn document_encoding(instruction: &str, format: &str, encoding_bits: &str) {
-    println!("Instruction: {}", instruction);
-    println!("Format: {}", format);
-    println!("Encoding: {}", encoding_bits);
+    println!("Instruction: {instruction}");
+    println!("Format: {format}");
+    println!("Encoding: {encoding_bits}");
     println!();
 }
 
 /// Memory visualization helper for debugging
 pub fn visualize_memory(cpu: &CPU, start_addr: u32, length: usize) {
-    println!("Memory dump starting at {:#010x}:", start_addr);
+    println!("Memory dump starting at {start_addr:#010x}:");
     println!("Address  | +0  +1  +2  +3  +4  +5  +6  +7  | ASCII");
     println!("---------+--------------------------------+--------");
 
@@ -272,7 +273,7 @@ pub fn visualize_memory(cpu: &CPU, start_addr: u32, length: usize) {
         for i in 0..8 {
             if offset + i < length {
                 let byte = cpu.memory[start + offset + i];
-                if byte >= 0x20 && byte <= 0x7E {
+                if (0x20..=0x7E).contains(&byte) {
                     print!("{}", byte as char);
                 } else {
                     print!(".");

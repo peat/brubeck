@@ -2,9 +2,9 @@
 //!
 //! This module provides a complete implementation of the RV32I base integer
 //! instruction set, including:
-//! 
+//!
 //! - The [CPU] emulator with registers and memory
-//! - All 47 RV32I [instructions](Instruction) 
+//! - All 47 RV32I [instructions](Instruction)
 //! - Instruction encoding [formats](formats) (R, I, S, B, U, J types)
 //! - [Register](Register) definitions with ABI names
 //! - Common [pseudo-instructions](pseudo_instructions) that expand to RV32I instructions
@@ -44,11 +44,12 @@ mod tests {
     #[test]
     fn add_sub() {
         let mut cpu = CPU::default();
-        let mut inst = RType::default();
-
-        inst.rd = Register::X1;
-        inst.rs1 = Register::X2;
-        inst.rs2 = Register::X3;
+        let inst = RType {
+            rd: Register::X1,
+            rs1: Register::X2,
+            rs2: Register::X3,
+            ..Default::default()
+        };
 
         let add = Instruction::ADD(inst);
         let sub = Instruction::SUB(inst);
@@ -118,10 +119,11 @@ mod tests {
     #[test]
     fn slti() {
         let mut cpu = CPU::default();
-        let mut inst = IType::default();
-
-        inst.rd = Register::X1;
-        inst.rs1 = Register::X2;
+        let mut inst = IType {
+            rd: Register::X1,
+            rs1: Register::X2,
+            ..Default::default()
+        };
         inst.imm.set_unsigned(0).unwrap();
 
         let slti = Instruction::SLTI(inst);
@@ -151,13 +153,15 @@ mod tests {
 
     #[test]
     fn sltiu() {
-        let mut cpu = CPU::default();
-        let mut inst = IType::default();
-
-        cpu.x2 = 255; // initial value to compare against
-
-        inst.rd = Register::X1;
-        inst.rs1 = Register::X2;
+        let mut cpu = CPU {
+            x2: 255, // initial value to compare against
+            ..Default::default()
+        };
+        let mut inst = IType {
+            rd: Register::X1,
+            rs1: Register::X2,
+            ..Default::default()
+        };
 
         // equal value
         inst.imm.set_unsigned(255).unwrap();
@@ -187,10 +191,11 @@ mod tests {
     #[test]
     fn andi_ori_xori() {
         let mut cpu = CPU::default();
-        let mut inst = IType::default();
-
-        inst.rd = Register::X1;
-        inst.rs1 = Register::X2;
+        let mut inst = IType {
+            rd: Register::X1,
+            rs1: Register::X2,
+            ..Default::default()
+        };
 
         // all 1s across the register and imm
         let result = inst.imm.set_unsigned(inst.imm.unsigned_max());
@@ -236,9 +241,10 @@ mod tests {
     #[test]
     fn lui() {
         let mut cpu = CPU::default();
-        let mut inst = UType::default();
-
-        inst.rd = Register::X1;
+        let mut inst = UType {
+            rd: Register::X1,
+            ..Default::default()
+        };
         let result = inst.imm.set_unsigned(1);
         assert!(result.is_ok());
 
@@ -251,9 +257,10 @@ mod tests {
     #[test]
     fn auipc() {
         let mut cpu = CPU::default();
-        let mut inst = UType::default();
-
-        inst.rd = Register::X1;
+        let mut inst = UType {
+            rd: Register::X1,
+            ..Default::default()
+        };
         let result = inst.imm.set_unsigned(1);
         assert!(result.is_ok());
 
@@ -272,9 +279,10 @@ mod tests {
     #[test]
     fn jal() {
         let mut cpu = CPU::default();
-        let mut inst = JType::default();
-
-        inst.rd = Register::X1;
+        let mut inst = JType {
+            rd: Register::X1,
+            ..Default::default()
+        };
         let result = inst.imm.set_unsigned(4);
         assert!(result.is_ok());
 
@@ -295,10 +303,11 @@ mod tests {
     #[test]
     fn jalr() {
         let mut cpu = CPU::default();
-        let mut inst = IType::default();
-
-        inst.rs1 = Register::X2;
-        inst.rd = Register::X1;
+        let mut inst = IType {
+            rs1: Register::X2,
+            rd: Register::X1,
+            ..Default::default()
+        };
         let result = inst.imm.set_unsigned(12);
         assert!(result.is_ok());
 
@@ -322,15 +331,17 @@ mod tests {
 
     #[test]
     fn beq() {
-        let mut cpu = CPU::default();
-        let mut inst = BType::default();
-
-        cpu.x1 = 24;
-        cpu.x2 = 24;
-        cpu.pc = 0;
-
-        inst.rs1 = Register::X1;
-        inst.rs2 = Register::X2;
+        let mut cpu = CPU {
+            x1: 24,
+            x2: 24,
+            pc: 0,
+            ..Default::default()
+        };
+        let mut inst = BType {
+            rs1: Register::X1,
+            rs2: Register::X2,
+            ..Default::default()
+        };
 
         inst.imm.set_signed(64).unwrap();
         let beq = Instruction::BEQ(inst);
@@ -356,15 +367,17 @@ mod tests {
 
     #[test]
     fn bne() {
-        let mut cpu = CPU::default();
-        let mut inst = BType::default();
-
-        cpu.x1 = 23;
-        cpu.x2 = 24;
-        cpu.pc = 0;
-
-        inst.rs1 = Register::X1;
-        inst.rs2 = Register::X2;
+        let mut cpu = CPU {
+            x1: 23,
+            x2: 24,
+            pc: 0,
+            ..Default::default()
+        };
+        let mut inst = BType {
+            rs1: Register::X1,
+            rs2: Register::X2,
+            ..Default::default()
+        };
 
         inst.imm.set_signed(64).unwrap();
         let bne = Instruction::BNE(inst);
@@ -390,15 +403,17 @@ mod tests {
 
     #[test]
     fn blt() {
-        let mut cpu = CPU::default();
-        let mut inst = BType::default();
-
-        cpu.x1 = 23;
-        cpu.x2 = 24;
-        cpu.pc = 0;
-
-        inst.rs1 = Register::X1;
-        inst.rs2 = Register::X2;
+        let mut cpu = CPU {
+            x1: 23,
+            x2: 24,
+            pc: 0,
+            ..Default::default()
+        };
+        let mut inst = BType {
+            rs1: Register::X1,
+            rs2: Register::X2,
+            ..Default::default()
+        };
 
         inst.imm.set_signed(64).unwrap();
         let blt = Instruction::BLT(inst);
@@ -424,15 +439,17 @@ mod tests {
 
     #[test]
     fn bltu() {
-        let mut cpu = CPU::default();
-        let mut inst = BType::default();
-
-        cpu.x1 = 23;
-        cpu.x2 = 24;
-        cpu.pc = 0;
-
-        inst.rs1 = Register::X1;
-        inst.rs2 = Register::X2;
+        let mut cpu = CPU {
+            x1: 23,
+            x2: 24,
+            pc: 0,
+            ..Default::default()
+        };
+        let mut inst = BType {
+            rs1: Register::X1,
+            rs2: Register::X2,
+            ..Default::default()
+        };
 
         inst.imm.set_unsigned(64).unwrap();
         let bltu = Instruction::BLTU(inst);
@@ -458,15 +475,17 @@ mod tests {
 
     #[test]
     fn bge() {
-        let mut cpu = CPU::default();
-        let mut inst = BType::default();
-
-        cpu.x1 = 24;
-        cpu.x2 = 23;
-        cpu.pc = 0;
-
-        inst.rs1 = Register::X1;
-        inst.rs2 = Register::X2;
+        let mut cpu = CPU {
+            x1: 24,
+            x2: 23,
+            pc: 0,
+            ..Default::default()
+        };
+        let mut inst = BType {
+            rs1: Register::X1,
+            rs2: Register::X2,
+            ..Default::default()
+        };
 
         inst.imm.set_signed(64).unwrap();
         let bge = Instruction::BGE(inst);
@@ -492,15 +511,17 @@ mod tests {
 
     #[test]
     fn bgeu() {
-        let mut cpu = CPU::default();
-        let mut inst = BType::default();
-
-        cpu.x1 = 24;
-        cpu.x2 = 23;
-        cpu.pc = 0;
-
-        inst.rs1 = Register::X1;
-        inst.rs2 = Register::X2;
+        let mut cpu = CPU {
+            x1: 24,
+            x2: 23,
+            pc: 0,
+            ..Default::default()
+        };
+        let mut inst = BType {
+            rs1: Register::X1,
+            rs2: Register::X2,
+            ..Default::default()
+        };
 
         inst.imm.set_unsigned(64).unwrap();
         let bgeu = Instruction::BGEU(inst);
@@ -527,8 +548,6 @@ mod tests {
     #[test]
     fn lw_lh_lb() {
         let mut cpu = CPU::default();
-        let mut inst = IType::default();
-
         cpu.memory[1024] = 1;
         cpu.memory[1025] = 2;
         cpu.memory[1026] = 3;
@@ -536,8 +555,11 @@ mod tests {
 
         cpu.x1 = 1024;
 
-        inst.rs1 = Register::X1;
-        inst.rd = Register::X2;
+        let mut inst = IType {
+            rs1: Register::X1,
+            rd: Register::X2,
+            ..Default::default()
+        };
 
         inst.imm.set_unsigned(0).unwrap(); // zero offset
         let lw = Instruction::LW(inst);
@@ -584,14 +606,16 @@ mod tests {
 
     #[test]
     fn sw_sh_sb() {
-        let mut cpu = CPU::default();
-        let mut inst = SType::default();
-
-        cpu.x1 = 100; // base address
-        cpu.x2 = 0b1111_1111_1111_1110_1111_1100_1111_1000; // value to store
-
-        inst.rs1 = Register::X1;
-        inst.rs2 = Register::X2;
+        let mut cpu = CPU {
+            x1: 100,                                       // base address
+            x2: 0b1111_1111_1111_1110_1111_1100_1111_1000, // value to store
+            ..Default::default()
+        };
+        let mut inst = SType {
+            rs1: Register::X1,
+            rs2: Register::X2,
+            ..Default::default()
+        };
 
         inst.imm.set_unsigned(0).unwrap(); // zero offset
         let sw = Instruction::SW(inst);
@@ -618,22 +642,27 @@ mod tests {
 
     #[test]
     fn sw_lw_roundtrip() {
-        let mut cpu = CPU::default();
+        let mut cpu = CPU {
+            x1: 100,                                       // base address
+            x2: 0b1111_1111_1111_1110_1111_1100_1111_1000, // value to store
+            ..Default::default()
+        };
 
-        cpu.x1 = 100; // base address
-        cpu.x2 = 0b1111_1111_1111_1110_1111_1100_1111_1000; // value to store
-
-        let mut store_inst = SType::default();
-        store_inst.rs1 = Register::X1;
-        store_inst.rs2 = Register::X2;
+        let store_inst = SType {
+            rs1: Register::X1,
+            rs2: Register::X2,
+            ..Default::default()
+        };
 
         let sw = Instruction::SW(store_inst);
         let result = cpu.execute(sw);
         assert!(result.is_ok());
 
-        let mut load_inst = IType::default();
-        load_inst.rs1 = Register::X1; // base address
-        load_inst.rd = Register::X3; // destination register
+        let load_inst = IType {
+            rs1: Register::X1, // base address
+            rd: Register::X3,  // destination register
+            ..Default::default()
+        };
 
         let lw = Instruction::LW(load_inst);
         let result = cpu.execute(lw);
@@ -643,22 +672,27 @@ mod tests {
 
     #[test]
     fn sh_lh_roundtrip() {
-        let mut cpu = CPU::default();
+        let mut cpu = CPU {
+            x1: 100,                                       // base address
+            x2: 0b1111_1111_1111_1110_1111_1100_1111_1000, // value to store
+            ..Default::default()
+        };
 
-        cpu.x1 = 100; // base address
-        cpu.x2 = 0b1111_1111_1111_1110_1111_1100_1111_1000; // value to store
-
-        let mut store_inst = SType::default();
-        store_inst.rs1 = Register::X1;
-        store_inst.rs2 = Register::X2;
+        let store_inst = SType {
+            rs1: Register::X1,
+            rs2: Register::X2,
+            ..Default::default()
+        };
 
         let sh = Instruction::SH(store_inst);
         let result = cpu.execute(sh);
         assert!(result.is_ok());
 
-        let mut load_inst = IType::default();
-        load_inst.rs1 = Register::X1; // base address
-        load_inst.rd = Register::X3; // destination register
+        let load_inst = IType {
+            rs1: Register::X1, // base address
+            rd: Register::X3,  // destination register
+            ..Default::default()
+        };
 
         // Use LHU for unsigned roundtrip since the value has sign bit set
         let lhu = Instruction::LHU(load_inst);
@@ -669,22 +703,27 @@ mod tests {
 
     #[test]
     fn sb_lb_roundtrip() {
-        let mut cpu = CPU::default();
+        let mut cpu = CPU {
+            x1: 100,                                       // base address
+            x2: 0b1111_1111_1111_1110_1111_1100_1111_1000, // value to store
+            ..Default::default()
+        };
 
-        cpu.x1 = 100; // base address
-        cpu.x2 = 0b1111_1111_1111_1110_1111_1100_1111_1000; // value to store
-
-        let mut store_inst = SType::default();
-        store_inst.rs1 = Register::X1;
-        store_inst.rs2 = Register::X2;
+        let store_inst = SType {
+            rs1: Register::X1,
+            rs2: Register::X2,
+            ..Default::default()
+        };
 
         let sb = Instruction::SB(store_inst);
         let result = cpu.execute(sb);
         assert!(result.is_ok());
 
-        let mut load_inst = IType::default();
-        load_inst.rs1 = Register::X1; // base address
-        load_inst.rd = Register::X3; // destination register
+        let load_inst = IType {
+            rs1: Register::X1, // base address
+            rd: Register::X3,  // destination register
+            ..Default::default()
+        };
 
         // Use LBU for unsigned roundtrip since the value has sign bit set
         let lbu = Instruction::LBU(load_inst);

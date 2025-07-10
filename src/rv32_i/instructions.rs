@@ -4,7 +4,7 @@
 //! base integer instruction set. These are the actual instructions that the
 //! CPU can execute.
 //!
-//! For assembly convenience, see the `pseudo_instructions` module which 
+//! For assembly convenience, see the `pseudo_instructions` module which
 //! provides common pseudo-instructions that expand to these real instructions.
 
 use super::*;
@@ -56,19 +56,19 @@ pub enum Instruction {
     SW(SType),
     XOR(RType),
     XORI(IType),
-    
+
     // CSR Instructions (Control and Status Register)
     CSRRW(IType),
     CSRRS(IType),
     CSRRC(IType),
     CSRRWI(IType),
     CSRRSI(IType),
-    CSRRCI(IType)
+    CSRRCI(IType),
 }
 
 impl Instruction {
     pub const LENGTH: u32 = 4; // 4 bytes, 32 bits
-    
+
     /// Returns the mnemonic (instruction name) as a string
     pub fn mnemonic(&self) -> &'static str {
         match self {

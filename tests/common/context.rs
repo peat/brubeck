@@ -4,9 +4,8 @@
 //! a CPU (for unit tests) or an Interpreter (for integration tests)
 //! with a consistent fluent API.
 
-use brubeck::rv32_i::{CPU, Register};
-use brubeck::interpreter::Interpreter;
 use super::assertions::*;
+use brubeck::interpreter::Interpreter;
 
 /// Generic test context that provides a fluent API for testing
 pub struct TestContext<T> {
@@ -16,13 +15,14 @@ pub struct TestContext<T> {
 
 // ==================== COMMON IMPLEMENTATION ====================
 
+#[allow(dead_code)] // Methods are used but some only with specific features
 impl<T> TestContext<T> {
     /// Set the test name for better error messages
     pub fn with_name(mut self, name: &str) -> Self {
         self.test_name = name.to_string();
         self
     }
-    
+
     /// Get a context string for error messages
     pub fn context(&self, operation: &str) -> String {
         if self.test_name.is_empty() {
@@ -34,62 +34,18 @@ impl<T> TestContext<T> {
 }
 
 // ==================== CPU-SPECIFIC IMPLEMENTATION ====================
-
-impl TestContext<CPU> {
-    /// Create a new test context for CPU testing
-    pub fn new_cpu() -> Self {
-        Self {
-            inner: CPU::default(),
-            test_name: String::new(),
-        }
-    }
-    
-    /// Create with custom memory size
-    pub fn new_cpu_with_memory(size: usize) -> Self {
-        Self {
-            inner: CPU::new(size),
-            test_name: String::new(),
-        }
-    }
-    
-    /// Set a register value
-    pub fn set_reg(&mut self, reg: Register, value: u32) -> &mut Self {
-        self.inner.set_register(reg, value);
-        self
-    }
-    
-    /// Get a register value
-    pub fn get_reg(&self, reg: Register) -> u32 {
-        self.inner.get_register(reg)
-    }
-    
-    /// Execute an instruction directly
-    pub fn execute(&mut self, inst: brubeck::rv32_i::Instruction) -> &mut Self {
-        let ctx = self.context("Execute instruction");
-        self.inner.execute(inst)
-            .unwrap_or_else(|e| panic!("{}: {:?}", ctx, e));
-        self
-    }
-    
-    /// Check register value
-    pub fn check_reg_value(&self, reg: Register, expected: u32) -> &Self {
-        let actual = self.get_reg(reg);
-        let ctx = self.context(&format!("Check {:?}", reg));
-        assert_with_context(actual, expected, &ctx, 
-            &format!("Register {:?} mismatch", reg));
-        self
-    }
-    
-    /// Write to memory
-    pub fn write_memory(&mut self, addr: u32, bytes: &[u8]) -> &mut Self {
-        let start = addr as usize;
-        self.inner.memory[start..start + bytes.len()].copy_from_slice(bytes);
-        self
-    }
-}
+// Note: Currently unused - CPU-specific test context functionality has been removed
+// as all current tests use the Interpreter context instead.
 
 // ==================== INTERPRETER-SPECIFIC IMPLEMENTATION ====================
 
+impl Default for TestContext<Interpreter> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[allow(dead_code)] // Some methods only used with 'repl' feature
 impl TestContext<Interpreter> {
     /// Create a new test context for Interpreter testing
     pub fn new() -> Self {
@@ -98,109 +54,94 @@ impl TestContext<Interpreter> {
             test_name: String::new(),
         }
     }
-    
+
     /// Execute an instruction string
     pub fn exec(&mut self, instruction: &str) -> &mut Self {
-        let ctx = self.context(&format!("Execute '{}'", instruction));
-        self.inner.interpret(instruction)
-            .unwrap_or_else(|e| panic!("{}: {:?}", ctx, e));
+        let ctx = self.context(&format!("Execute '{instruction}'"));
+        self.inner
+            .interpret(instruction)
+            .unwrap_or_else(|e| panic!("{ctx}: {e:?}"));
         self
     }
-    
+
     /// Execute and expect failure
     pub fn exec_fail(&mut self, instruction: &str) -> String {
-        let ctx = self.context(&format!("Execute '{}' (expecting failure)", instruction));
-        self.inner.interpret(instruction)
+        let ctx = self.context(&format!("Execute '{instruction}' (expecting failure)"));
+        self.inner
+            .interpret(instruction)
             .err()
-            .unwrap_or_else(|| panic!("{}: Expected failure but succeeded", ctx))
+            .unwrap_or_else(|| panic!("{ctx}: Expected failure but succeeded"))
             .to_string()
     }
-    
+
     /// Check register contains value
     pub fn check_reg(&mut self, reg: &str, expected: &str) -> &mut Self {
-        let ctx = self.context(&format!("Check {}", reg));
-        let result = self.inner.interpret(reg)
-            .unwrap_or_else(|e| panic!("{}: Failed to read register: {:?}", ctx, e));
+        let ctx = self.context(&format!("Check {reg}"));
+        let result = self
+            .inner
+            .interpret(&format!("/regs {reg}"))
+            .unwrap_or_else(|e| panic!("{ctx}: Failed to read register: {e:?}"));
         assert_contains_with_context(&result, expected, &ctx);
         self
     }
-    
+
     /// Check multiple registers are zero
     pub fn check_regs_zero(&mut self, start: u32, end: u32) -> &mut Self {
         for i in start..=end {
-            self.check_reg(&format!("x{}", i), "0");
+            self.check_reg(&format!("x{i}"), "0");
         }
         self
     }
-    
-    /// Get register value as string
-    pub fn get_reg_str(&mut self, reg: &str) -> String {
-        let ctx = self.context(&format!("Get {}", reg));
-        self.inner.interpret(reg)
-            .unwrap_or_else(|e| panic!("{}: Failed to read register: {:?}", ctx, e))
-    }
-    
+
     /// Get the current PC value
     pub fn get_pc(&self) -> u32 {
         self.inner.get_pc()
     }
-    
-    /// Load a value into a register efficiently
-    pub fn load_reg(&mut self, reg: &str, value: i32) -> &mut Self {
-        use super::values::fits_in_imm12;
-        
-        if fits_in_imm12(value) {
-            self.exec(&format!("ADDI {}, x0, {}", reg, value))
-        } else {
-            self.exec(&format!("LI {}, {}", reg, value))
-        }
-    }
-    
+
     /// Undo last operation
     #[cfg(feature = "repl")]
     pub fn undo(&mut self) -> &mut Self {
         let ctx = self.context("Undo");
-        self.inner.interpret("/undo")
-            .unwrap_or_else(|e| panic!("{}: {:?}", ctx, e));
+        self.inner
+            .interpret("/undo")
+            .unwrap_or_else(|e| panic!("{ctx}: {e:?}"));
         self
     }
-    
+
     /// Undo with expected content
     #[cfg(feature = "repl")]
     pub fn undo_expect(&mut self, expected: &str) -> &mut Self {
         let ctx = self.context("Undo");
-        let result = self.inner.interpret("/undo")
-            .unwrap_or_else(|e| panic!("{}: {:?}", ctx, e));
+        let result = self
+            .inner
+            .interpret("/undo")
+            .unwrap_or_else(|e| panic!("{ctx}: {e:?}"));
         assert_contains_with_context(&result, expected, &ctx);
         self
     }
-    
+
     /// Redo last undone operation
     #[cfg(feature = "repl")]
     pub fn redo(&mut self) -> &mut Self {
         let ctx = self.context("Redo");
-        self.inner.interpret("/redo")
-            .unwrap_or_else(|e| panic!("{}: {:?}", ctx, e));
+        self.inner
+            .interpret("/redo")
+            .unwrap_or_else(|e| panic!("{ctx}: {e:?}"));
         self
     }
-    
+
     /// Check undo should fail
     #[cfg(feature = "repl")]
     pub fn undo_should_fail(&mut self) -> &mut Self {
         let ctx = self.context("Undo (expecting failure)");
         if self.inner.interpret("/undo").is_ok() {
-            panic!("{}: Expected undo to fail but it succeeded", ctx);
+            panic!("{ctx}: Expected undo to fail but it succeeded");
         }
         self
     }
 }
 
 // ==================== CONVERSION HELPERS ====================
-
-/// Create a CPU test context
-pub fn cpu_context() -> TestContext<CPU> {
-    TestContext::new_cpu()
-}
 
 /// Create an Interpreter test context
 pub fn interpreter_context() -> TestContext<Interpreter> {
@@ -209,31 +150,4 @@ pub fn interpreter_context() -> TestContext<Interpreter> {
 
 // ==================== TEST MACROS ====================
 
-/// Macro to create a test with a TestContext
-#[macro_export]
-macro_rules! context_test {
-    ($name:ident, $context_type:ident, $body:expr) => {
-        #[test]
-        fn $name() {
-            let mut ctx = super::$context_type();
-            ctx.test_name = stringify!($name).to_string();
-            $body(&mut ctx);
-        }
-    };
-}
-
-/// Macro for CPU unit tests
-#[macro_export]
-macro_rules! cpu_test {
-    ($name:ident, $body:expr) => {
-        context_test!($name, cpu_context, $body);
-    };
-}
-
-/// Macro for interpreter integration tests
-#[macro_export]
-macro_rules! interpreter_test {
-    ($name:ident, $body:expr) => {
-        context_test!($name, interpreter_context, $body);
-    };
-}
+// Test macros have been removed as they were not being used

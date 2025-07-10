@@ -36,8 +36,10 @@ fn test_jal_basic() {
     // Used for function calls when offset is known at compile time
     let mut cpu = CpuBuilder::new().with_pc(0).build();
 
-    let mut inst = JType::default();
-    inst.rd = Register::X1; // Standard link register (ra)
+    let mut inst = JType {
+        rd: Register::X1, // Standard link register (ra)
+        ..Default::default()
+    };
     inst.imm.set_unsigned(4).unwrap(); // Encoded offset (actual: 4*2 = 8)
 
     let jal = Instruction::JAL(inst);
@@ -54,8 +56,10 @@ fn test_jal_misalignment() {
     // JAL to misaligned address should fail
     let mut cpu = CpuBuilder::new().with_pc(0).build();
 
-    let mut inst = JType::default();
-    inst.rd = Register::X1;
+    let mut inst = JType {
+        rd: Register::X1,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(1).unwrap(); // Becomes offset 2 (not 4-byte aligned)
 
     let jal = Instruction::JAL(inst);
@@ -72,8 +76,10 @@ fn test_jal_negative_offset() {
     // Backward jumps are used for loops and backward branches
     let mut cpu = CpuBuilder::new().with_pc(1000).build();
 
-    let mut inst = JType::default();
-    inst.rd = Register::X1;
+    let mut inst = JType {
+        rd: Register::X1,
+        ..Default::default()
+    };
     inst.imm.set_signed(-100).unwrap(); // Encoded: -100, Actual: -200
 
     let jal = Instruction::JAL(inst);
@@ -89,8 +95,10 @@ fn test_jal_x0_destination() {
     // Common pattern: infinite loops, goto statements
     let mut cpu = CpuBuilder::new().with_pc(0).build();
 
-    let mut inst = JType::default();
-    inst.rd = Register::X0; // Discard return address
+    let mut inst = JType {
+        rd: Register::X0, // Discard return address
+        ..Default::default()
+    };
     inst.imm.set_unsigned(10).unwrap();
 
     let jal = Instruction::JAL(inst);
@@ -110,9 +118,11 @@ fn test_jalr_basic() {
         .with_register(Register::X2, 100) // Base address
         .build();
 
-    let mut inst = IType::default();
-    inst.rs1 = Register::X2;
-    inst.rd = Register::X1; // Save return address
+    let mut inst = IType {
+        rs1: Register::X2,
+        rd: Register::X1, // Save return address
+        ..Default::default()
+    };
     inst.imm.set_signed(12).unwrap();
 
     let jalr = Instruction::JALR(inst);
@@ -130,9 +140,11 @@ fn test_jalr_with_base() {
         .with_register(Register::X2, 24) // Base address
         .build();
 
-    let mut inst = IType::default();
-    inst.rs1 = Register::X2;
-    inst.rd = Register::X1;
+    let mut inst = IType {
+        rs1: Register::X2,
+        rd: Register::X1,
+        ..Default::default()
+    };
     inst.imm.set_signed(-12).unwrap();
 
     let jalr = Instruction::JALR(inst);
@@ -151,9 +163,11 @@ fn test_jalr_least_significant_bit() {
         .with_register(Register::X2, 13) // Odd address
         .build();
 
-    let mut inst = IType::default();
-    inst.rs1 = Register::X2;
-    inst.rd = Register::X1;
+    let mut inst = IType {
+        rs1: Register::X2,
+        rd: Register::X1,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(0).unwrap();
 
     let jalr = Instruction::JALR(inst);
@@ -171,9 +185,11 @@ fn test_jalr_return_pattern() {
         .with_register(Register::X1, 0x1000) // Return address (ra)
         .build();
 
-    let mut inst = IType::default();
-    inst.rd = Register::X0; // Discard "return" address
-    inst.rs1 = Register::X1; // Jump to address in ra
+    let mut inst = IType {
+        rd: Register::X0,  // Discard "return" address
+        rs1: Register::X1, // Jump to address in ra
+        ..Default::default()
+    };
     inst.imm.set_unsigned(0).unwrap();
 
     let jalr = Instruction::JALR(inst);
@@ -192,8 +208,10 @@ fn test_jal_jalr_call_return() {
         .build();
 
     // Step 1: Call function using JAL
-    let mut jal_inst = JType::default();
-    jal_inst.rd = Register::X1; // Save return address in ra
+    let mut jal_inst = JType {
+        rd: Register::X1, // Save return address in ra
+        ..Default::default()
+    };
     jal_inst.imm.set_unsigned(100).unwrap(); // Jump forward 200 bytes
 
     let jal = Instruction::JAL(jal_inst);
@@ -207,9 +225,11 @@ fn test_jal_jalr_call_return() {
     cpu.pc = 0x2000; // Function does some work...
 
     // Step 3: Return from function using JALR (RET pseudo-instruction)
-    let mut jalr_inst = IType::default();
-    jalr_inst.rd = Register::X0; // RET doesn't save new return address
-    jalr_inst.rs1 = Register::X1; // Jump to saved return address
+    let mut jalr_inst = IType {
+        rd: Register::X0,  // RET doesn't save new return address
+        rs1: Register::X1, // Jump to saved return address
+        ..Default::default()
+    };
     jalr_inst.imm.set_unsigned(0).unwrap();
 
     let jalr = Instruction::JALR(jalr_inst);

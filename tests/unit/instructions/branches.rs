@@ -34,9 +34,11 @@ fn test_beq_equal() {
         .with_pc(0)
         .build();
 
-    let mut inst = BType::default();
-    inst.rs1 = Register::X1;
-    inst.rs2 = Register::X2;
+    let mut inst = BType {
+        rs1: Register::X1,
+        rs2: Register::X2,
+        ..Default::default()
+    };
     inst.imm.set_signed(64).unwrap(); // Encoded offset (actual: 64*2 = 128)
 
     let beq = Instruction::BEQ(inst);
@@ -54,9 +56,11 @@ fn test_beq_not_equal() {
         .with_pc(0)
         .build();
 
-    let mut inst = BType::default();
-    inst.rs1 = Register::X1;
-    inst.rs2 = Register::X2;
+    let mut inst = BType {
+        rs1: Register::X1,
+        rs2: Register::X2,
+        ..Default::default()
+    };
     inst.imm.set_signed(64).unwrap();
 
     let beq = Instruction::BEQ(inst);
@@ -78,9 +82,11 @@ fn test_beq_backward_branch() {
         .with_pc(256)
         .build();
 
-    let mut inst = BType::default();
-    inst.rs1 = Register::X1;
-    inst.rs2 = Register::X2;
+    let mut inst = BType {
+        rs1: Register::X1,
+        rs2: Register::X2,
+        ..Default::default()
+    };
     inst.imm.set_signed(-64).unwrap(); // Negative offset for backward branch
 
     let beq = Instruction::BEQ(inst);
@@ -99,9 +105,11 @@ fn test_bne_not_equal() {
         .with_pc(0)
         .build();
 
-    let mut inst = BType::default();
-    inst.rs1 = Register::X1;
-    inst.rs2 = Register::X2;
+    let mut inst = BType {
+        rs1: Register::X1,
+        rs2: Register::X2,
+        ..Default::default()
+    };
     inst.imm.set_signed(64).unwrap();
 
     let bne = Instruction::BNE(inst);
@@ -119,9 +127,11 @@ fn test_bne_equal() {
         .with_pc(0)
         .build();
 
-    let mut inst = BType::default();
-    inst.rs1 = Register::X1;
-    inst.rs2 = Register::X2;
+    let mut inst = BType {
+        rs1: Register::X1,
+        rs2: Register::X2,
+        ..Default::default()
+    };
     inst.imm.set_signed(64).unwrap();
 
     let bne = Instruction::BNE(inst);
@@ -136,9 +146,11 @@ fn test_blt_signed_comparison() {
     // Uses two's complement signed comparison
     let mut cpu = CpuBuilder::new().with_pc(0).build();
 
-    let mut inst = BType::default();
-    inst.rs1 = Register::X1;
-    inst.rs2 = Register::X2;
+    let mut inst = BType {
+        rs1: Register::X1,
+        rs2: Register::X2,
+        ..Default::default()
+    };
     inst.imm.set_signed(64).unwrap();
     let blt = Instruction::BLT(inst);
 
@@ -172,9 +184,11 @@ fn test_bltu_unsigned_comparison() {
     // All values treated as unsigned integers
     let mut cpu = CpuBuilder::new().with_pc(0).build();
 
-    let mut inst = BType::default();
-    inst.rs1 = Register::X1;
-    inst.rs2 = Register::X2;
+    let mut inst = BType {
+        rs1: Register::X1,
+        rs2: Register::X2,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(64).unwrap();
     let bltu = Instruction::BLTU(inst);
 
@@ -207,9 +221,11 @@ fn test_bge_signed_comparison() {
     // Branches when rs1 >= rs2 using signed comparison
     let mut cpu = CpuBuilder::new().with_pc(0).build();
 
-    let mut inst = BType::default();
-    inst.rs1 = Register::X1;
-    inst.rs2 = Register::X2;
+    let mut inst = BType {
+        rs1: Register::X1,
+        rs2: Register::X2,
+        ..Default::default()
+    };
     inst.imm.set_signed(64).unwrap();
     let bge = Instruction::BGE(inst);
 
@@ -243,9 +259,11 @@ fn test_bgeu_unsigned_comparison() {
     // All values treated as unsigned integers
     let mut cpu = CpuBuilder::new().with_pc(0).build();
 
-    let mut inst = BType::default();
-    inst.rs1 = Register::X1;
-    inst.rs2 = Register::X2;
+    let mut inst = BType {
+        rs1: Register::X1,
+        rs2: Register::X2,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(64).unwrap();
     let bgeu = Instruction::BGEU(inst);
 
@@ -282,9 +300,11 @@ fn test_branch_offset_encoding() {
         .with_register(Register::X2, 100) // Equal for BEQ
         .build();
 
-    let mut inst = BType::default();
-    inst.rs1 = Register::X1;
-    inst.rs2 = Register::X2;
+    let mut inst = BType {
+        rs1: Register::X1,
+        rs2: Register::X2,
+        ..Default::default()
+    };
 
     // Test various offsets (encoded_imm, actual_offset)
     let test_cases = [
@@ -298,7 +318,7 @@ fn test_branch_offset_encoding() {
     ];
 
     for (encoded_imm, actual_offset, desc) in
-        test_cases.map(|(i, o)| (i, o, format!("offset {} -> PC+{}", i, o)))
+        test_cases.map(|(i, o)| (i, o, format!("offset {i} -> PC+{o}")))
     {
         cpu.pc = 1000; // Start from non-zero PC
         inst.imm.set_signed(encoded_imm).unwrap();
@@ -320,9 +340,11 @@ fn test_branch_with_x0() {
     // - BGE rs, x0: branch if rs >= 0 (signed)
     let mut cpu = CpuBuilder::new().with_pc(0).build();
 
-    let mut inst = BType::default();
-    inst.rs1 = Register::X1;
-    inst.rs2 = Register::X0; // x0 always reads as 0
+    let mut inst = BType {
+        rs1: Register::X1,
+        rs2: Register::X0, // x0 always reads as 0
+        ..Default::default()
+    };
     inst.imm.set_signed(64).unwrap();
 
     // Pattern 1: BEQ x1, x0 - branch if x1 == 0

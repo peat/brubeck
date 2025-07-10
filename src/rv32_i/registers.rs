@@ -205,7 +205,8 @@ impl Register {
     /// Create a Register from a u32 value (for CSR immediate instructions)
     /// This is used for the 5-bit immediate in CSR instructions
     pub fn from_u32(value: u32) -> Self {
-        match value & 0x1F {  // Mask to 5 bits
+        match value & 0x1F {
+            // Mask to 5 bits
             0 => Register::X0,
             1 => Register::X1,
             2 => Register::X2,

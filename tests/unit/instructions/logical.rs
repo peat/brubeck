@@ -32,9 +32,11 @@ fn test_andi_ori_xori_all_ones() {
         .with_register(Register::X2, values::NEG_ONE) // All 1s
         .build();
 
-    let mut inst = IType::default();
-    inst.rd = Register::X1;
-    inst.rs1 = Register::X2;
+    let mut inst = IType {
+        rd: Register::X1,
+        rs1: Register::X2,
+        ..Default::default()
+    };
     inst.imm.set_signed(-1).unwrap(); // Sign-extends to all 1s
 
     // ANDI: all 1s AND all 1s = all 1s
@@ -60,9 +62,11 @@ fn test_andi_ori_xori_all_zeros() {
         .with_register(Register::X2, values::NEG_ONE) // Test value
         .build();
 
-    let mut inst = IType::default();
-    inst.rd = Register::X1;
-    inst.rs1 = Register::X2;
+    let mut inst = IType {
+        rd: Register::X1,
+        rs1: Register::X2,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(0).unwrap();
 
     // ANDI: value AND 0 = 0 (zero is annihilator)
@@ -89,9 +93,11 @@ fn test_logical_sign_extension() {
         .with_register(Register::X2, 0xFFFF_0000) // Upper half set
         .build();
 
-    let mut inst = IType::default();
-    inst.rd = Register::X1;
-    inst.rs1 = Register::X2;
+    let mut inst = IType {
+        rd: Register::X1,
+        rs1: Register::X2,
+        ..Default::default()
+    };
     inst.imm.set_signed(-1).unwrap(); // 12-bit -1 becomes 32-bit 0xFFFFFFFF
 
     // ANDI: Preserves only bits set in both operands
@@ -130,9 +136,11 @@ fn test_xori_bitwise_not() {
     // This is a pseudo-instruction: NOT rd, rs
     let mut cpu = CpuBuilder::new().build();
 
-    let mut inst = IType::default();
-    inst.rd = Register::X1;
-    inst.rs1 = Register::X2;
+    let mut inst = IType {
+        rd: Register::X1,
+        rs1: Register::X2,
+        ..Default::default()
+    };
     inst.imm.set_signed(-1).unwrap(); // The magic immediate for NOT
     let xori = Instruction::XORI(inst);
 
@@ -164,9 +172,11 @@ fn test_logical_common_patterns() {
     // Common bit manipulation patterns in RISC-V
     let mut cpu = CpuBuilder::new().build();
 
-    let mut inst = IType::default();
-    inst.rd = Register::X1;
-    inst.rs1 = Register::X2;
+    let mut inst = IType {
+        rd: Register::X1,
+        rs1: Register::X2,
+        ..Default::default()
+    };
 
     // Pattern 1: Extract lower byte with ANDI
     cpu.set_register(Register::X2, 0x1234_5678);

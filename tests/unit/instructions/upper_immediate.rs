@@ -34,8 +34,10 @@ fn test_lui_basic() {
     // Places 20-bit immediate in upper portion, zeros lower 12 bits
     let mut cpu = CpuBuilder::new().build();
 
-    let mut inst = UType::default();
-    inst.rd = Register::X1;
+    let mut inst = UType {
+        rd: Register::X1,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(1).unwrap();
 
     let lui = Instruction::LUI(inst);
@@ -53,8 +55,10 @@ fn test_lui_edge_cases() {
     // Test boundary values for 20-bit immediate
     let mut cpu = CpuBuilder::new().build();
 
-    let mut inst = UType::default();
-    inst.rd = Register::X1;
+    let mut inst = UType {
+        rd: Register::X1,
+        ..Default::default()
+    };
 
     // Case 1: Maximum 20-bit value (all ones)
     inst.imm.set_unsigned(values::IMM20_MAX).unwrap();
@@ -85,8 +89,10 @@ fn test_auipc_basic() {
     // Used for PC-relative addressing in position-independent code
     let mut cpu = CpuBuilder::new().with_pc(0).build();
 
-    let mut inst = UType::default();
-    inst.rd = Register::X1;
+    let mut inst = UType {
+        rd: Register::X1,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(1).unwrap();
 
     let auipc = Instruction::AUIPC(inst);
@@ -100,8 +106,10 @@ fn test_auipc_with_pc() {
     // AUIPC with non-zero PC - common in real programs
     let mut cpu = CpuBuilder::new().with_pc(0x1000).build();
 
-    let mut inst = UType::default();
-    inst.rd = Register::X1;
+    let mut inst = UType {
+        rd: Register::X1,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(0x12345).unwrap();
 
     let auipc = Instruction::AUIPC(inst);
@@ -126,8 +134,10 @@ fn test_auipc_pc_relative_addressing() {
     // - Upper 20 bits: 0x12 (but we need to adjust for sign extension)
     // - Lower 12 bits: 0x345
     // Since 0x345 is positive, we use 0x12 directly
-    let mut inst = UType::default();
-    inst.rd = Register::X1;
+    let mut inst = UType {
+        rd: Register::X1,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(0x12).unwrap();
 
     let auipc = Instruction::AUIPC(inst);
@@ -149,8 +159,10 @@ fn test_lui_auipc_x0_destination() {
     // This can be used as a multi-byte NOP
     let mut cpu = CpuBuilder::new().with_pc(0).build();
 
-    let mut inst = UType::default();
-    inst.rd = Register::X0;
+    let mut inst = UType {
+        rd: Register::X0,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(0x12345).unwrap();
 
     // Test LUI to x0

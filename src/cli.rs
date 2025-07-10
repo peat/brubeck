@@ -18,27 +18,27 @@ pub struct Cli {
     /// Memory size (e.g., 1M, 256k, 1024)
     #[arg(short = 'm', long = "memory", default_value = "1M")]
     pub memory: String,
-    
+
     /// Maximum undo/redo depth
     #[arg(long = "undo-limit", default_value_t = 1000)]
     pub undo_limit: usize,
-    
+
     /// Disable undo/redo functionality
     #[arg(long = "no-undo", conflicts_with = "undo_limit")]
     pub no_undo: bool,
-    
+
     /// Execute commands and exit (semicolon-separated)
     #[arg(short = 'e', long = "execute", conflicts_with = "script")]
     pub execute: Option<String>,
-    
+
     /// Execute script file and exit
     #[arg(short = 's', long = "script", conflicts_with = "execute")]
     pub script: Option<String>,
-    
+
     /// Suppress banner and instruction descriptions (REPL only)
     #[arg(short = 'q', long = "quiet")]
     pub quiet: bool,
-    
+
     /// Show instruction trace with PC and descriptions (script/execute only)
     #[arg(short = 'v', long = "verbose")]
     pub verbose: bool,
@@ -61,7 +61,7 @@ impl Config {
             undo_limit,
         })
     }
-    
+
     /// Returns the effective undo limit (0 means disabled)
     pub fn effective_undo_limit(&self) -> usize {
         self.undo_limit
@@ -92,7 +92,7 @@ const MAX_MEMORY_SIZE: usize = 1024 * 1024 * 1024;
 /// # Examples
 /// ```
 /// use brubeck::cli::parse_memory_size;
-/// 
+///
 /// assert_eq!(parse_memory_size("1024").unwrap(), 1024);
 /// assert_eq!(parse_memory_size("1k").unwrap(), 1024);
 /// assert_eq!(parse_memory_size("1K").unwrap(), 1024);
@@ -101,16 +101,16 @@ const MAX_MEMORY_SIZE: usize = 1024 * 1024 * 1024;
 /// ```
 pub fn parse_memory_size(s: &str) -> Result<usize, ParseMemoryError> {
     let s = s.trim();
-    
+
     if s.is_empty() {
         return Err(ParseMemoryError {
             message: "empty string".to_string(),
         });
     }
-    
+
     // Check if last character is a unit suffix
     let last_char = s.chars().last().unwrap();
-    
+
     let (number_part, multiplier) = match last_char {
         'k' | 'K' => {
             let num_str = &s[..s.len() - 1];
@@ -126,38 +126,38 @@ pub fn parse_memory_size(s: &str) -> Result<usize, ParseMemoryError> {
         }
         _ => {
             return Err(ParseMemoryError {
-                message: format!("invalid suffix '{}'", last_char),
+                message: format!("invalid suffix '{last_char}'"),
             });
         }
     };
-    
+
     // Parse the numeric part
-    let number: u64 = number_part.parse()
-        .map_err(|_| ParseMemoryError {
-            message: format!("invalid number '{}'", number_part),
-        })?;
-    
+    let number: u64 = number_part.parse().map_err(|_| ParseMemoryError {
+        message: format!("invalid number '{number_part}'"),
+    })?;
+
     // Check for overflow when multiplying
-    let result = number.checked_mul(multiplier as u64)
+    let result = number
+        .checked_mul(multiplier as u64)
         .ok_or_else(|| ParseMemoryError {
             message: "arithmetic overflow".to_string(),
         })?;
-    
+
     // Check if it fits in usize
     if result > usize::MAX as u64 {
         return Err(ParseMemoryError {
             message: "size too large for platform".to_string(),
         });
     }
-    
+
     // Check against our maximum limit (1GB)
     let size = result as usize;
     if size > MAX_MEMORY_SIZE {
         return Err(ParseMemoryError {
-            message: format!("size exceeds maximum of 1GB (got {} bytes)", size),
+            message: format!("size exceeds maximum of 1GB (got {size} bytes)"),
         });
     }
-    
+
     Ok(size)
 }
 
@@ -190,17 +190,12 @@ impl Cli {
     /// Converts CLI arguments into a Config
     pub fn to_config(&self) -> Result<Config, ParseMemoryError> {
         let memory_size = parse_memory_size(&self.memory)?;
-        
-        let undo_limit = if self.no_undo {
-            0
-        } else {
-            self.undo_limit
-        };
-        
-        Config::new(memory_size, undo_limit)
-            .map_err(|e| ParseMemoryError { message: e })
+
+        let undo_limit = if self.no_undo { 0 } else { self.undo_limit };
+
+        Config::new(memory_size, undo_limit).map_err(|e| ParseMemoryError { message: e })
     }
-    
+
     /// Determines the execution mode from CLI arguments
     pub fn execution_mode(&self) -> ExecutionMode {
         if self.execute.is_some() {
@@ -213,32 +208,19 @@ impl Cli {
     }
 }
 
-// Placeholder functions for execute and script modes
-// These will be implemented when we update main.rs
-
-/// Runs commands in execute mode
-pub fn run_execute_mode(_commands: &str) -> String {
-    // TODO: Implement when updating main.rs
-    unimplemented!("Execute mode not yet implemented")
-}
-
-/// Runs a script file
-pub fn run_script_mode(_path: &str) -> Result<String, std::io::Error> {
-    // TODO: Implement when updating main.rs
-    unimplemented!("Script mode not yet implemented")
-}
+// Execute and script mode functions are implemented in main.rs
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_parse_memory_size_basic() {
         assert_eq!(parse_memory_size("1024").unwrap(), 1024);
         assert_eq!(parse_memory_size("1k").unwrap(), 1024);
         assert_eq!(parse_memory_size("1M").unwrap(), 1024 * 1024);
     }
-    
+
     #[test]
     fn test_parse_memory_size_errors() {
         assert!(parse_memory_size("").is_err());

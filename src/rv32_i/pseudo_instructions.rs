@@ -1,8 +1,8 @@
 //! RV32I pseudo-instructions
 //!
 //! This module provides support for common RISC-V pseudo-instructions that
-//! expand to RV32I base instructions. Pseudo-instructions are assembly 
-//! mnemonics that expand to one or more real instructions, making assembly 
+//! expand to RV32I base instructions. Pseudo-instructions are assembly
+//! mnemonics that expand to one or more real instructions, making assembly
 //! code more readable and convenient.
 //!
 //! All pseudo-instructions in this module are specific to the RV32I base
@@ -19,7 +19,7 @@ use super::{
 use crate::Immediate;
 
 /// Represents an RV32I pseudo-instruction
-/// 
+///
 /// These pseudo-instructions are specific to the RV32I base integer
 /// instruction set and expand only to RV32I instructions.
 #[derive(Debug, Clone, PartialEq)]

@@ -80,9 +80,11 @@ fn test_slli_basic() {
         .with_register(Register::X1, 0b1111) // Value: 15
         .build();
 
-    let mut inst = IType::default();
-    inst.rd = Register::X2;
-    inst.rs1 = Register::X1;
+    let mut inst = IType {
+        rd: Register::X2,
+        rs1: Register::X1,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(3).unwrap(); // Shift by 3
 
     let slli = Instruction::SLLI(inst);
@@ -97,9 +99,11 @@ fn test_slli_max_shift() {
     // Shifting 1 by 31 positions sets only the MSB
     let mut cpu = CpuBuilder::new().with_register(Register::X1, 1).build();
 
-    let mut inst = IType::default();
-    inst.rd = Register::X2;
-    inst.rs1 = Register::X1;
+    let mut inst = IType {
+        rd: Register::X2,
+        rs1: Register::X1,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(31).unwrap(); // Maximum valid shift
 
     let slli = Instruction::SLLI(inst);
@@ -169,9 +173,11 @@ fn test_srli_basic() {
         .with_register(Register::X1, 0xFF000000)
         .build();
 
-    let mut inst = IType::default();
-    inst.rd = Register::X2;
-    inst.rs1 = Register::X1;
+    let mut inst = IType {
+        rd: Register::X2,
+        rs1: Register::X1,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(8).unwrap();
 
     let srli = Instruction::SRLI(inst);
@@ -266,9 +272,11 @@ fn test_srai_basic() {
         .with_register(Register::X1, (-1024_i32) as u32)
         .build();
 
-    let mut inst = IType::default();
-    inst.rd = Register::X2;
-    inst.rs1 = Register::X1;
+    let mut inst = IType {
+        rd: Register::X2,
+        rs1: Register::X1,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(2).unwrap();
 
     let srai = Instruction::SRAI(inst);
@@ -320,9 +328,11 @@ fn test_shift_edge_cases() {
     // Test boundary conditions for shift operations
     let mut cpu = CpuBuilder::new().build();
 
-    let mut inst = IType::default();
-    inst.rd = Register::X2;
-    inst.rs1 = Register::X1;
+    let mut inst = IType {
+        rd: Register::X2,
+        rs1: Register::X1,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(31).unwrap(); // Maximum shift amount
 
     // Case 1: Shift 1 left by 31 (sets only MSB)
@@ -357,9 +367,11 @@ fn test_shift_chain() {
         .build();
 
     // Step 1: Shift left by 4 (multiply by 16)
-    let mut inst = IType::default();
-    inst.rd = Register::X2;
-    inst.rs1 = Register::X1;
+    let mut inst = IType {
+        rd: Register::X2,
+        rs1: Register::X1,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(4).unwrap();
 
     let slli = Instruction::SLLI(inst);

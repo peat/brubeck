@@ -83,9 +83,11 @@ fn test_addi_basic() {
     let mut cpu = CpuBuilder::new().build();
 
     // Test 1: Add zero (NOP-like behavior when rd=rs1)
-    let mut inst = IType::default();
-    inst.rd = Register::X1;
-    inst.rs1 = Register::X1;
+    let mut inst = IType {
+        rd: Register::X1,
+        rs1: Register::X1,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(0).unwrap();
     let addi = Instruction::ADDI(inst);
     cpu.execute_expect(addi, "ADDI with zero immediate");
@@ -123,9 +125,11 @@ fn test_addi_sign_extension() {
     ];
 
     for (imm_val, expected, desc) in test_cases {
-        let mut inst = IType::default();
-        inst.rd = Register::X1;
-        inst.rs1 = Register::X0; // x0 = 0, so result = 0 + immediate
+        let mut inst = IType {
+            rd: Register::X1,
+            rs1: Register::X0, // x0 = 0, so result = 0 + immediate
+            ..Default::default()
+        };
         inst.imm.set_signed(imm_val).unwrap();
         let addi = Instruction::ADDI(inst);
 

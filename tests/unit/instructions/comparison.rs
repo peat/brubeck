@@ -39,9 +39,11 @@ fn test_slti_signed_comparison() {
         .with_register(Register::X2, 0) // Start with zero
         .build();
 
-    let mut inst = IType::default();
-    inst.rd = Register::X1;
-    inst.rs1 = Register::X2;
+    let mut inst = IType {
+        rd: Register::X1,
+        rs1: Register::X2,
+        ..Default::default()
+    };
     inst.imm.set_unsigned(0).unwrap();
 
     let slti = Instruction::SLTI(inst);
@@ -69,9 +71,11 @@ fn test_slti_edge_cases() {
     // Two's complement representation is critical here
     let mut cpu = CpuBuilder::new().build();
 
-    let mut inst = IType::default();
-    inst.rd = Register::X1;
-    inst.rs1 = Register::X2;
+    let mut inst = IType {
+        rd: Register::X1,
+        rs1: Register::X2,
+        ..Default::default()
+    };
 
     // Test with maximum positive value in rs1
     // 0x7FFFFFFF (2147483647) is the largest positive signed 32-bit
@@ -99,9 +103,11 @@ fn test_sltiu_unsigned_comparison() {
         .with_register(Register::X2, 255) // Test value
         .build();
 
-    let mut inst = IType::default();
-    inst.rd = Register::X1;
-    inst.rs1 = Register::X2;
+    let mut inst = IType {
+        rd: Register::X1,
+        rs1: Register::X2,
+        ..Default::default()
+    };
 
     // Test equal values (255 == 255)
     inst.imm.set_unsigned(255).unwrap();
@@ -128,9 +134,11 @@ fn test_sltiu_sign_extension() {
     // This creates interesting behavior with negative immediates
     let mut cpu = CpuBuilder::new().with_register(Register::X2, 1).build();
 
-    let mut inst = IType::default();
-    inst.rd = Register::X1;
-    inst.rs1 = Register::X2;
+    let mut inst = IType {
+        rd: Register::X1,
+        rs1: Register::X2,
+        ..Default::default()
+    };
 
     // Set immediate to -1, which sign-extends to 0xFFFFFFFF
     // As unsigned: 0xFFFFFFFF = 4,294,967,295 (max u32)
@@ -169,9 +177,11 @@ fn test_comparison_patterns() {
     // -1        | 1         | A < B   | A > B
     // 0x80000000| 0x7FFFFFFF| A < B   | A > B
 
-    let mut inst = IType::default();
-    inst.rd = Register::X1;
-    inst.rs1 = Register::X2;
+    let mut inst = IType {
+        rd: Register::X1,
+        rs1: Register::X2,
+        ..Default::default()
+    };
 
     // Case 1: -1 vs 1
     cpu.set_register(Register::X2, values::NEG_ONE); // -1 as signed

@@ -18,22 +18,22 @@ pub struct MemoryDelta {
 pub struct StateSnapshot {
     /// Instruction that was executed (for display)
     pub instruction: String,
-    
+
     /// Register values BEFORE execution
     pub registers: [u32; 32],
-    
+
     /// PC value BEFORE execution
     pub pc: u32,
-    
+
     /// Register values AFTER execution (for redo)
     pub registers_after: [u32; 32],
-    
+
     /// PC value AFTER execution (for redo)
     pub pc_after: u32,
-    
+
     /// CSR changes: (address, old_value, new_value)
     pub csr_changes: Vec<(u32, u32, u32)>,
-    
+
     /// Memory changes (only modified bytes)
     pub memory_changes: Vec<MemoryDelta>,
 }
@@ -65,12 +65,12 @@ impl StateSnapshot {
 pub struct HistoryManager {
     /// Ring buffer of state snapshots
     history: VecDeque<StateSnapshot>,
-    
+
     /// Current position in history
     /// -1 means we're at the latest state (nothing to redo)
     /// 0..history.len()-1 means we've undone some operations
     current_position: isize,
-    
+
     /// Maximum history size
     max_history: usize,
 }
@@ -84,40 +84,40 @@ impl HistoryManager {
             max_history,
         }
     }
-    
+
     /// Adds a new state snapshot to history
     pub fn push(&mut self, snapshot: StateSnapshot) {
         // If undo limit is 0, history is disabled
         if self.max_history == 0 {
             return;
         }
-        
+
         // If we're not at the latest position, we need to clear redo history
         if self.current_position >= 0 && self.current_position < (self.history.len() - 1) as isize {
             // Remove everything after current position
             let keep = (self.current_position + 1) as usize;
             self.history.truncate(keep);
         }
-        
+
         // Add the new snapshot
         self.history.push_back(snapshot);
-        
+
         // Enforce history limit
         if self.history.len() > self.max_history {
             self.history.pop_front();
         }
-        
+
         // Update position to latest
         self.current_position = (self.history.len() - 1) as isize;
     }
-    
+
     /// Undoes the last operation, returning the snapshot if successful
     pub fn undo(&mut self) -> Option<&StateSnapshot> {
         // If history is empty, nothing to undo
         if self.history.is_empty() {
             return None;
         }
-        
+
         // If we're at the latest state (position == len - 1), we can undo
         // If we're at an earlier state (from previous undos), we can still go back
         if self.current_position >= 0 {
@@ -125,10 +125,10 @@ impl HistoryManager {
             self.current_position -= 1;
             return Some(snapshot);
         }
-        
+
         None
     }
-    
+
     /// Redoes a previously undone operation
     pub fn redo(&mut self) -> Option<&StateSnapshot> {
         if self.current_position < (self.history.len() - 1) as isize {
@@ -138,12 +138,12 @@ impl HistoryManager {
             None
         }
     }
-    
+
     /// Returns true if redo is available
     pub fn can_redo(&self) -> bool {
         self.current_position < (self.history.len() - 1) as isize
     }
-    
+
     /// Returns the current position in history (for testing)
     #[cfg(test)]
     pub fn current_position(&self) -> isize {

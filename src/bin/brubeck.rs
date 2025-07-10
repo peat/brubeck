@@ -71,7 +71,7 @@ fn execute_and_print(interpreter: &mut Interpreter, input: &str, use_color: bool
             if use_color {
                 let mut stdout = io::stdout();
                 stdout.execute(SetForegroundColor(Color::Green))?;
-                stdout.execute(Print("✅ "))?;
+                stdout.execute(Print("● "))?;
                 stdout.execute(ResetColor)?;
                 println!("{}", s);
             } else {
@@ -82,7 +82,7 @@ fn execute_and_print(interpreter: &mut Interpreter, input: &str, use_color: bool
             if use_color {
                 let mut stdout = io::stdout();
                 stdout.execute(SetForegroundColor(Color::Red))?;
-                stdout.execute(Print("❌ "))?;
+                stdout.execute(Print("● "))?;
                 stdout.execute(ResetColor)?;
                 println!("{}", s);
             } else {

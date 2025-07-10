@@ -161,19 +161,21 @@ Brubeck now has a CLI using `clap`:
 - **Automatic mode detection**: Banner/prompt suppression for non-interactive use
 - **Human-friendly parsing**: Memory sizes like "1k", "5M", "1GB"
 
-### Undo/Redo Functionality
+### History Navigation (Previous/Next)
 
 **Status**: Completed
 
-We have implemented an undo/redo system for the REPL that:
-- Allows users to undo instruction execution with `/undo` or `/u`
-- Supports redo with `/redo`
+We have implemented a history navigation system for the REPL that:
+- Allows users to navigate to previous state with `/previous`, `/prev`, or `/p`
+- Supports moving forward with `/next` or `/n`
 - Uses efficient delta compression for memory changes
 - Maintains a configurable history (default: 1000 states)
 - Only tracks successfully executed instructions
 - Has test coverage for all RV32I instructions
 
 Implementation uses `src/history.rs` for state management with efficient delta compression.
+
+Note: We chose "previous/next" over "undo/redo" to better convey that this is history navigation, not error correction.
 
 ### REPL Usability
 
@@ -197,19 +199,20 @@ We have implemented significant REPL usability improvements to make Brubeck more
 - **Clean separation**: All REPL enhancements are in the binary, not the library
 
 ### Command System Implementation
-- **Completed**: `/regs` (alias `/r`), `/help` (alias `/h`), `/undo` (alias `/u`), `/redo`
+- **Completed**: `/regs` (alias `/r`), `/help` (alias `/h`), `/previous` (aliases `/prev`, `/p`), `/next` (alias `/n`), `/reset`
 - **Direct register inspection removed**: Must use `/regs x1` instead of `x1`
 - **Flexible syntax**: `/regs x1 x2 sp` shows specific registers
+- **Reset command**: Prompts for confirmation before clearing all state
 
 ### Current Development
 
 See `PROJECT_STATUS.md` for the consolidated task list and roadmap.
 
 Key priorities:
-1. Rename history navigation commands for clarity
-2. Add `/memory` command for debugging
-3. Add `/reset` command with safety confirmation
-4. Enhance error messages with educational content
+1. Add `/memory` command for debugging
+2. Enhance error messages with educational content
+3. Add instruction history command
+4. Continue improving REPL usability based on user feedback
 
 ## Testing Approach
 
@@ -313,3 +316,51 @@ git push origin feature/memory-inspection
    - Start with easier/smaller tasks as warm-up
    - Complete one task fully before moving to the next
    - Run quality checks before marking complete
+
+## Architecture and Testing Guidelines
+
+### Design Principles
+
+1. **Components should own their state management**
+   - Each module should handle its own initialization, reset, and cleanup
+   - Example: `CPU::reset()` handles all CPU state, not the caller
+   - This improves encapsulation and reduces coupling
+
+2. **Clear method naming prevents confusion**
+   - Avoid names that conflict with standard traits (e.g., `next()` vs `Iterator::next()`)
+   - Use descriptive names: `go_previous()/go_next()` instead of `previous()/next()`
+   - Even internal APIs benefit from clear naming
+
+3. **Feature flag discipline**
+   - Maintain clear separation between library and REPL features
+   - Use `#[cfg(feature = "repl")]` consistently
+   - Remember that feature flags affect testing and compilation
+
+### Testing Considerations
+
+1. **Interactive features are hard to test**
+   - Features requiring user input (like confirmation prompts) need manual testing
+   - Consider dependency injection for I/O operations if testability is critical
+   - Document which features require manual verification
+
+2. **Listen to linter warnings**
+   - Clippy warnings often highlight real API design issues
+   - Address warnings promptly to maintain code quality
+   - Use `cargo clippy -- -D warnings` to ensure no warnings slip through
+
+3. **Test organization**
+   - Keep unit tests close to the code they test
+   - Use integration tests for cross-module functionality
+   - Document any manual testing requirements
+
+### Development Workflow Lessons
+
+1. **Feature branches for focused work**
+   - Even small features benefit from feature branches
+   - Makes changes easier to review and rollback if needed
+   - Keeps main branch stable
+
+2. **Commit hygiene**
+   - Make atomic commits: one logical change per commit
+   - Fix linter warnings in separate commits from feature implementation
+   - This makes history cleaner and cherry-picking easier

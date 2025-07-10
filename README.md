@@ -1,8 +1,8 @@
-# Brubeck!
+# Brubeck
 
 Brubeck is a RISC-V assembly language REPL and emulator library designed for learning RISC-V architecture and assembly programming. It includes a parser with validation and helpful error messages.
 
-Please follow this repo if you're interested in the project! I'm also very keen on feedback and thoughts on what you think would be awesome to see in a RISC-V assembly playground.
+Feedback and suggestions for this RISC-V assembly playground are welcome.
 
 ## Current State
 

@@ -105,27 +105,40 @@ The parser is designed as an educational resource demonstrating compiler front-e
 - No support for labels or assembler directives
 - REPL lacks advanced features like command history or tab completion
 
-## Current Project: Command-Line Interface
+## Recent Major Refactoring
 
-**Status**: In progress - implementing command-line argument parsing
+**Status**: Completed - interpreter split into modular architecture
 
-We are currently adding command-line argument support to Brubeck using the `clap` crate. This will allow users to configure memory size, undo/redo limits, and run scripts or one-liner commands.
+The interpreter.rs file (previously 1785 lines) has been refactored into 6 focused modules:
 
-### Planned CLI Arguments
+### New Interpreter Architecture (`src/interpreter/`)
+- **`parser.rs`** (642 lines) - Complete parsing pipeline
+- **`builder.rs`** (725 lines) - Instruction building and validation
+- **`executor.rs`** (213 lines) - Command execution and state management
+- **`formatter.rs`** (370 lines) - Human-readable output formatting
+- **`validator.rs`** (72 lines) - Input validation functions
+- **`types.rs`** (140 lines) - Common types (Command, Token, Error)
+
+### Key Improvements
+- **Better separation of concerns**: Each module has a single responsibility
+- **Removed direct register inspection**: No more confusing `x1` commands, use `/regs` instead
+- **Clean code**: Zero clippy warnings, proper Rust idioms throughout
+- **Educational structure**: Demonstrates good software architecture practices
+
+See `REFACTORING_SUMMARY.md` for complete details.
+
+## Recent Major Features
+
+### Command-Line Interface
+
+**Status**: Completed
+
+Brubeck now has a comprehensive CLI using `clap`:
 - **Memory configuration**: `-m, --memory <size>` (e.g., 1M, 256k)
 - **History configuration**: `--undo-limit <n>`, `--no-undo`
 - **Execution modes**: `-e, --execute <commands>`, `-s, --script <file>`
-- **Standard options**: `-h, --help`, `-V, --version`
-
-### Implementation Progress
-See `docs/specs/CLI_ARGS_SPEC.md` for the implementation specification.
-
-### Related Improvements
-- Adding semicolon support to parser for multi-command lines
-- Automatic banner suppression in non-interactive modes
-- Human-friendly memory size parsing (1k, 5M, etc.)
-
-## Recent Improvements
+- **Automatic mode detection**: Banner/prompt suppression for non-interactive use
+- **Human-friendly parsing**: Memory sizes like "1k", "5M", "1GB"
 
 ### Undo/Redo Functionality
 
@@ -162,12 +175,18 @@ We have implemented significant REPL usability improvements to make Brubeck more
 - **Binary has rich features**: Terminal colors, TTY detection, etc. via feature flags
 - **Clean separation**: All REPL enhancements are in the binary, not the library
 
-### Still Planned
-- **Command system**: `/regs`, `/memory`, `/help`, `/reset` with "/" prefix
-- **Register state overview**: Show all registers at once
-- **Safety confirmations**: Prevent accidental state loss
+### Command System Implementation
+- **Completed**: `/regs` (alias `/r`), `/help` (alias `/h`), `/undo` (alias `/u`), `/redo`
+- **Direct register inspection removed**: Must use `/regs x1` instead of `x1`
+- **Flexible syntax**: `/regs x1 x2 sp` shows specific registers
 
-See `REPL_USABILITY_FEEDBACK.md` for the original analysis.
+### Still Planned
+- **`/memory` command**: View memory contents for debugging
+- **`/reset` command**: Reset CPU state with confirmation
+- **Command renaming**: Change `/undo`→`/previous` and `/redo`→`/next`
+- **Enhanced error messages**: More educational context
+
+See `TODO_PHASE2.md` for the roadmap and `REPL_USABILITY_FEEDBACK.md` for the original analysis.
 
 ## Testing Approach
 

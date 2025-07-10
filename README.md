@@ -48,21 +48,21 @@ Ctrl-C to quit
 [0x00000008]> ADD x3, x1, x2
 ● ADD: Added X1 (100) and X2 (50) and stored result in X3 (150)
 
-[0x0000000c]> x3
-● X3: 150 (0x96)
+[0x0000000c]> /regs x3
+● x 3 (gp  ): 0x00000096
 
 [0x0000000c]> /undo
 Undid: ADD
 
-[0x00000008]> x3
-● X3: 0 (0x0)
+[0x00000008]> /regs x3
+● x 3 (gp  ): 0x00000000
 ```
 
 ### Command-Line Usage
 ```bash
 # Quick calculations
-$ brubeck -e "ADDI x1, x0, 42; SLLI x2, x1, 2; x2"
-X2: 168 (0xa8)
+$ brubeck -e "ADDI x1, x0, 42; SLLI x2, x1, 2; /r x2"
+x 2 (sp  ): 0x000000a8
 
 # Run a script file
 $ brubeck -s program.bru
@@ -73,7 +73,7 @@ $ brubeck -s program.bru --verbose
 ADDI x1, x0, 100     # 0x00000000 ADDI: Added 100 to X0 (0) and stored result in X1 (100)
 SLLI x2, x1, 2       # 0x00000004 SLLI: Executed instruction
 ADD x3, x1, x2       # 0x00000008 ADD: Added X1 (100) and X2 (400) and stored result in X3 (500)
-X3: 500 (0x1f4)
+x 3 (gp  ): 0x000001f4
 
 # Custom memory size
 $ brubeck -m 64k
@@ -107,7 +107,7 @@ cargo run
 cargo run -- -m 256k
 
 # Execute one-liners
-cargo run -- -e "LI x1, 0x1234; x1"
+cargo run -- -e "LI x1, 0x1234; /regs x1"
 
 # Run tests
 cargo test
@@ -136,6 +136,7 @@ Options:
 ## Future Enhancements
 
 * **RISC-V Extensions**: Add M (multiplication/division), A (atomic), F/D (floating-point) extensions
+* **REPL Commands**: `/memory` for memory inspection, `/reset` to clear state
 * **Advanced REPL**: Command history, tab completion, syntax highlighting
 * **Debugging Features**: Breakpoints, step execution, execution tracing
 * **Educational Tools**: Instruction encoding display, pipeline visualization

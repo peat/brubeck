@@ -111,8 +111,8 @@ impl HistoryManager {
         self.current_position = (self.history.len() - 1) as isize;
     }
 
-    /// Undoes the last operation, returning the snapshot if successful
-    pub fn undo(&mut self) -> Option<&StateSnapshot> {
+    /// Navigates to the previous state, returning the snapshot if successful
+    pub fn go_previous(&mut self) -> Option<&StateSnapshot> {
         // If history is empty, nothing to undo
         if self.history.is_empty() {
             return None;
@@ -129,9 +129,11 @@ impl HistoryManager {
         None
     }
 
-    /// Redoes a previously undone operation
-    pub fn redo(&mut self) -> Option<&StateSnapshot> {
-        if self.current_position < (self.history.len() - 1) as isize {
+    /// Navigates to the next state in history
+    pub fn go_next(&mut self) -> Option<&StateSnapshot> {
+        if self.history.is_empty() {
+            None
+        } else if self.current_position < (self.history.len() - 1) as isize {
             self.current_position += 1;
             Some(&self.history[self.current_position as usize])
         } else {
@@ -139,9 +141,13 @@ impl HistoryManager {
         }
     }
 
-    /// Returns true if redo is available
-    pub fn can_redo(&self) -> bool {
-        self.current_position < (self.history.len() - 1) as isize
+    /// Returns true if next state is available
+    pub fn can_next(&self) -> bool {
+        if self.history.is_empty() {
+            false
+        } else {
+            self.current_position < (self.history.len() - 1) as isize
+        }
     }
 
     /// Returns the current position in history (for testing)

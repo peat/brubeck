@@ -225,7 +225,7 @@ impl CPU {
     }
 
     /// Initialize standard CSRs with their default values
-    fn init_csrs(&mut self) {
+    pub fn init_csrs(&mut self) {
         // User-level CSRs (read-only performance counters)
         self.csr_exists[CSR_CYCLE as usize] = true;
         self.csr_readonly[CSR_CYCLE as usize] = true;
@@ -1397,6 +1397,57 @@ impl CPU {
         self.csr_changes.clear();
     }
 
+    /// Resets the CPU to its initial state
+    pub fn reset(&mut self) {
+        // Reset all registers to 0
+        self.x0 = 0;
+        self.x1 = 0;
+        self.x2 = 0;
+        self.x3 = 0;
+        self.x4 = 0;
+        self.x5 = 0;
+        self.x6 = 0;
+        self.x7 = 0;
+        self.x8 = 0;
+        self.x9 = 0;
+        self.x10 = 0;
+        self.x11 = 0;
+        self.x12 = 0;
+        self.x13 = 0;
+        self.x14 = 0;
+        self.x15 = 0;
+        self.x16 = 0;
+        self.x17 = 0;
+        self.x18 = 0;
+        self.x19 = 0;
+        self.x20 = 0;
+        self.x21 = 0;
+        self.x22 = 0;
+        self.x23 = 0;
+        self.x24 = 0;
+        self.x25 = 0;
+        self.x26 = 0;
+        self.x27 = 0;
+        self.x28 = 0;
+        self.x29 = 0;
+        self.x30 = 0;
+        self.x31 = 0;
+        self.pc = 0;
+
+        // Clear memory
+        self.memory.fill(0);
+
+        // Reset CSRs
+        self.csrs = [0; 4096];
+        self.csr_exists = [false; 4096];
+        self.csr_readonly = [false; 4096];
+        self.init_csrs();
+
+        // Clear tracking if REPL feature is enabled
+        #[cfg(feature = "repl")]
+        self.clear_tracking();
+    }
+
     /// Restores memory from a set of deltas (for undo)
     #[cfg(feature = "repl")]
     pub fn restore_memory(&mut self, deltas: &[crate::history::MemoryDelta]) {
@@ -1950,5 +2001,48 @@ mod tests {
         // Our implementation: 0x40000100
         // 0100_0000_0000_0000_0000_0001_0000_0000
         // MXL=01 (32-bit), I bit set
+    }
+
+    #[test]
+    fn test_cpu_reset() {
+        let mut cpu = CPU::default();
+
+        // Modify CPU state
+        cpu.set_register(Register::X1, 0xDEADBEEF);
+        cpu.set_register(Register::X15, 0x12345678);
+        cpu.pc = 0x1000;
+        cpu.memory[0] = 0xFF;
+        cpu.memory[100] = 0xAB;
+        cpu.write_csr(0x340, 0xCAFEBABE).unwrap(); // mscratch
+
+        // Verify state was changed
+        assert_eq!(cpu.get_register(Register::X1), 0xDEADBEEF);
+        assert_eq!(cpu.pc, 0x1000);
+        assert_eq!(cpu.memory[0], 0xFF);
+        assert_eq!(cpu.read_csr(0x340).unwrap(), 0xCAFEBABE);
+
+        // Reset CPU
+        cpu.reset();
+
+        // Verify all state is cleared
+        for i in 0..32 {
+            assert_eq!(
+                cpu.get_register(Register::from_u32(i)),
+                0,
+                "Register X{} should be 0",
+                i
+            );
+        }
+        assert_eq!(cpu.pc, 0);
+        assert_eq!(cpu.memory[0], 0);
+        assert_eq!(cpu.memory[100], 0);
+
+        // Verify CSRs are reset but standard ones still exist
+        assert_eq!(cpu.read_csr(0x340).unwrap(), 0); // mscratch cleared
+        assert_eq!(cpu.read_csr(0x300).unwrap(), 0x00001800); // mstatus has default value
+        assert_eq!(cpu.read_csr(0x301).unwrap(), 0x40000100); // misa has default value
+        assert!(cpu.csr_exists[0x300]); // mstatus exists
+        assert!(cpu.csr_exists[0x301]); // misa exists
+        assert!(cpu.csr_readonly[0x301]); // misa is read-only
     }
 }

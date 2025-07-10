@@ -8,7 +8,7 @@ mod history_manager {
     #[test]
     fn test_empty_history_undo_fails() {
         let mut history = HistoryManager::new(100);
-        assert!(history.undo().is_none());
+        assert!(history.go_previous().is_none());
     }
 
     #[test]
@@ -29,12 +29,12 @@ mod history_manager {
         history.push(snapshot.clone());
 
         // Should be able to undo
-        let undone = history.undo();
+        let undone = history.go_previous();
         assert!(undone.is_some());
         assert_eq!(undone.unwrap().instruction, "ADDI x1, x0, 42");
 
         // Should not be able to undo again
-        assert!(history.undo().is_none());
+        assert!(history.go_previous().is_none());
     }
 
     #[test]
@@ -56,16 +56,16 @@ mod history_manager {
         }
 
         // Undo all three
-        assert_eq!(history.undo().unwrap().instruction, "ADDI x3, x0, 12");
-        assert_eq!(history.undo().unwrap().instruction, "ADDI x2, x0, 11");
-        assert_eq!(history.undo().unwrap().instruction, "ADDI x1, x0, 10");
-        assert!(history.undo().is_none());
+        assert_eq!(history.go_previous().unwrap().instruction, "ADDI x3, x0, 12");
+        assert_eq!(history.go_previous().unwrap().instruction, "ADDI x2, x0, 11");
+        assert_eq!(history.go_previous().unwrap().instruction, "ADDI x1, x0, 10");
+        assert!(history.go_previous().is_none());
 
         // Redo all three
-        assert_eq!(history.redo().unwrap().instruction, "ADDI x1, x0, 10");
-        assert_eq!(history.redo().unwrap().instruction, "ADDI x2, x0, 11");
-        assert_eq!(history.redo().unwrap().instruction, "ADDI x3, x0, 12");
-        assert!(history.redo().is_none());
+        assert_eq!(history.go_next().unwrap().instruction, "ADDI x1, x0, 10");
+        assert_eq!(history.go_next().unwrap().instruction, "ADDI x2, x0, 11");
+        assert_eq!(history.go_next().unwrap().instruction, "ADDI x3, x0, 12");
+        assert!(history.go_next().is_none());
     }
 
     #[test]
@@ -87,10 +87,10 @@ mod history_manager {
         }
 
         // Should only be able to undo 3 times (oldest 2 were dropped)
-        assert_eq!(history.undo().unwrap().instruction, "Instruction 4");
-        assert_eq!(history.undo().unwrap().instruction, "Instruction 3");
-        assert_eq!(history.undo().unwrap().instruction, "Instruction 2");
-        assert!(history.undo().is_none());
+        assert_eq!(history.go_previous().unwrap().instruction, "Instruction 4");
+        assert_eq!(history.go_previous().unwrap().instruction, "Instruction 3");
+        assert_eq!(history.go_previous().unwrap().instruction, "Instruction 2");
+        assert!(history.go_previous().is_none());
     }
 
     #[test]
@@ -119,10 +119,10 @@ mod history_manager {
         });
 
         // Undo one
-        history.undo();
+        history.go_previous();
 
         // Verify we can redo
-        assert!(history.can_redo());
+        assert!(history.can_next());
 
         // Push a new instruction
         history.push(StateSnapshot {
@@ -136,8 +136,48 @@ mod history_manager {
         });
 
         // Redo should no longer be available
-        assert!(!history.can_redo());
-        assert!(history.redo().is_none());
+        assert!(!history.can_next());
+        assert!(history.go_next().is_none());
+    }
+
+    #[test]
+    fn test_clear_history() {
+        let mut history = HistoryManager::new(100);
+
+        // Push several instructions
+        for i in 0..5 {
+            history.push(StateSnapshot {
+                instruction: format!("Instruction {}", i),
+                registers: [0; 32],
+                pc: i * 4,
+                registers_after: [0; 32],
+                pc_after: (i + 1) * 4,
+                csr_changes: vec![],
+                memory_changes: vec![],
+            });
+        }
+
+        // Verify we have history (we should be able to undo)
+        assert!(history.go_previous().is_some());
+
+        // Push it back to restore state
+        history.push(StateSnapshot {
+            instruction: "Dummy".to_string(),
+            registers: [0; 32],
+            pc: 0,
+            registers_after: [0; 32],
+            pc_after: 4,
+            csr_changes: vec![],
+            memory_changes: vec![],
+        });
+
+        // Clear history
+        history.clear();
+
+        // Verify history is empty
+        assert!(history.go_previous().is_none());
+        assert!(!history.can_next());
+        assert!(history.go_next().is_none());
     }
 }
 

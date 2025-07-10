@@ -161,7 +161,7 @@ pub fn execute_pseudo(
 #[cfg(feature = "repl")]
 fn handle_previous(interpreter: &mut crate::interpreter::Interpreter) -> Result<String, Error> {
     // Clone the snapshot to avoid borrowing conflicts
-    let snapshot = match interpreter.history_mut().undo() {
+    let snapshot = match interpreter.history_mut().go_previous() {
         Some(s) => s.clone(),
         None => return Err(Error::Generic("No previous state in history".to_string())),
     };
@@ -197,7 +197,7 @@ fn handle_previous(interpreter: &mut crate::interpreter::Interpreter) -> Result<
 #[cfg(feature = "repl")]
 fn handle_next(interpreter: &mut crate::interpreter::Interpreter) -> Result<String, Error> {
     // Clone the snapshot to avoid borrowing conflicts
-    let snapshot = match interpreter.history_mut().redo() {
+    let snapshot = match interpreter.history_mut().go_next() {
         Some(s) => s.clone(),
         None => return Err(Error::Generic("No next state in history".to_string())),
     };
@@ -256,27 +256,7 @@ fn handle_reset(interpreter: &mut crate::interpreter::Interpreter) -> Result<Str
 
     if confirmed {
         // Reset CPU state
-        let cpu = interpreter.cpu_mut();
-
-        // Reset all registers to 0
-        for i in 0..32 {
-            cpu.set_register(crate::rv32_i::Register::from_u32(i), 0);
-        }
-
-        // Reset PC
-        cpu.pc = 0;
-
-        // Clear memory
-        cpu.memory.fill(0);
-
-        // Clear CSRs to their initial state
-        cpu.csrs = [0; 4096];
-        cpu.csr_exists = [false; 4096];
-        cpu.csr_readonly = [false; 4096];
-        cpu.init_csrs();
-
-        // Clear tracking
-        cpu.clear_tracking();
+        interpreter.cpu_mut().reset();
 
         // Clear history
         interpreter.history_mut().clear();

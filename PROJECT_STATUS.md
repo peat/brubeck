@@ -34,13 +34,14 @@ Making Brubeck more beginner-friendly and educational based on user feedback.
 ```
 
 #### 3. Reset Command ⏱️ ~2 hours
-**Status**: Not started  
+**Status**: ✅ Completed  
 **Why**: Users need to start fresh without restarting REPL  
-**Specification**:
-- `/reset` - Clear all state with confirmation
-- Prompt: "Reset CPU? This will clear all registers, memory, and history. (y/N): "
-- Reset: registers → 0, PC → 0, clear memory, clear history
-- No aliases (destructive command should be explicit)
+**Changes**:
+- Added `/reset` command to parser
+- Prompts for confirmation before resetting
+- CPU::reset() method handles all state clearing
+- HistoryManager::clear() clears execution history
+- Comprehensive test coverage added
 
 ### 🟡 Medium Priority (Enhanced Learning)
 
@@ -138,4 +139,4 @@ Making Brubeck more beginner-friendly and educational based on user feedback.
 
 ---
 
-**Next Action**: Start with #1 (Rename commands) as a warm-up, then tackle #2 (Memory inspection)
+**Next Action**: Memory inspection command (#2) is the next high-priority task

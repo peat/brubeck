@@ -66,13 +66,19 @@ fn run_batch(interpreter: &mut Interpreter) -> io::Result<()> {
 
 #[cfg(feature = "repl")]
 fn execute_and_print(interpreter: &mut Interpreter, input: &str, use_color: bool) -> io::Result<()> {
+    // Check if this is a slash command
+    let is_slash_command = input.trim().starts_with('/');
+    
     match interpreter.interpret(input) {
         Ok(s) => {
-            if use_color {
+            if use_color && !is_slash_command {
                 let mut stdout = io::stdout();
                 stdout.execute(SetForegroundColor(Color::Green))?;
                 stdout.execute(Print("● "))?;
                 stdout.execute(ResetColor)?;
+                println!("{}", s);
+            } else if use_color && is_slash_command {
+                // Slash commands: no dot prefix
                 println!("{}", s);
             } else {
                 println!("OK: {}", s);

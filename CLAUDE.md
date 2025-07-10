@@ -6,361 +6,240 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 1. **Always use PROJECT_STATUS.md** to track current work and planned tasks. Do not create multiple tracking files - consolidate everything in PROJECT_STATUS.md.
 2. **Always write tests first** before implementing new features or making changes. Follow TDD (Test-Driven Development) practices.
+3. **Always run quality checks** before committing: `cargo fmt`, `cargo clippy -- -D warnings`, `cargo test`
 
 ## Project Overview
 
 Brubeck is a RISC-V assembly language REPL and emulation library written in Rust. It implements the RV32I (32-bit integer) instruction set and provides both a library interface and an interactive REPL for executing RISC-V assembly instructions.
 
-The implementation follows the official RISC-V ISA specification, available as AsciiDoc source files in `riscv-isa-manual/src/`. The RV32I base instruction set is documented in `riscv-isa-manual/src/rv32.adoc`.
+Key design principles:
+- **Library remains pure**: No dependencies, ready for no-std and WASM
+- **Binary has rich features**: Terminal colors, TTY detection, etc. via feature flags
+- **Clean separation**: All REPL enhancements are in the binary, not the library
+- **Educational focus**: Clear error messages, helpful documentation, teaching-oriented design
 
-## Common Development Commands
-
-### Build and Run
-- `cargo build` - Build the project in debug mode
-- `cargo build --release` - Build optimized release version
-- `cargo run` - Launch the Brubeck RISC-V REPL
-- `cargo run --release` - Run the optimized REPL
-
-### Testing
-- `cargo test` - Run all unit tests
-- `cargo test -- --nocapture` - Run tests with println! output visible
-- `cargo test test_name` - Run a specific test by name
-- `cargo test --test unit_components` - Run component unit tests
-- `cargo test --test unit_instructions` - Run instruction unit tests
-- `cargo test --test parser` - Run parser integration tests
-- `cargo test --test pseudo_instructions` - Run pseudo-instruction tests
-
-### Code Quality
-- `cargo fmt` - Format code according to Rust standards
-- `cargo clippy` - Run linter for code improvements
-- `cargo check` - Quick error check without building
-- `cargo clippy -- -D warnings` - Ensure no clippy warnings (CI requirement)
-
-### Documentation
-- `cargo doc --open` - Generate and open documentation
+The implementation follows the official RISC-V ISA specification, available in `riscv-isa-manual/src/`.
 
 ## Architecture Overview
-
-The codebase is organized as both a library and binary application:
 
 ### Core Components
 
 1. **CPU Emulation (`src/rv32_i/`)**
-   - `cpu.rs` - Main CPU emulator with 32 general-purpose registers, 1 MiB memory, and CSR (Control and Status Register) support
+   - `cpu.rs` - CPU emulator with 32 registers, configurable memory, CSR support
    - `instructions.rs` - RV32I instruction definitions and opcode decoding
    - `formats.rs` - Instruction encoding formats (R, I, S, B, U, J types)
-   - `registers.rs` - Register definitions with ABI names (x0-x31, zero, ra, sp, etc.)
-   - `pseudo_instructions.rs` - RV32I-specific pseudo-instructions (MV, NOT, LI, etc.)
+   - `registers.rs` - Register definitions with ABI names
+   - `pseudo_instructions.rs` - Common pseudo-instructions (MV, NOT, LI, etc.)
 
-2. **Interpreter System (`src/interpreter/`)** - Modular architecture for parsing and execution
-   - `parser.rs` (643 lines) - Four-phase parsing pipeline with educational error messages
-   - `builder.rs` (819 lines) - Instruction building and validation logic
-   - `executor.rs` (252 lines) - Command execution and state management
-   - `formatter.rs` (403 lines) - Human-readable output formatting
-   - `validator.rs` (174 lines) - Common validation functions
-   - `types.rs` (128 lines) - Shared types (Command, Token, Error)
-   - `interpreter.rs` (188 lines) - Main interpreter orchestration
+2. **Interpreter System (`src/interpreter/`)** - Modular architecture
+   - `parser.rs` - Four-phase parsing pipeline with validation
+   - `builder.rs` - Instruction building and validation logic
+   - `executor.rs` - Command execution and state management
+   - `formatter.rs` - Human-readable output formatting
+   - `validator.rs` - Reusable validation functions
+   - `types.rs` - Shared types (Command, Token, Error)
 
-3. **REPL Infrastructure (`src/`)**
-   - `cli.rs` (232 lines) - Command-line argument parsing with clap
-   - `history.rs` (286 lines) - Undo/redo state management with delta compression
-   - `bin/brubeck.rs` (233 lines) - Binary entry point with terminal features
-   - `lib.rs` (30 lines) - Library entry point exposing public API
-   - `interpreter.rs` (188 lines) - Main interpreter orchestration
-
-4. **Utilities**
-   - `immediate.rs` - Sign extension utilities for immediate values
-
-### Key Design Patterns
-
-- The CPU struct maintains state with registers and memory
-- Instructions are decoded using pattern matching on opcode/funct3/funct7 fields
-- The interpreter is split into focused modules for maintainability
-- Commands use `/` prefix to distinguish from instructions
-- Comprehensive unit tests validate all instruction implementations
-
-### Parser Architecture (Teaching-Focused)
-
-The parser is designed as an educational resource demonstrating compiler front-end techniques:
-
-**Modular Architecture:**
-- **Parser Module**: Four-phase parsing (normalize → tokenize → build → execute)
-- **Builder Module**: Type-specific instruction builders with validation
-- **Executor Module**: Command dispatch and state tracking
-- **Formatter Module**: Human-readable output generation
-- **Validator Module**: Reusable validation logic
-
-**Educational Features:**
-- Comprehensive function documentation with examples
-- Helper functions demonstrating compiler patterns
-- Rich error messages with contextual tips
-- Comments explaining design decisions
-- Clear module boundaries for learning
-
-**Validation & Error Handling:**
-- PC register protection (prevents misuse)
-- Immediate range validation for each instruction type
-- Argument count checking with instruction-specific guidance
-- Support for both standard and legacy assembly syntax
+3. **REPL Infrastructure**
+   - `cli.rs` - Command-line argument parsing with clap
+   - `history.rs` - History navigation with delta compression
+   - `bin/brubeck.rs` - Binary entry point with terminal features
 
 ### Current Features
 
-- **Complete RV32I instruction set implementation** (47 instructions)
-- **CSR (Control and Status Register) support** with 6 CSR instructions:
-  - CSRRW, CSRRS, CSRRC (register variants)
-  - CSRRWI, CSRRSI, CSRRCI (immediate variants)
-  - Standard CSRs: MSTATUS, MISA, CYCLE, TIME, INSTRET, MSCRATCH, MEPC, MCAUSE, etc.
-- **System instructions**: FENCE, ECALL, EBREAK  
-- **Common pseudo-instructions**: MV, NOT, SEQZ, SNEZ, J, JR, RET, LI
-- **Multiple immediate formats**: Hex (0x), binary (0b), and decimal values
-- **Parser** with validation and helpful error messages
-- **Standard RISC-V assembly syntax**: Both `LW x1, 4(x2)` and legacy `LW x1, x2, 4` formats
-- **Validation**: PC register protection, immediate range checking, argument validation
-- **Memory**: Configurable size (default 1 MiB) with proper load/store operations
-- **Command system**: `/regs`, `/help`, `/undo`, `/redo` with aliases
-- **CLI support**: Script files, one-liners, memory configuration
+- **Complete RV32I instruction set** (47 instructions) + CSR support
+- **Command system**: 
+  - `/regs` (`/r`) - Show registers
+  - `/memory` (`/m`) - Inspect memory
+  - `/previous` (`/prev`, `/p`) - Navigate to previous state
+  - `/next` (`/n`) - Navigate to next state
+  - `/reset` - Reset CPU state (with confirmation)
+  - `/help` (`/h`) - Show help
+- **Multiple number formats**: Hex (0x), binary (0b), decimal
+- **Flexible syntax**: Both standard and legacy RISC-V assembly formats
+- **History navigation**: Navigate through execution history
+- **Memory inspection**: View memory in hex/ASCII format
+- **Educational error messages**: Context-aware help for common mistakes
 
-### Limitations
+## Development Workflow
 
-- No support for other RISC-V extensions (M, A, F, D, etc.)
-- No support for labels or assembler directives
-- REPL lacks advanced features like command history or tab completion
+### Common Commands
 
-## Recent Major Refactoring
-
-**Status**: Completed - interpreter split into modular architecture
-
-The interpreter.rs file (previously 1785 lines, now 188 lines) has been refactored into 6 focused modules:
-
-### New Interpreter Architecture (`src/interpreter/`)
-- **`parser.rs`** (643 lines) - Complete parsing pipeline
-- **`builder.rs`** (819 lines) - Instruction building and validation
-- **`executor.rs`** (252 lines) - Command execution and state management
-- **`formatter.rs`** (403 lines) - Human-readable output formatting
-- **`validator.rs`** (174 lines) - Input validation functions
-- **`types.rs`** (128 lines) - Common types (Command, Token, Error)
-
-### Key Improvements
-- **Better separation of concerns**: Each module has a single responsibility
-- **Removed direct register inspection**: No more confusing `x1` commands, use `/regs` instead
-- **Clean code**: Zero clippy warnings, proper Rust idioms throughout
-- **Educational structure**: Demonstrates good software architecture practices
-
-See `REFACTORING_SUMMARY.md` for complete details.
-
-## Recent Major Features
-
-### Command-Line Interface
-
-**Status**: Completed
-
-Brubeck now has a CLI using `clap`:
-- **Memory configuration**: `-m, --memory <size>` (e.g., 1M, 256k)
-- **History configuration**: `--undo-limit <n>`, `--no-undo`
-- **Execution modes**: `-e, --execute <commands>`, `-s, --script <file>`
-- **Automatic mode detection**: Banner/prompt suppression for non-interactive use
-- **Human-friendly parsing**: Memory sizes like "1k", "5M", "1GB"
-
-### History Navigation (Previous/Next)
-
-**Status**: Completed
-
-We have implemented a history navigation system for the REPL that:
-- Allows users to navigate to previous state with `/previous`, `/prev`, or `/p`
-- Supports moving forward with `/next` or `/n`
-- Uses efficient delta compression for memory changes
-- Maintains a configurable history (default: 1000 states)
-- Only tracks successfully executed instructions
-- Has test coverage for all RV32I instructions
-
-Implementation uses `src/history.rs` for state management with efficient delta compression.
-
-Note: We chose "previous/next" over "undo/redo" to better convey that this is history navigation, not error correction.
-
-### REPL Usability
-
-**Status**: Completed based on user feedback from hands-on testing
-
-We have implemented significant REPL usability improvements to make Brubeck more beginner-friendly and educational:
-
-### Completed Improvements
-1. **PC address prompt**: `[0x00000000]> ` shows current execution address
-2. **Human-readable output**: All instructions show their mnemonic and describe what they did
-   - Example: `ADDI: Added 42 to X0 (0) and stored result in X1 (42)`
-3. **Instruction mnemonics**: Added `mnemonic()` method to Instruction enum for clean access
-4. **Non-interactive mode**: Supports piped input for testing and scripting
-   - `echo "ADDI x1, x0, 42" | brubeck` works seamlessly
-5. **Colorized output**: Interactive mode uses colors (green ✅, red ❌)
-6. **Terminal features**: Full terminal support via `crossterm` (optional, binary-only)
-
-### Architecture Decisions
-- **Library remains pure**: No dependencies, ready for no-std and WASM
-- **Binary has rich features**: Terminal colors, TTY detection, etc. via feature flags
-- **Clean separation**: All REPL enhancements are in the binary, not the library
-
-### Command System Implementation
-- **Completed**: `/regs` (alias `/r`), `/help` (alias `/h`), `/previous` (aliases `/prev`, `/p`), `/next` (alias `/n`), `/reset`
-- **Direct register inspection removed**: Must use `/regs x1` instead of `x1`
-- **Flexible syntax**: `/regs x1 x2 sp` shows specific registers
-- **Reset command**: Prompts for confirmation before clearing all state
-
-### Current Development
-
-See `PROJECT_STATUS.md` for the consolidated task list and roadmap.
-
-Key priorities:
-1. Add `/memory` command for debugging
-2. Enhance error messages with educational content
-3. Add instruction history command
-4. Continue improving REPL usability based on user feedback
-
-## Testing Approach
-
-Tests have been reorganized into a structured hierarchy under the `tests/` directory:
-
-### Test Organization
-- **Unit Tests** (`tests/unit/`)
-  - `components/` - Tests for core components like immediates
-  - `instructions/` - Comprehensive tests for each instruction category
-- **Integration Tests** (`tests/`)
-  - `parser.rs` - Tests for the REPL parser and interpreter
-  - `pseudo_instructions.rs` - Tests for pseudo-instruction parsing and expansion
-
-### Test Coverage Status
-- **RV32I Instructions**: Complete coverage (47/47 instructions)
-- **CSR Instructions**: Complete coverage (6/6 instructions)
-- **Pseudo-instructions**: Complete coverage (8/8 pseudo-instructions)
-- **Parser Features**: Comprehensive integration tests
-- **Edge Cases**: Extensive validation and error handling tests
-
-**Total Test Count**: 350+ tests across unit and integration test suites.
-
-For test coverage details, see `tests/TEST_COVERAGE.md`.
-
-## Implementing New Instructions
-
-When adding new RISC-V instructions, follow the systematic process documented in `INSTRUCTION_IMPLEMENTATION.md`. This guide provides:
-- Step-by-step implementation checklist
-- Code examples for each phase
-- Current implementation status
-- References to relevant specification sections
-
-The process ensures each instruction is correctly implemented across all layers: definition, decoding, execution, parsing, and testing.
-
-## Code Quality Requirements
-
-**IMPORTANT**: Before marking any task as complete, you MUST run the following commands to ensure code quality:
-
-1. `cargo fmt` - Format code according to Rust standards
-2. `cargo clippy -- -D warnings` - Ensure no clippy warnings
-3. `cargo test` - Run all tests to ensure nothing is broken
-
-Only proceed with marking a task complete if all three commands pass successfully. If any fail, fix the issues before continuing.
-
-## Git Workflow
-
-**IMPORTANT**: Follow these Git practices for all development work:
-
-1. **Commit frequently** - Make small, focused commits rather than large ones
-   - Easier to review and understand changes
-   - Simpler to cherry-pick specific changes
-   - Reduces merge conflicts with other contributors
-
-2. **Write clear commit messages** - Describe what changed and why
-
-3. **Use branches for larger features** - For tasks requiring multiple commits:
-   - Create a feature branch for the work
-   - Make regular commits as you progress
-   - Keep commits atomic and focused
-
-4. **Never commit without testing** - Always run `cargo fmt`, `cargo clippy`, and `cargo test` before committing
-
-5. **Group related changes** - When making multiple related changes:
-   - Stage and commit related files together (e.g., code + tests)
-   - Keep documentation updates separate from code changes
-   - Use `git add -p` to review and stage specific changes
-
-6. **Documentation tone** - Keep language professional and concise:
-   - Avoid hyperbolic terms like "comprehensive", "robust", "production-grade"
-   - Focus on clarity and accuracy over enthusiasm
-   - Error messages should be helpful without being verbose
-
-Example workflow:
 ```bash
-# After making a small, focused change
-cargo fmt
-cargo clippy -- -D warnings
-cargo test
-git add -p  # Review changes
-git commit -m "Add validation for CSR addresses"
+# Building and Running
+cargo build                  # Debug build
+cargo build --release        # Release build
+cargo run                   # Run REPL
+cargo run -- -e "ADDI x1, x0, 42"  # One-liner
 
-# For larger features
-git checkout -b feature/memory-inspection
-# ... make changes, commit frequently ...
-git push origin feature/memory-inspection
+# Testing
+cargo test                  # Run all tests
+cargo test test_name        # Run specific test
+cargo test -- --nocapture   # Show println! output
+
+# Code Quality (REQUIRED before commits)
+cargo fmt                   # Format code
+cargo clippy -- -D warnings # Check for issues
+cargo check                # Quick compilation check
 ```
 
-## Task Management Best Practices
+### Git Workflow
 
-1. **Always update PROJECT_STATUS.md** when completing tasks
-   - Mark tasks as completed with ✅
-   - Update the "Last Updated" date
-   - Keep task descriptions current
+1. **Use feature branches** for any non-trivial changes:
+   ```bash
+   git checkout -b feature/new-command
+   # ... make changes ...
+   cargo fmt && cargo clippy -- -D warnings && cargo test
+   git add -p  # Review changes
+   git commit -m "Add new command implementation"
+   ```
 
-2. **Use the TodoWrite tool** throughout development:
-   - Mark tasks as `in_progress` when starting
+2. **Commit guidelines**:
+   - Make small, atomic commits (one logical change per commit)
+   - Write clear commit messages explaining what and why
+   - Separate code changes from documentation updates
+   - Fix linter warnings in separate commits
+
+3. **Quality requirements**:
+   - All tests must pass
+   - Zero clippy warnings
+   - Code must be formatted with cargo fmt
+
+### Task Management
+
+1. **Use the TodoWrite tool** to track progress:
+   - Create todos when starting a complex task
+   - Mark as `in_progress` when beginning work
    - Update to `completed` immediately when done
-   - Don't batch status updates
 
-3. **Follow the established workflow**:
-   - Start with easier/smaller tasks as warm-up
-   - Complete one task fully before moving to the next
-   - Run quality checks before marking complete
+2. **Update PROJECT_STATUS.md** after completing tasks:
+   - Mark completed items with ✅
+   - Update status descriptions
+   - Keep "Next Action" current
 
-## Architecture and Testing Guidelines
+## Testing Guidelines
 
-### Design Principles
+### Test Organization
 
-1. **Components should own their state management**
-   - Each module should handle its own initialization, reset, and cleanup
-   - Example: `CPU::reset()` handles all CPU state, not the caller
-   - This improves encapsulation and reduces coupling
+- **Unit tests**: In `tests/unit/` for focused component testing
+- **Integration tests**: In `tests/` for cross-module functionality
+- **Manual testing**: Document any features requiring user interaction
 
-2. **Clear method naming prevents confusion**
-   - Avoid names that conflict with standard traits (e.g., `next()` vs `Iterator::next()`)
-   - Use descriptive names: `go_previous()/go_next()` instead of `previous()/next()`
-   - Even internal APIs benefit from clear naming
+### Writing Effective Tests
 
-3. **Feature flag discipline**
-   - Maintain clear separation between library and REPL features
-   - Use `#[cfg(feature = "repl")]` consistently
-   - Remember that feature flags affect testing and compilation
+1. **Test real scenarios**: Use meaningful test data (e.g., "Hello" not just random bytes)
+2. **Test error cases**: Invalid inputs, edge cases, boundary conditions
+3. **Test the user's perspective**: What will users actually type?
+4. **Keep tests focused**: One concept per test function
 
-### Testing Considerations
+Example from memory command:
+```rust
+// Good: Tests actual usage pattern
+i.interpret("ADDI x1, x0, 0x100").unwrap();
+i.interpret("ADDI x2, x0, 72").unwrap();     // 'H'
+i.interpret("SB x2, 0(x1)").unwrap();
+let result = i.interpret("/memory 0x100");
+assert!(result.unwrap().contains("48"));     // Hex for 'H'
+assert!(result.unwrap().contains("H"));       // ASCII display
+```
 
-1. **Interactive features are hard to test**
-   - Features requiring user input (like confirmation prompts) need manual testing
-   - Consider dependency injection for I/O operations if testability is critical
-   - Document which features require manual verification
+## Implementation Patterns
 
-2. **Listen to linter warnings**
-   - Clippy warnings often highlight real API design issues
-   - Address warnings promptly to maintain code quality
-   - Use `cargo clippy -- -D warnings` to ensure no warnings slip through
+### Parser Design
 
-3. **Test organization**
-   - Keep unit tests close to the code they test
-   - Use integration tests for cross-module functionality
-   - Document any manual testing requirements
+1. **Validate early**: Check constraints in the parser when possible
+2. **Provide context**: Error messages should guide users to the solution
+3. **Support flexibility**: Accept multiple input formats where sensible
 
-### Development Workflow Lessons
+Example from memory command:
+```rust
+match normalized.len() {
+    1 => Ok(Command::ShowMemory { start: None, end: None }),
+    2 => {
+        let addr = parse_address(&normalized[1])?;
+        Ok(Command::ShowMemory { start: Some(addr), end: None })
+    }
+    3 => {
+        let start = parse_address(&normalized[1])?;
+        let end = parse_address(&normalized[2])?;
+        if end <= start {
+            return Err(Error::Generic("End address must be greater..."));
+        }
+        // ... validate range size ...
+    }
+    _ => Err(Error::Generic("Too many arguments..."))
+}
+```
 
-1. **Feature branches for focused work**
-   - Even small features benefit from feature branches
-   - Makes changes easier to review and rollback if needed
-   - Keeps main branch stable
+### Formatting and Display
 
-2. **Commit hygiene**
-   - Make atomic commits: one logical change per commit
-   - Fix linter warnings in separate commits from feature implementation
-   - This makes history cleaner and cherry-picking easier
+1. **Align output**: Use consistent alignment for readability
+2. **Provide dual representations**: Show both raw and interpreted data
+3. **Add visual separators**: Help users parse dense information
+
+Example from memory formatter:
+```rust
+// 16-byte aligned display with separator at byte 8
+output.push_str(&format!("0x{addr:08x}: "));
+for i in 0..16 {
+    if i == 7 { output.push_str("| "); }
+    // ... hex and ASCII display ...
+}
+```
+
+### State Management
+
+1. **Components own their state**: Each module manages its own lifecycle
+2. **Clear reset semantics**: Provide explicit reset methods
+3. **Avoid external state manipulation**: Use encapsulation
+
+Good example:
+```rust
+impl CPU {
+    pub fn reset(&mut self) {
+        self.registers.fill(0);
+        self.pc = 0;
+        self.memory.fill(0);
+        self.init_csrs();
+    }
+}
+```
+
+## Code Style Guidelines
+
+### Rust Best Practices
+
+1. **Follow clippy suggestions**: Use modern Rust idioms
+   - `format!("{var}")` not `format!("{}", var)`
+   - `(0x20..=0x7E).contains(&byte)` not `byte >= 0x20 && byte <= 0x7E`
+
+2. **Error handling**: Provide actionable error messages
+3. **Documentation**: Use doc comments for public APIs
+4. **Feature flags**: Keep library and binary features separate
+
+### Documentation Standards
+
+1. **Avoid hyperbole**: No "robust", "comprehensive", "production-grade"
+2. **Be concise**: Get to the point quickly
+3. **Focus on clarity**: Simple language, clear examples
+4. **Document limitations**: Be honest about what doesn't work
+
+## Debugging Tips
+
+1. **Use debug prints in tests**: `cargo test -- --nocapture`
+2. **Check instruction syntax**: Store format differs between addressing modes
+3. **Verify alignment**: Memory displays often need alignment
+4. **Test incrementally**: Build parser → formatter → executor → tests
+
+## Common Pitfalls
+
+1. **Store instruction syntax**: Use `SB x2, 0(x1)` not `SB x2, x1, 0`
+2. **Option dereferencing**: Can't dereference `Option<T>` directly
+3. **Doc test format**: Use ` ```text` for non-code examples
+4. **Feature flag scope**: Remember what's gated by `#[cfg(feature = "repl")]`
+
+## References
+
+- RISC-V ISA Manual: `riscv-isa-manual/src/rv32.adoc`
+- Test organization: `tests/TEST_COVERAGE.md`
+- Implementation guide: `INSTRUCTION_IMPLEMENTATION.md`
+- Task tracking: `PROJECT_STATUS.md`

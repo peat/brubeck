@@ -68,4 +68,57 @@ pub enum Instruction {
 
 impl Instruction {
     pub const LENGTH: u32 = 4; // 4 bytes, 32 bits
+    
+    /// Returns the mnemonic (instruction name) as a string
+    pub fn mnemonic(&self) -> &'static str {
+        match self {
+            Instruction::ADD(_) => "ADD",
+            Instruction::ADDI(_) => "ADDI",
+            Instruction::AND(_) => "AND",
+            Instruction::ANDI(_) => "ANDI",
+            Instruction::AUIPC(_) => "AUIPC",
+            Instruction::BEQ(_) => "BEQ",
+            Instruction::BGE(_) => "BGE",
+            Instruction::BGEU(_) => "BGEU",
+            Instruction::BLT(_) => "BLT",
+            Instruction::BLTU(_) => "BLTU",
+            Instruction::BNE(_) => "BNE",
+            Instruction::EBREAK(_) => "EBREAK",
+            Instruction::ECALL(_) => "ECALL",
+            Instruction::FENCE(_) => "FENCE",
+            Instruction::JAL(_) => "JAL",
+            Instruction::JALR(_) => "JALR",
+            Instruction::LB(_) => "LB",
+            Instruction::LBU(_) => "LBU",
+            Instruction::LH(_) => "LH",
+            Instruction::LHU(_) => "LHU",
+            Instruction::LUI(_) => "LUI",
+            Instruction::LW(_) => "LW",
+            Instruction::NOP => "NOP",
+            Instruction::OR(_) => "OR",
+            Instruction::ORI(_) => "ORI",
+            Instruction::SB(_) => "SB",
+            Instruction::SH(_) => "SH",
+            Instruction::SLL(_) => "SLL",
+            Instruction::SLLI(_) => "SLLI",
+            Instruction::SLT(_) => "SLT",
+            Instruction::SLTI(_) => "SLTI",
+            Instruction::SLTIU(_) => "SLTIU",
+            Instruction::SLTU(_) => "SLTU",
+            Instruction::SRA(_) => "SRA",
+            Instruction::SRAI(_) => "SRAI",
+            Instruction::SRL(_) => "SRL",
+            Instruction::SRLI(_) => "SRLI",
+            Instruction::SUB(_) => "SUB",
+            Instruction::SW(_) => "SW",
+            Instruction::XOR(_) => "XOR",
+            Instruction::XORI(_) => "XORI",
+            Instruction::CSRRW(_) => "CSRRW",
+            Instruction::CSRRS(_) => "CSRRS",
+            Instruction::CSRRC(_) => "CSRRC",
+            Instruction::CSRRWI(_) => "CSRRWI",
+            Instruction::CSRRSI(_) => "CSRRSI",
+            Instruction::CSRRCI(_) => "CSRRCI",
+        }
+    }
 }

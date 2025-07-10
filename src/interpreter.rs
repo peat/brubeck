@@ -53,8 +53,116 @@ impl Interpreter {
     /// Executes an [Instruction] directly, skipping the parsing steps.
     pub fn execute(&mut self, instruction: Instruction) -> Result<String, Error> {
         match self.cpu.execute(instruction) {
-            Ok(()) => Ok(format!("{instruction:?}")),
+            Ok(()) => Ok(self.humanize_instruction(instruction)),
             e => Err(Error::Generic(format!("{e:?}"))),
+        }
+    }
+
+    /// Converts an instruction into a human-readable description
+    fn humanize_instruction(&self, instruction: Instruction) -> String {
+        match instruction {
+            Instruction::ADD(i) => {
+                let rs1_val = self.cpu.get_register(i.rs1);
+                let rs2_val = self.cpu.get_register(i.rs2);
+                let rd_val = self.cpu.get_register(i.rd);
+                format!("{}: Added {:?} ({}) and {:?} ({}) and stored result in {:?} ({})", 
+                    instruction.mnemonic(), i.rs1, rs1_val, i.rs2, rs2_val, i.rd, rd_val)
+            },
+            Instruction::ADDI(i) => {
+                let rs1_val = self.cpu.get_register(i.rs1);
+                let rd_val = self.cpu.get_register(i.rd);
+                format!("{}: Added {} to {:?} ({}) and stored result in {:?} ({})", 
+                    instruction.mnemonic(), i.imm.as_i32(), i.rs1, rs1_val, i.rd, rd_val)
+            },
+            Instruction::SUB(i) => {
+                let rs1_val = self.cpu.get_register(i.rs1);
+                let rs2_val = self.cpu.get_register(i.rs2);
+                let rd_val = self.cpu.get_register(i.rd);
+                format!("{}: Subtracted {:?} ({}) from {:?} ({}) and stored result in {:?} ({})", 
+                    instruction.mnemonic(), i.rs2, rs2_val, i.rs1, rs1_val, i.rd, rd_val)
+            },
+            Instruction::LW(i) => {
+                let rs1_val = self.cpu.get_register(i.rs1);
+                let addr = rs1_val.wrapping_add(i.imm.as_u32());
+                let rd_val = self.cpu.get_register(i.rd);
+                format!("{}: Loaded word from memory address 0x{:x} ({}+{}) into {:?} ({})", 
+                    instruction.mnemonic(), addr, rs1_val, i.imm.as_i32(), i.rd, rd_val)
+            },
+            Instruction::SW(i) => {
+                let rs1_val = self.cpu.get_register(i.rs1);
+                let rs2_val = self.cpu.get_register(i.rs2);
+                let addr = rs1_val.wrapping_add(i.imm.as_u32());
+                format!("{}: Stored word from {:?} ({}) to memory address 0x{:x} ({}+{})", 
+                    instruction.mnemonic(), i.rs2, rs2_val, addr, rs1_val, i.imm.as_i32())
+            },
+            Instruction::BEQ(i) => {
+                let rs1_val = self.cpu.get_register(i.rs1);
+                let rs2_val = self.cpu.get_register(i.rs2);
+                if rs1_val == rs2_val {
+                    format!("{}: Branch taken: {:?} ({}) equals {:?} ({})", 
+                        instruction.mnemonic(), i.rs1, rs1_val, i.rs2, rs2_val)
+                } else {
+                    format!("{}: Branch not taken: {:?} ({}) does not equal {:?} ({})", 
+                        instruction.mnemonic(), i.rs1, rs1_val, i.rs2, rs2_val)
+                }
+            },
+            Instruction::BNE(i) => {
+                let rs1_val = self.cpu.get_register(i.rs1);
+                let rs2_val = self.cpu.get_register(i.rs2);
+                if rs1_val != rs2_val {
+                    format!("{}: Branch taken: {:?} ({}) does not equal {:?} ({})", 
+                        instruction.mnemonic(), i.rs1, rs1_val, i.rs2, rs2_val)
+                } else {
+                    format!("{}: Branch not taken: {:?} ({}) equals {:?} ({})", 
+                        instruction.mnemonic(), i.rs1, rs1_val, i.rs2, rs2_val)
+                }
+            },
+            Instruction::JAL(i) => {
+                let return_addr = self.cpu.get_register(i.rd);
+                format!("{}: Jumped to PC+{} and stored return address in {:?} ({})", 
+                    instruction.mnemonic(), i.imm.as_i32() * 2, i.rd, return_addr)
+            },
+            Instruction::JALR(i) => {
+                let rs1_val = self.cpu.get_register(i.rs1);
+                let return_addr = self.cpu.get_register(i.rd);
+                format!("{}: Jumped to {:?} ({}) + {} and stored return address in {:?} ({})", 
+                    instruction.mnemonic(), i.rs1, rs1_val, i.imm.as_i32(), i.rd, return_addr)
+            },
+            Instruction::LUI(i) => {
+                let rd_val = self.cpu.get_register(i.rd);
+                format!("{}: Loaded upper immediate {} into {:?} ({})", 
+                    instruction.mnemonic(), i.imm.as_i32(), i.rd, rd_val)
+            },
+            Instruction::AUIPC(i) => {
+                let rd_val = self.cpu.get_register(i.rd);
+                format!("{}: Added upper immediate {} to PC and stored in {:?} ({})", 
+                    instruction.mnemonic(), i.imm.as_i32(), i.rd, rd_val)
+            },
+            Instruction::AND(i) => {
+                let rs1_val = self.cpu.get_register(i.rs1);
+                let rs2_val = self.cpu.get_register(i.rs2);
+                let rd_val = self.cpu.get_register(i.rd);
+                format!("{}: Bitwise AND of {:?} ({}) and {:?} ({}) stored in {:?} ({})", 
+                    instruction.mnemonic(), i.rs1, rs1_val, i.rs2, rs2_val, i.rd, rd_val)
+            },
+            Instruction::OR(i) => {
+                let rs1_val = self.cpu.get_register(i.rs1);
+                let rs2_val = self.cpu.get_register(i.rs2);
+                let rd_val = self.cpu.get_register(i.rd);
+                format!("{}: Bitwise OR of {:?} ({}) and {:?} ({}) stored in {:?} ({})", 
+                    instruction.mnemonic(), i.rs1, rs1_val, i.rs2, rs2_val, i.rd, rd_val)
+            },
+            Instruction::XOR(i) => {
+                let rs1_val = self.cpu.get_register(i.rs1);
+                let rs2_val = self.cpu.get_register(i.rs2);
+                let rd_val = self.cpu.get_register(i.rd);
+                format!("{}: Bitwise XOR of {:?} ({}) and {:?} ({}) stored in {:?} ({})", 
+                    instruction.mnemonic(), i.rs1, rs1_val, i.rs2, rs2_val, i.rd, rd_val)
+            },
+            Instruction::NOP => format!("{}: No operation", instruction.mnemonic()),
+            _ => {
+                format!("{}: Executed instruction", instruction.mnemonic())
+            }
         }
     }
 
@@ -69,7 +177,133 @@ impl Interpreter {
                 self.cpu.get_register(r),
                 self.cpu.get_register(r)
             )),
+            Command::ShowRegs => Ok(self.show_registers()),
+            Command::ShowSpecificRegs(regs) => Ok(self.show_specific_registers(regs)),
+            Command::ShowHelp => Ok(self.show_help()),
         }
+    }
+
+    /// Shows all register values in a formatted table
+    fn show_registers(&self) -> String {
+        let mut output = String::new();
+        
+        for i in 0..32 {
+            let reg = match i {
+                0 => Register::X0, 1 => Register::X1, 2 => Register::X2, 3 => Register::X3,
+                4 => Register::X4, 5 => Register::X5, 6 => Register::X6, 7 => Register::X7,
+                8 => Register::X8, 9 => Register::X9, 10 => Register::X10, 11 => Register::X11,
+                12 => Register::X12, 13 => Register::X13, 14 => Register::X14, 15 => Register::X15,
+                16 => Register::X16, 17 => Register::X17, 18 => Register::X18, 19 => Register::X19,
+                20 => Register::X20, 21 => Register::X21, 22 => Register::X22, 23 => Register::X23,
+                24 => Register::X24, 25 => Register::X25, 26 => Register::X26, 27 => Register::X27,
+                28 => Register::X28, 29 => Register::X29, 30 => Register::X30, 31 => Register::X31,
+                _ => unreachable!(),
+            };
+            
+            let val = self.cpu.get_register(reg);
+            let abi_name = match reg {
+                Register::X0 => "zero", Register::X1 => "ra", Register::X2 => "sp", Register::X3 => "gp",
+                Register::X4 => "tp", Register::X5 => "t0", Register::X6 => "t1", Register::X7 => "t2",
+                Register::X8 => "s0", Register::X9 => "s1", Register::X10 => "a0", Register::X11 => "a1",
+                Register::X12 => "a2", Register::X13 => "a3", Register::X14 => "a4", Register::X15 => "a5",
+                Register::X16 => "a6", Register::X17 => "a7", Register::X18 => "s2", Register::X19 => "s3",
+                Register::X20 => "s4", Register::X21 => "s5", Register::X22 => "s6", Register::X23 => "s7",
+                Register::X24 => "s8", Register::X25 => "s9", Register::X26 => "s10", Register::X27 => "s11",
+                Register::X28 => "t3", Register::X29 => "t4", Register::X30 => "t5", Register::X31 => "t6",
+                Register::PC => "pc",
+            };
+            
+            if i % 2 == 0 && i < 31 {
+                output.push_str(&format!("x{i:2} ({abi_name:4}): 0x{val:08x}    "));
+            } else {
+                output.push_str(&format!("x{i:2} ({abi_name:4}): 0x{val:08x}\n"));
+            }
+        }
+        
+        output
+    }
+
+    /// Shows specific register values
+    fn show_specific_registers(&self, regs: Vec<Register>) -> String {
+        let mut output = String::new();
+        
+        for (i, reg) in regs.iter().enumerate() {
+            let val = self.cpu.get_register(*reg);
+            let abi_name = match reg {
+                Register::X0 => "zero", Register::X1 => "ra", Register::X2 => "sp", Register::X3 => "gp",
+                Register::X4 => "tp", Register::X5 => "t0", Register::X6 => "t1", Register::X7 => "t2",
+                Register::X8 => "s0", Register::X9 => "s1", Register::X10 => "a0", Register::X11 => "a1",
+                Register::X12 => "a2", Register::X13 => "a3", Register::X14 => "a4", Register::X15 => "a5",
+                Register::X16 => "a6", Register::X17 => "a7", Register::X18 => "s2", Register::X19 => "s3",
+                Register::X20 => "s4", Register::X21 => "s5", Register::X22 => "s6", Register::X23 => "s7",
+                Register::X24 => "s8", Register::X25 => "s9", Register::X26 => "s10", Register::X27 => "s11",
+                Register::X28 => "t3", Register::X29 => "t4", Register::X30 => "t5", Register::X31 => "t6",
+                Register::PC => "pc",
+            };
+            
+            let reg_num = match reg {
+                Register::X0 => 0, Register::X1 => 1, Register::X2 => 2, Register::X3 => 3,
+                Register::X4 => 4, Register::X5 => 5, Register::X6 => 6, Register::X7 => 7,
+                Register::X8 => 8, Register::X9 => 9, Register::X10 => 10, Register::X11 => 11,
+                Register::X12 => 12, Register::X13 => 13, Register::X14 => 14, Register::X15 => 15,
+                Register::X16 => 16, Register::X17 => 17, Register::X18 => 18, Register::X19 => 19,
+                Register::X20 => 20, Register::X21 => 21, Register::X22 => 22, Register::X23 => 23,
+                Register::X24 => 24, Register::X25 => 25, Register::X26 => 26, Register::X27 => 27,
+                Register::X28 => 28, Register::X29 => 29, Register::X30 => 30, Register::X31 => 31,
+                Register::PC => 32,
+            };
+            
+            if reg_num == 32 {
+                output.push_str(&format!("PC ({abi_name:4}): 0x{val:08x}"));
+            } else {
+                output.push_str(&format!("x{reg_num:2} ({abi_name:4}): 0x{val:08x}"));
+            }
+            
+            if i < regs.len() - 1 {
+                output.push_str("    ");
+                if (i + 1) % 2 == 0 {
+                    output.push('\n');
+                }
+            }
+        }
+        
+        if !output.ends_with('\n') {
+            output.push('\n');
+        }
+        
+        output
+    }
+
+    /// Shows help information
+    fn show_help(&self) -> String {
+        r#"Brubeck: A RISC-V REPL Help
+
+Commands:
+  /regs, /r         Show all registers
+  /r x1 x2 sp       Show specific registers
+  /help, /h         Show this help
+  
+Instructions:
+  ADDI x1, x0, 42   Add immediate: x1 = x0 + 42
+  ADD x1, x2, x3    Add: x1 = x2 + x3
+  LW x1, 4(x2)      Load word: x1 = memory[x2 + 4]
+  SW x1, 4(x2)      Store word: memory[x2 + 4] = x1
+  BEQ x1, x2, 8     Branch if equal: if x1 == x2, jump PC + 8
+  JAL x1, 16        Jump and link: x1 = PC + 4, jump PC + 16
+  
+Register inspection:
+  x1, x2, sp, ra    Show individual register value
+  PC                Show program counter
+  
+Pseudo-instructions:
+  MV x1, x2         Move: x1 = x2
+  LI x1, 100        Load immediate: x1 = 100
+  NOP               No operation
+  
+Number formats:
+  42                Decimal
+  0x2a              Hexadecimal  
+  0b101010          Binary"#.to_string()
     }
 
     /// Executes a pseudo-instruction by expanding it and running the real instructions
@@ -84,16 +318,24 @@ impl Interpreter {
         let mut results = Vec::new();
         for inst in instructions {
             match self.cpu.execute(inst) {
-                Ok(()) => results.push(format!("{inst:?}")),
+                Ok(()) => results.push(self.humanize_instruction(inst)),
                 Err(e) => return Err(Error::Generic(format!("{e:?}"))),
             }
         }
 
-        Ok(format!(
-            "Pseudo {:?} expanded to: {}",
-            pseudo,
-            results.join(", ")
-        ))
+        if results.len() == 1 {
+            Ok(format!("Pseudo-instruction: {}", results[0]))
+        } else {
+            Ok(format!(
+                "Pseudo-instruction expanded to: {}",
+                results.join("; ")
+            ))
+        }
+    }
+
+    /// Gets the current program counter value
+    pub fn get_pc(&self) -> u32 {
+        self.cpu.pc
     }
 }
 
@@ -102,6 +344,9 @@ pub enum Command {
     Inspect(Register),
     Exec(Instruction),
     ExecPseudo(PseudoInstruction),
+    ShowRegs,
+    ShowSpecificRegs(Vec<Register>),
+    ShowHelp,
 }
 
 #[derive(Debug, PartialEq)]
@@ -248,6 +493,32 @@ fn parse(input: &str) -> Result<Command, Error> {
         return Err(Error::Generic("No input provided".to_owned()));
     }
 
+    // Handle commands that start with '/'
+    if let Some(first_word) = normalized.first() {
+        if first_word.starts_with('/') {
+            return match first_word.as_str() {
+                "/REGS" | "/R" => {
+                    if normalized.len() == 1 {
+                        // No arguments, show all registers
+                        Ok(Command::ShowRegs)
+                    } else {
+                        // Parse register arguments
+                        let mut regs = Vec::new();
+                        for arg in &normalized[1..] {
+                            match parse_register(arg) {
+                                Some(reg) => regs.push(reg),
+                                None => return Err(Error::Generic(format!("Invalid register: {arg}"))),
+                            }
+                        }
+                        Ok(Command::ShowSpecificRegs(regs))
+                    }
+                },
+                "/HELP" | "/H" => Ok(Command::ShowHelp),
+                _ => Err(Error::Generic(format!("Unknown command: {first_word}"))),
+            };
+        }
+    }
+
     // Phase 2: Convert normalized string into meaningful tokens
     let mut tokens = tokenize(normalized)?;
 
@@ -301,7 +572,7 @@ fn create_command_from_tokens(tokens: &mut Vec<Token>) -> Result<Command, Error>
             &mut p, tokens,
         )?)),
         Token::OffsetRegister { offset, register } => Err(Error::Generic(format!(
-            "Unexpected offset(register) syntax: {}({:?})", offset, register
+            "Unexpected offset(register) syntax: {offset}({register:?})"
         ))),
     }
 }
@@ -448,7 +719,7 @@ fn build_pseudo_instruction(
         PseudoInstruction::J { offset: _ } => {
             if let [Token::Value32(val)] = args {
                 PseudoInstruction::J {
-                    offset: *val as i32,
+                    offset: *val,
                 }
             } else {
                 return Err(Error::Generic(format!("Invalid J arguments: {args:?}")));
@@ -535,8 +806,7 @@ fn build_jtype(jtype: &mut JType, args: &[Token], instruction_name: &str) -> Res
         // Check alignment - must be even
         if *imm % 2 != 0 {
             return Err(Error::Generic(format!(
-                "{}: Jump offset {} must be even (2-byte aligned)",
-                instruction_name, imm
+                "{instruction_name}: Jump offset {imm} must be even (2-byte aligned)"
             )));
         }
         
@@ -573,8 +843,7 @@ fn build_btype(btype: &mut BType, args: &[Token], instruction_name: &str) -> Res
         // Check alignment - must be even
         if *imm % 2 != 0 {
             return Err(Error::Generic(format!(
-                "{}: Branch offset {} must be even (2-byte aligned)",
-                instruction_name, imm
+                "{instruction_name}: Branch offset {imm} must be even (2-byte aligned)"
             )));
         }
         
@@ -687,8 +956,7 @@ fn validate_immediate_range(instruction: &str, value: i32, min: i32, max: i32) -
 fn validate_not_pc(reg: Register, position: &str) -> Result<(), Error> {
     if reg == Register::PC {
         Err(Error::Generic(format!(
-            "PC register cannot be used as {} in this instruction. PC is only accessible via AUIPC or as an implicit operand in jumps.",
-            position
+            "PC register cannot be used as {position} in this instruction. PC is only accessible via AUIPC or as an implicit operand in jumps."
         )))
     } else {
         Ok(())
@@ -1198,7 +1466,7 @@ fn parse_number(input: &str) -> Result<i32, String> {
         input.parse::<i32>()
     };
     
-    value.map_err(|_| format!("Invalid number: {}", input))
+    value.map_err(|_| format!("Invalid number: {input}"))
 }
 
 fn parse_register(input: &str) -> Option<Register> {

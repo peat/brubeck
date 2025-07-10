@@ -105,26 +105,33 @@ The parser is designed as an educational resource demonstrating compiler front-e
 - No support for labels or assembler directives
 - REPL lacks advanced features like command history or tab completion
 
-## Current Work: REPL Usability Improvements
+## Recent Improvements: REPL Usability
 
-**Status**: In progress based on user feedback from hands-on testing
+**Status**: Completed based on user feedback from hands-on testing
 
-We are currently working on significant REPL usability improvements to make Brubeck more beginner-friendly and educational. Key findings from user testing:
+We have implemented significant REPL usability improvements to make Brubeck more beginner-friendly and educational:
 
-### Critical Issues Identified
-1. **Missing visual prompt** - No indication of where to type
-2. **Cryptic debug output** - Shows internal structures instead of human explanations
-3. **No register state overview** - Must inspect registers individually
-4. **No command system** - Missing essential learning commands
+### Completed Improvements
+1. **PC address prompt**: `[0x00000000]> ` shows current execution address
+2. **Human-readable output**: All instructions show their mnemonic and describe what they did
+   - Example: `ADDI: Added 42 to X0 (0) and stored result in X1 (42)`
+3. **Instruction mnemonics**: Added `mnemonic()` method to Instruction enum for clean access
+4. **Non-interactive mode**: Supports piped input for testing and scripting
+   - `echo "ADDI x1, x0, 42" | brubeck` works seamlessly
+5. **Colorized output**: Interactive mode uses colors (green ✅, red ❌)
+6. **Terminal features**: Full terminal support via `crossterm` (optional, binary-only)
 
-### Planned Improvements
-- **PC address prompt**: `[0x00000000]> ` to show execution flow
-- **Human-readable output**: "Added 42 to x0 (0) and stored the result in x1 (42)" 
+### Architecture Decisions
+- **Library remains pure**: No dependencies, ready for no-std and WASM
+- **Binary has rich features**: Terminal colors, TTY detection, etc. via feature flags
+- **Clean separation**: All REPL enhancements are in the binary, not the library
+
+### Still Planned
 - **Command system**: `/regs`, `/memory`, `/help`, `/reset` with "/" prefix
-- **Flexible syntax**: Support both spaces and commas in commands
+- **Register state overview**: Show all registers at once
 - **Safety confirmations**: Prevent accidental state loss
 
-See `REPL_USABILITY_FEEDBACK.md` for complete analysis and implementation plan.
+See `REPL_USABILITY_FEEDBACK.md` for the original analysis.
 
 ## Testing Approach
 

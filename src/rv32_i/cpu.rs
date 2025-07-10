@@ -246,7 +246,7 @@ impl CPU {
     /// Read a CSR value
     pub fn read_csr(&self, addr: u16) -> Result<u32, Error> {
         if addr >= 4096 || !self.csr_exists[addr as usize] {
-            return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} does not exist", addr)));
+            return Err(Error::IllegalInstruction(format!("CSR address 0x{addr:03x} does not exist")));
         }
         
         // Special handling for dynamic CSRs
@@ -273,11 +273,11 @@ impl CPU {
     /// Write a CSR value (returns old value like CSRRW instruction)
     pub fn write_csr(&mut self, addr: u16, value: u32) -> Result<u32, Error> {
         if addr >= 4096 || !self.csr_exists[addr as usize] {
-            return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} does not exist", addr)));
+            return Err(Error::IllegalInstruction(format!("CSR address 0x{addr:03x} does not exist")));
         }
         
         if self.csr_readonly[addr as usize] {
-            return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} is read-only", addr)));
+            return Err(Error::IllegalInstruction(format!("CSR address 0x{addr:03x} is read-only")));
         }
         
         // Read old value first (atomic read-modify-write)
@@ -1050,7 +1050,7 @@ impl CPU {
 
     /// CSR Instructions - Control and Status Register Operations
     /// Reference: RISC-V ISA Manual, Chapter 9 "Zicsr" Extension
-
+    ///
     /// CSRRW (Atomic Read/Write CSR)
     /// Atomically swaps values in the CSRs and integer registers.
     /// Old CSR value → rd, rs1 → CSR
@@ -1063,12 +1063,12 @@ impl CPU {
         
         // Check if CSR exists
         if csr_addr >= 4096 || !self.csr_exists[csr_addr as usize] {
-            return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} does not exist", csr_addr)));
+            return Err(Error::IllegalInstruction(format!("CSR address 0x{csr_addr:03x} does not exist")));
         }
         
         // Check if writing to read-only CSR
         if self.csr_readonly[csr_addr as usize] {
-            return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} is read-only", csr_addr)));
+            return Err(Error::IllegalInstruction(format!("CSR address 0x{csr_addr:03x} is read-only")));
         }
         
         // Read old value only if rd != x0 (to avoid side effects)
@@ -1101,7 +1101,7 @@ impl CPU {
         
         // Check if CSR exists
         if csr_addr >= 4096 || !self.csr_exists[csr_addr as usize] {
-            return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} does not exist", csr_addr)));
+            return Err(Error::IllegalInstruction(format!("CSR address 0x{csr_addr:03x} does not exist")));
         }
         
         // Always read the CSR value
@@ -1114,7 +1114,7 @@ impl CPU {
         if instruction.rs1 != Register::X0 {
             // Check if writing to read-only CSR
             if self.csr_readonly[csr_addr as usize] {
-                return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} is read-only", csr_addr)));
+                return Err(Error::IllegalInstruction(format!("CSR address 0x{csr_addr:03x} is read-only")));
             }
             
             let new_value = old_value | rs1_value;
@@ -1136,7 +1136,7 @@ impl CPU {
         
         // Check if CSR exists
         if csr_addr >= 4096 || !self.csr_exists[csr_addr as usize] {
-            return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} does not exist", csr_addr)));
+            return Err(Error::IllegalInstruction(format!("CSR address 0x{csr_addr:03x} does not exist")));
         }
         
         // Always read the CSR value
@@ -1149,7 +1149,7 @@ impl CPU {
         if instruction.rs1 != Register::X0 {
             // Check if writing to read-only CSR
             if self.csr_readonly[csr_addr as usize] {
-                return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} is read-only", csr_addr)));
+                return Err(Error::IllegalInstruction(format!("CSR address 0x{csr_addr:03x} is read-only")));
             }
             
             let new_value = old_value & !rs1_value;
@@ -1173,12 +1173,12 @@ impl CPU {
         
         // Check if CSR exists
         if csr_addr >= 4096 || !self.csr_exists[csr_addr as usize] {
-            return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} does not exist", csr_addr)));
+            return Err(Error::IllegalInstruction(format!("CSR address 0x{csr_addr:03x} does not exist")));
         }
         
         // Check if writing to read-only CSR
         if self.csr_readonly[csr_addr as usize] {
-            return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} is read-only", csr_addr)));
+            return Err(Error::IllegalInstruction(format!("CSR address 0x{csr_addr:03x} is read-only")));
         }
         
         // Read old value only if rd != x0 (to avoid side effects)
@@ -1212,7 +1212,7 @@ impl CPU {
         
         // Check if CSR exists
         if csr_addr >= 4096 || !self.csr_exists[csr_addr as usize] {
-            return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} does not exist", csr_addr)));
+            return Err(Error::IllegalInstruction(format!("CSR address 0x{csr_addr:03x} does not exist")));
         }
         
         // Always read the CSR value
@@ -1225,7 +1225,7 @@ impl CPU {
         if uimm != 0 {
             // Check if writing to read-only CSR
             if self.csr_readonly[csr_addr as usize] {
-                return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} is read-only", csr_addr)));
+                return Err(Error::IllegalInstruction(format!("CSR address 0x{csr_addr:03x} is read-only")));
             }
             
             let new_value = old_value | uimm;
@@ -1248,7 +1248,7 @@ impl CPU {
         
         // Check if CSR exists
         if csr_addr >= 4096 || !self.csr_exists[csr_addr as usize] {
-            return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} does not exist", csr_addr)));
+            return Err(Error::IllegalInstruction(format!("CSR address 0x{csr_addr:03x} does not exist")));
         }
         
         // Always read the CSR value
@@ -1261,7 +1261,7 @@ impl CPU {
         if uimm != 0 {
             // Check if writing to read-only CSR
             if self.csr_readonly[csr_addr as usize] {
-                return Err(Error::IllegalInstruction(format!("CSR address 0x{:03x} is read-only", csr_addr)));
+                return Err(Error::IllegalInstruction(format!("CSR address 0x{csr_addr:03x} is read-only")));
             }
             
             let new_value = old_value & !uimm;

@@ -61,7 +61,7 @@ Making Brubeck more beginner-friendly and educational based on user feedback.
 - Alias: `/hist`
 
 #### 6. Review and Update README.md ⏱️ ~1 hour
-**Status**: Not started  
+**Status**: ✅ Completed  
 **Why**: Ensure README accurately reflects current features and capabilities  
 **Tasks**:
 - Review for accuracy and clarity
@@ -70,7 +70,7 @@ Making Brubeck more beginner-friendly and educational based on user feedback.
 - Remove outdated information
 
 #### 7. Remove Hype from Strings ⏱️ ~2 hours
-**Status**: Not started  
+**Status**: ✅ Completed  
 **Why**: Make the project more professional and concise  
 **Tasks**:
 - Review all user-facing strings

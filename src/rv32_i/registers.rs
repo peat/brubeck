@@ -1,5 +1,5 @@
 /// Used to access [CPU](crate::rv32_i::CPU) registers via `get_register()`
-#[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash)]
 /// ```
 /// use brubeck::rv32_i::*;
 ///

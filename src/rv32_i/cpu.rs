@@ -69,6 +69,8 @@ pub struct CPU {
     pub memory_changes: Vec<crate::history::MemoryDelta>,
     #[cfg(feature = "repl")]
     pub csr_changes: Vec<(u32, u32, u32)>, // (address, old_value, new_value)
+    #[cfg(feature = "repl")]
+    pub register_changes: Vec<(Register, u32, u32)>, // (register, old_value, new_value)
 }
 
 impl Default for CPU {
@@ -125,6 +127,8 @@ impl CPU {
             memory_changes: Vec::new(),
             #[cfg(feature = "repl")]
             csr_changes: Vec::new(),
+            #[cfg(feature = "repl")]
+            register_changes: Vec::new(),
         };
 
         // Initialize standard CSRs
@@ -177,6 +181,9 @@ impl CPU {
     ///
     /// `Register::X0` will always remain zero
     pub fn set_register(&mut self, r: Register, v: u32) {
+        #[cfg(feature = "repl")]
+        let old_value = self.get_register(r);
+
         match r {
             Register::X0 => self.x0 = 0,
             Register::X1 => self.x1 = v,
@@ -211,6 +218,14 @@ impl CPU {
             Register::X30 => self.x30 = v,
             Register::X31 => self.x31 = v,
             Register::PC => self.pc = v,
+        }
+
+        #[cfg(feature = "repl")]
+        {
+            let new_value = self.get_register(r);
+            if old_value != new_value {
+                self.register_changes.push((r, old_value, new_value));
+            }
         }
     }
 
@@ -1395,6 +1410,7 @@ impl CPU {
     pub fn clear_tracking(&mut self) {
         self.memory_changes.clear();
         self.csr_changes.clear();
+        self.register_changes.clear();
     }
 
     /// Resets the CPU to its initial state

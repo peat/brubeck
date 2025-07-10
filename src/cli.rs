@@ -50,6 +50,10 @@ pub struct Cli {
     /// Show instruction trace with PC and descriptions (script/execute only)
     #[arg(short = 'v', long = "verbose")]
     pub verbose: bool,
+
+    /// Disable color output
+    #[arg(long = "no-color")]
+    pub no_color: bool,
 }
 
 /// Configuration derived from CLI arguments

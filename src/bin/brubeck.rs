@@ -37,11 +37,11 @@ fn main() -> io::Result<()> {
         match cli.execution_mode() {
             ExecutionMode::Execute => {
                 let commands = cli.execute.unwrap();
-                run_execute_mode(&mut interpreter, &commands, cli.verbose)
+                run_execute_mode(&mut interpreter, &commands, cli.verbose, cli.no_color)
             }
             ExecutionMode::Script => {
                 let path = cli.script.unwrap();
-                run_script_mode(&mut interpreter, &path, cli.verbose)
+                run_script_mode(&mut interpreter, &path, cli.verbose, cli.no_color)
             }
             ExecutionMode::Interactive => {
                 // Check if stdin is a terminal (interactive mode) or pipe
@@ -51,7 +51,7 @@ fn main() -> io::Result<()> {
                     let history_size = if cli.no_history { 0 } else { cli.history_size };
                     run_interactive(&mut interpreter, cli.quiet, history_size)
                 } else {
-                    run_batch(&mut interpreter)
+                    run_batch(&mut interpreter, cli.no_color)
                 }
             }
         }
@@ -130,9 +130,12 @@ fn run_interactive(
     }
 }
 
-fn run_batch(interpreter: &mut Interpreter) -> io::Result<()> {
+fn run_batch(interpreter: &mut Interpreter, no_color: bool) -> io::Result<()> {
     let stdin = io::stdin();
     let reader = stdin.lock();
+
+    // Check if stdout is a terminal to determine if we can use colors
+    let use_color = io::stdout().is_tty() && !no_color;
 
     for line in reader.lines() {
         let line = line?;
@@ -142,7 +145,7 @@ fn run_batch(interpreter: &mut Interpreter) -> io::Result<()> {
             continue;
         }
 
-        execute_and_print(interpreter, &line, false, false, false)?;
+        execute_and_print(interpreter, &line, use_color, false, false)?;
     }
 
     Ok(())
@@ -190,6 +193,7 @@ fn execute_and_print(
                     // Add blank line before slash command output
                     println!();
                 }
+
                 println!("{s}");
             } else {
                 // Script/execute mode
@@ -244,21 +248,33 @@ fn run_execute_mode(
     interpreter: &mut Interpreter,
     commands: &str,
     verbose: bool,
+    no_color: bool,
 ) -> io::Result<()> {
     use brubeck::cli::split_commands;
 
+    // Check if stdout is a terminal to determine if we can use colors
+    let use_color = io::stdout().is_tty() && !no_color;
+
     // Split by semicolons and execute each command
     for command in split_commands(commands) {
-        execute_and_print(interpreter, command, false, false, verbose)?;
+        execute_and_print(interpreter, command, use_color, false, verbose)?;
     }
 
     Ok(())
 }
 
 #[cfg(feature = "repl")]
-fn run_script_mode(interpreter: &mut Interpreter, path: &str, verbose: bool) -> io::Result<()> {
+fn run_script_mode(
+    interpreter: &mut Interpreter,
+    path: &str,
+    verbose: bool,
+    no_color: bool,
+) -> io::Result<()> {
     // Read the script file
     let contents = fs::read_to_string(path)?;
+
+    // Check if stdout is a terminal to determine if we can use colors
+    let use_color = io::stdout().is_tty() && !no_color;
 
     // Execute each line
     for line in contents.lines() {
@@ -269,7 +285,7 @@ fn run_script_mode(interpreter: &mut Interpreter, path: &str, verbose: bool) -> 
             continue;
         }
 
-        execute_and_print(interpreter, line, false, false, verbose)?;
+        execute_and_print(interpreter, line, use_color, false, verbose)?;
     }
 
     Ok(())

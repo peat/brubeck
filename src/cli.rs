@@ -27,6 +27,14 @@ pub struct Cli {
     #[arg(long = "no-undo", conflicts_with = "undo_limit")]
     pub no_undo: bool,
 
+    /// Maximum command history size
+    #[arg(long = "history-size", default_value_t = 1000)]
+    pub history_size: usize,
+
+    /// Disable command history
+    #[arg(long = "no-history", conflicts_with = "history_size")]
+    pub no_history: bool,
+
     /// Execute commands and exit (semicolon-separated)
     #[arg(short = 'e', long = "execute", conflicts_with = "script")]
     pub execute: Option<String>,

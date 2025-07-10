@@ -48,7 +48,8 @@ fn main() -> io::Result<()> {
                 let is_interactive = io::stdin().is_tty();
 
                 if is_interactive {
-                    run_interactive(&mut interpreter, cli.quiet)
+                    let history_size = if cli.no_history { 0 } else { cli.history_size };
+                    run_interactive(&mut interpreter, cli.quiet, history_size)
                 } else {
                     run_batch(&mut interpreter)
                 }
@@ -59,11 +60,20 @@ fn main() -> io::Result<()> {
     #[cfg(not(feature = "repl"))]
     {
         let mut interpreter = Interpreter::new();
-        run_interactive(&mut interpreter, false)
+        run_interactive(
+            &mut interpreter,
+            false,
+            #[cfg(feature = "repl")]
+            1000,
+        )
     }
 }
 
-fn run_interactive(interpreter: &mut Interpreter, quiet: bool) -> io::Result<()> {
+fn run_interactive(
+    interpreter: &mut Interpreter,
+    quiet: bool,
+    #[cfg(feature = "repl")] history_size: usize,
+) -> io::Result<()> {
     // Only show banner if not in quiet mode
     #[cfg(feature = "repl")]
     if !quiet && should_show_banner(ExecutionMode::Interactive) && io::stdin().is_tty() {
@@ -79,7 +89,7 @@ fn run_interactive(interpreter: &mut Interpreter, quiet: bool) -> io::Result<()>
 
     // Initialize command history
     #[cfg(feature = "repl")]
-    let mut history = repl::CommandHistory::new(1000); // TODO: Make configurable
+    let mut history = repl::CommandHistory::new(history_size);
 
     loop {
         // Show PC address prompt

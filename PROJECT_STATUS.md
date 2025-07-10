@@ -20,18 +20,15 @@ Making Brubeck more beginner-friendly and educational based on user feedback.
 - Update documentation
 
 #### 2. Memory Inspection Command ⏱️ ~4 hours
-**Status**: Not started  
+**Status**: ✅ Completed  
 **Why**: Critical for debugging loads/stores and understanding memory  
-**Specification**:
-- `/memory` - Show 64 bytes around PC
-- `/memory <addr>` - Show 64 bytes at address
-- `/memory <start> <end>` - Show range (max 256 bytes)
-- Alias: `/m`
-- Format: Address | Hex bytes | ASCII representation
-```
-0x00001000: 48 65 6c 6c 6f 20 57 6f | 72 6c 64 21 00 00 00 00  Hello World!....
-0x00001010: 00 00 00 00 00 00 00 00 | 00 00 00 00 00 00 00 00  ................
-```
+**Changes**:
+- Added `/memory` command with alias `/m`
+- Three modes: no args (around PC), single address, or range
+- Displays memory in hex format with ASCII representation
+- 16-byte aligned display with separators
+- Shows current PC if in displayed range
+- Comprehensive tests added
 
 #### 3. Reset Command ⏱️ ~2 hours
 **Status**: ✅ Completed  
@@ -95,7 +92,7 @@ Making Brubeck more beginner-friendly and educational based on user feedback.
 
 ## 📊 Progress Summary
 
-### ✅ Completed (Phase 1)
+### ✅ Completed
 - [x] PC address prompt `[0x00000000]>`
 - [x] Human-readable instruction output
 - [x] Colorized output (green/red dots)
@@ -103,9 +100,11 @@ Making Brubeck more beginner-friendly and educational based on user feedback.
 - [x] `/regs` command with specific register support
 - [x] `/help` command
 - [x] Removed direct register inspection
-- [x] Undo/redo functionality
+- [x] History navigation (`/previous`, `/next`)
 - [x] Professional CLI with clap
 - [x] Modular interpreter architecture
+- [x] `/reset` command with confirmation
+- [x] `/memory` command for memory inspection
 
 ### 🚧 In Progress
 - [ ] Phase 2 REPL improvements (see tasks above)
@@ -139,4 +138,4 @@ Making Brubeck more beginner-friendly and educational based on user feedback.
 
 ---
 
-**Next Action**: Memory inspection command (#2) is the next high-priority task
+**Next Action**: Enhanced error messages (#4) is the next task on the list

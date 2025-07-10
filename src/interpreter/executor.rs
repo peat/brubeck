@@ -35,9 +35,9 @@ pub fn run_command(
         )),
         Command::ShowHelp => Ok(formatter::format_help()),
         #[cfg(feature = "repl")]
-        Command::Undo => handle_undo(interpreter),
+        Command::Previous => handle_previous(interpreter),
         #[cfg(feature = "repl")]
-        Command::Redo => handle_redo(interpreter),
+        Command::Next => handle_next(interpreter),
     }
 }
 
@@ -147,21 +147,21 @@ pub fn execute_pseudo(
     }
 }
 
-/// Handles the /undo command
+/// Handles the /previous command
 ///
-/// # Undo Operation
+/// # Previous Operation
 ///
-/// Restores the CPU state to before the last executed instruction:
+/// Navigates to the previous state in the execution history:
 /// - Restores all register values
 /// - Restores program counter
 /// - Reverts memory modifications
 /// - Reverts CSR changes
 #[cfg(feature = "repl")]
-fn handle_undo(interpreter: &mut crate::interpreter::Interpreter) -> Result<String, Error> {
+fn handle_previous(interpreter: &mut crate::interpreter::Interpreter) -> Result<String, Error> {
     // Clone the snapshot to avoid borrowing conflicts
     let snapshot = match interpreter.history_mut().undo() {
         Some(s) => s.clone(),
-        None => return Err(Error::Generic("Nothing to undo".to_string())),
+        None => return Err(Error::Generic("No previous state in history".to_string())),
     };
 
     // Now we can mutably borrow the CPU without conflicts
@@ -177,24 +177,27 @@ fn handle_undo(interpreter: &mut crate::interpreter::Interpreter) -> Result<Stri
     // Restore CSR changes
     cpu.restore_csrs(&snapshot.csr_changes);
 
-    Ok(format!("Undid: {}", snapshot.instruction))
+    Ok(format!(
+        "Navigated to previous state: {}",
+        snapshot.instruction
+    ))
 }
 
-/// Handles the /redo command
+/// Handles the /next command
 ///
-/// # Redo Operation
+/// # Next Operation
 ///
-/// Re-applies a previously undone instruction:
+/// Navigates to the next state in the execution history:
 /// - Restores registers to the state after the instruction
 /// - Updates program counter
 /// - Re-applies memory modifications
 /// - Re-applies CSR changes
 #[cfg(feature = "repl")]
-fn handle_redo(interpreter: &mut crate::interpreter::Interpreter) -> Result<String, Error> {
+fn handle_next(interpreter: &mut crate::interpreter::Interpreter) -> Result<String, Error> {
     // Clone the snapshot to avoid borrowing conflicts
     let snapshot = match interpreter.history_mut().redo() {
         Some(s) => s.clone(),
-        None => return Err(Error::Generic("Nothing to redo".to_string())),
+        None => return Err(Error::Generic("No next state in history".to_string())),
     };
 
     // Now we can mutably borrow the CPU without conflicts
@@ -218,5 +221,5 @@ fn handle_redo(interpreter: &mut crate::interpreter::Interpreter) -> Result<Stri
         }
     }
 
-    Ok(format!("Redid: {}", snapshot.instruction))
+    Ok(format!("Navigated to next state: {}", snapshot.instruction))
 }

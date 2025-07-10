@@ -101,9 +101,9 @@ impl TestContext<Interpreter> {
     /// Undo last operation
     #[cfg(feature = "repl")]
     pub fn undo(&mut self) -> &mut Self {
-        let ctx = self.context("Undo");
+        let ctx = self.context("Previous");
         self.inner
-            .interpret("/undo")
+            .interpret("/previous")
             .unwrap_or_else(|e| panic!("{ctx}: {e:?}"));
         self
     }
@@ -114,7 +114,7 @@ impl TestContext<Interpreter> {
         let ctx = self.context("Undo");
         let result = self
             .inner
-            .interpret("/undo")
+            .interpret("/previous")
             .unwrap_or_else(|e| panic!("{ctx}: {e:?}"));
         assert_contains_with_context(&result, expected, &ctx);
         self
@@ -123,9 +123,9 @@ impl TestContext<Interpreter> {
     /// Redo last undone operation
     #[cfg(feature = "repl")]
     pub fn redo(&mut self) -> &mut Self {
-        let ctx = self.context("Redo");
+        let ctx = self.context("Next");
         self.inner
-            .interpret("/redo")
+            .interpret("/next")
             .unwrap_or_else(|e| panic!("{ctx}: {e:?}"));
         self
     }
@@ -134,7 +134,7 @@ impl TestContext<Interpreter> {
     #[cfg(feature = "repl")]
     pub fn undo_should_fail(&mut self) -> &mut Self {
         let ctx = self.context("Undo (expecting failure)");
-        if self.inner.interpret("/undo").is_ok() {
+        if self.inner.interpret("/previous").is_ok() {
             panic!("{ctx}: Expected undo to fail but it succeeded");
         }
         self

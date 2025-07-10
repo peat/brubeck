@@ -56,7 +56,7 @@ pub mod helpers {
             let ctx = self.context("Redo");
             let result = self
                 .inner
-                .interpret("/redo")
+                .interpret("/next")
                 .unwrap_or_else(|e| panic!("{ctx}: {e:?}"));
             crate::common::assertions::assert_contains_with_context(&result, expected, &ctx);
             self
@@ -64,7 +64,7 @@ pub mod helpers {
 
         fn redo_should_fail(&mut self) -> &mut Self {
             let ctx = self.context("Redo (expecting failure)");
-            if self.inner.interpret("/redo").is_ok() {
+            if self.inner.interpret("/next").is_ok() {
                 panic!("{ctx}: Expected redo to fail but it succeeded");
             }
             self

@@ -80,9 +80,9 @@ pub fn parse(input: &str) -> Result<Command, Error> {
                 }
                 "/HELP" | "/H" => Ok(Command::ShowHelp),
                 #[cfg(feature = "repl")]
-                "/UNDO" | "/U" => Ok(Command::Undo),
+                "/PREVIOUS" | "/PREV" | "/P" => Ok(Command::Previous),
                 #[cfg(feature = "repl")]
-                "/REDO" => Ok(Command::Redo),
+                "/NEXT" | "/N" => Ok(Command::Next),
                 _ => Err(Error::Generic(format!("Unknown command: {first_word}"))),
             };
         }

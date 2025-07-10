@@ -72,7 +72,8 @@ fn test_undo_csr_operations() {
     ctx.undo();
 
     // Read again - should get original value (0)
-    ctx.exec("CSRRS x4, 0x340, x0").check_reg("x4", "0x00000000");
+    ctx.exec("CSRRS x4, 0x340, x0")
+        .check_reg("x4", "0x00000000");
 }
 
 #[test]
@@ -86,7 +87,7 @@ fn test_undo_limit() {
 
     // Try to undo all - should eventually fail
     let mut undo_count = 0;
-    while ctx.inner.interpret("/undo").is_ok() {
+    while ctx.inner.interpret("/previous").is_ok() {
         undo_count += 1;
     }
 

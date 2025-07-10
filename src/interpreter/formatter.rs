@@ -319,14 +319,14 @@ Register Inspection:
   
 Other Commands:
   /h, /help        Show this help message
-  /undo            Undo last instruction (if undo/redo enabled)
-  /redo            Redo previously undone instruction
+  /p, /prev, /previous  Navigate to previous state in history
+  /n, /next        Navigate to next state in history
   
 Examples:
   ADDI x1, x0, 42  # Load 42 into x1
   /r x1            # Show value of x1
   /r x1 x2 x3      # Show x1, x2, and x3
-  /undo            # Undo the ADDI"#
+  /p               # Go to previous state"#
         .to_string()
 }
 

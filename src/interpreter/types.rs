@@ -19,12 +19,12 @@ pub enum Command {
     ShowSpecificRegs(Vec<Register>),
     /// Show help information
     ShowHelp,
-    /// Undo the last instruction (REPL feature)
+    /// Navigate to previous state in history (REPL feature)
     #[cfg(feature = "repl")]
-    Undo,
-    /// Redo a previously undone instruction (REPL feature)
+    Previous,
+    /// Navigate to next state in history (REPL feature)
     #[cfg(feature = "repl")]
-    Redo,
+    Next,
 }
 
 /// Represents a token in the parsed assembly

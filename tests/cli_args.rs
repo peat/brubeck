@@ -207,7 +207,7 @@ fn test_undo_limit_applied() {
     interpreter.interpret("ADDI x1, x0, 10").unwrap();
 
     // Undo should fail
-    let result = interpreter.interpret("/undo");
+    let result = interpreter.interpret("/previous");
     assert!(result.is_err() || result.unwrap().contains("No history"));
 }
 

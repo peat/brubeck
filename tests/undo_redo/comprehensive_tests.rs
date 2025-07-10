@@ -25,7 +25,10 @@ fn test_arithmetic_complete() {
         .check_reg("x4", "0x00000014");
 
     // Undo SUB and ADD
-    ctx.undo().check_reg("x4", "0x00000000").undo().check_reg("x3", "0x00000000");
+    ctx.undo()
+        .check_reg("x4", "0x00000000")
+        .undo()
+        .check_reg("x3", "0x00000000");
 
     // Redo both
     ctx.redo()
@@ -185,7 +188,10 @@ fn test_upper_immediate() {
     ctx.exec("AUIPC x2, 0x1000"); // PC + (0x1000 << 12)
 
     // Undo both
-    ctx.undo().check_reg("x2", "0x00000000").undo().check_reg("x1", "0x00000000");
+    ctx.undo()
+        .check_reg("x2", "0x00000000")
+        .undo()
+        .check_reg("x1", "0x00000000");
 }
 
 // ==================== BRANCH INSTRUCTIONS ====================
@@ -268,7 +274,8 @@ fn test_csr_all_variants() {
     ctx.undo_n(6);
 
     // Verify CSR is back to original state
-    ctx.exec("CSRRS x9, 0x340, x0").check_reg("x9", "0x00000000");
+    ctx.exec("CSRRS x9, 0x340, x0")
+        .check_reg("x9", "0x00000000");
 }
 
 #[test]
@@ -302,7 +309,7 @@ fn test_all_pseudo_instructions() {
 
     // Undo in reverse order
     ctx.undo_n(3) // RET, ADDI, J
-        .undo_expect("Undid:"); // Generic check
+        .undo_expect("Navigated to previous state:"); // Generic check
 }
 
 #[test]
@@ -310,8 +317,8 @@ fn test_li_large_values() {
     let mut ctx = test_ctx("test_li_large_values");
     // Test LI with values requiring LUI + ADDI
     ctx.exec("LI x1, 0x12345678")
-        .undo_expect("LI")  // This undoes the ADDI part
-        .undo()             // This undoes the LUI part
+        .undo_expect("LI") // This undoes the ADDI part
+        .undo() // This undoes the LUI part
         .check_reg("x1", "0x00000000");
 }
 

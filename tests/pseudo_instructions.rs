@@ -18,7 +18,10 @@ fn test_mv_pseudo_instruction() {
 
     // Verify the value was moved
     let x1_result = interpreter.interpret("/regs x1").unwrap();
-    assert!(x1_result.contains("x 1 (ra  ): 0x0000002a"), "x1 should contain 42 (0x2a)");
+    assert!(
+        x1_result.contains("x 1 (ra  ): 0x0000002a"),
+        "x1 should contain 42 (0x2a)"
+    );
 }
 
 #[test]
@@ -51,14 +54,20 @@ fn test_seqz_pseudo_instruction() {
     assert!(result.is_ok(), "SEQZ should execute successfully");
 
     let x2_result = interpreter.interpret("/regs x2").unwrap();
-    assert!(x2_result.contains("x 2 (sp  ): 0x00000001"), "SEQZ of 0 should be 1");
+    assert!(
+        x2_result.contains("x 2 (sp  ): 0x00000001"),
+        "SEQZ of 0 should be 1"
+    );
 
     // Test with non-zero value
     interpreter.interpret("ADDI x3, zero, 5").unwrap();
     interpreter.interpret("SEQZ x4, x3").unwrap();
 
     let x4_result = interpreter.interpret("/regs x4").unwrap();
-    assert!(x4_result.contains("x 4 (tp  ): 0x00000000"), "SEQZ of 5 should be 0");
+    assert!(
+        x4_result.contains("x 4 (tp  ): 0x00000000"),
+        "SEQZ of 5 should be 0"
+    );
 }
 
 #[test]
@@ -71,14 +80,20 @@ fn test_snez_pseudo_instruction() {
     assert!(result.is_ok(), "SNEZ should execute successfully");
 
     let x2_result = interpreter.interpret("/regs x2").unwrap();
-    assert!(x2_result.contains("x 2 (sp  ): 0x00000000"), "SNEZ of 0 should be 0");
+    assert!(
+        x2_result.contains("x 2 (sp  ): 0x00000000"),
+        "SNEZ of 0 should be 0"
+    );
 
     // Test with non-zero value
     interpreter.interpret("ADDI x3, zero, 5").unwrap();
     interpreter.interpret("SNEZ x4, x3").unwrap();
 
     let x4_result = interpreter.interpret("/regs x4").unwrap();
-    assert!(x4_result.contains("x 4 (tp  ): 0x00000001"), "SNEZ of 5 should be 1");
+    assert!(
+        x4_result.contains("x 4 (tp  ): 0x00000001"),
+        "SNEZ of 5 should be 1"
+    );
 }
 
 #[test]
@@ -91,7 +106,10 @@ fn test_j_pseudo_instruction() {
 
     // Check PC has jumped
     let pc_result = interpreter.interpret("/regs PC").unwrap();
-    assert!(pc_result.contains("pc: 0x00000008"), "PC should be 8 after J 8");
+    assert!(
+        pc_result.contains("pc: 0x00000008"),
+        "PC should be 8 after J 8"
+    );
 }
 
 #[test]
@@ -107,7 +125,10 @@ fn test_jr_pseudo_instruction() {
 
     // Check PC has jumped to register value
     let pc_result = interpreter.interpret("/regs PC").unwrap();
-    assert!(pc_result.contains("pc: 0x00000064"), "PC should be 100 (0x64) after JR x1");
+    assert!(
+        pc_result.contains("pc: 0x00000064"),
+        "PC should be 100 (0x64) after JR x1"
+    );
 }
 
 #[test]
@@ -123,7 +144,10 @@ fn test_ret_pseudo_instruction() {
 
     // Check PC has jumped to return address
     let pc_result = interpreter.interpret("/regs PC").unwrap();
-    assert!(pc_result.contains("pc: 0x000000c8"), "PC should be 200 (0xc8) after RET");
+    assert!(
+        pc_result.contains("pc: 0x000000c8"),
+        "PC should be 200 (0xc8) after RET"
+    );
 }
 
 #[test]
@@ -135,7 +159,10 @@ fn test_li_small_immediate() {
     assert!(result.is_ok(), "LI with small immediate should work");
 
     let x1_result = interpreter.interpret("/regs x1").unwrap();
-    assert!(x1_result.contains("x 1 (ra  ): 0x0000002a"), "x1 should contain 42 (0x2a)");
+    assert!(
+        x1_result.contains("x 1 (ra  ): 0x0000002a"),
+        "x1 should contain 42 (0x2a)"
+    );
 }
 
 #[test]
@@ -147,7 +174,10 @@ fn test_li_large_immediate() {
     assert!(result.is_ok(), "LI with large immediate should work");
 
     let x1_result = interpreter.interpret("/regs x1").unwrap();
-    assert!(x1_result.contains("x 1 (ra  ): 0x00012345"), "x1 should contain 0x12345 (74565)");
+    assert!(
+        x1_result.contains("x 1 (ra  ): 0x00012345"),
+        "x1 should contain 0x12345 (74565)"
+    );
 }
 
 #[test]
@@ -174,7 +204,10 @@ fn test_pseudo_instruction_with_abi_names() {
     interpreter.interpret("MV fp, sp").unwrap();
 
     let fp_result = interpreter.interpret("/regs fp").unwrap();
-    assert!(fp_result.contains("x 8 (s0  ): 0x000003e8"), "fp (x8) should contain 1000 (0x3e8)");
+    assert!(
+        fp_result.contains("x 8 (s0  ): 0x000003e8"),
+        "fp (x8) should contain 1000 (0x3e8)"
+    );
 
     // Test RET which implicitly uses ra
     interpreter.interpret("LI ra, 0x2000").unwrap();

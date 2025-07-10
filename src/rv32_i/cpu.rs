@@ -2029,8 +2029,7 @@ mod tests {
             assert_eq!(
                 cpu.get_register(Register::from_u32(i)),
                 0,
-                "Register X{} should be 0",
-                i
+                "Register X{i} should be 0"
             );
         }
         assert_eq!(cpu.pc, 0);

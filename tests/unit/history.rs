@@ -156,7 +156,7 @@ mod history_manager {
         // Push several instructions
         for i in 0..5 {
             history.push(StateSnapshot {
-                instruction: format!("Instruction {}", i),
+                instruction: format!("Instruction {i}"),
                 registers: [0; 32],
                 pc: i * 4,
                 registers_after: [0; 32],

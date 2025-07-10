@@ -194,7 +194,7 @@ mod tests {
     fn test_size_limit() {
         let mut history = CommandHistory::new(3);
         for i in 0..5 {
-            history.add(format!("command {}", i));
+            history.add(format!("command {i}"));
         }
         assert_eq!(history.len(), 3);
 

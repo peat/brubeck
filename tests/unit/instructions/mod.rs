@@ -11,6 +11,7 @@ mod jumps;
 mod loads_stores;
 mod logical;
 mod misc;
+mod pseudo;
 mod shifts;
 mod system;
 mod upper_immediate;

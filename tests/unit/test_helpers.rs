@@ -7,51 +7,9 @@
 
 use brubeck::rv32_i::{cpu::CPU, instructions::Instruction, registers::Register};
 
-/// Common test values with semantic meaning
-#[allow(dead_code)]
-pub mod values {
-
-    // Basic values
-    pub const ZERO: u32 = 0;
-    pub const ONE: u32 = 1;
-    pub const TWO: u32 = 2;
-    pub const TEN: u32 = 10;
-
-    // Boundary values
-    pub const U32_MAX: u32 = u32::MAX;
-    pub const U32_MIN: u32 = u32::MIN;
-    pub const I32_MAX: u32 = i32::MAX as u32;
-    pub const I32_MIN: u32 = i32::MIN as u32;
-
-    // Sign-related values
-    pub const NEG_ONE: u32 = -1_i32 as u32;
-    pub const NEG_TWO: u32 = -2_i32 as u32;
-    pub const MSB_SET: u32 = 0x8000_0000;
-    pub const MSB_CLEAR: u32 = 0x7FFF_FFFF;
-
-    // Common patterns
-    pub const ALL_ONES: u32 = 0xFFFF_FFFF;
-    pub const ALL_ZEROS: u32 = 0x0000_0000;
-    pub const ALTERNATING_BITS: u32 = 0xAAAA_AAAA;
-    pub const ALTERNATING_BITS_INV: u32 = 0x5555_5555;
-
-    // Memory addresses (typical values)
-    pub const STACK_BASE: u32 = 0x8000_0000;
-    pub const HEAP_BASE: u32 = 0x1000_0000;
-    pub const CODE_BASE: u32 = 0x0000_1000;
-    pub const TEST_ADDR: u32 = 1024; // Arbitrary but consistent
-
-    // Immediate boundaries
-    pub const IMM12_MAX: i32 = 2047; // Maximum 12-bit signed immediate
-    pub const IMM12_MIN: i32 = -2048; // Minimum 12-bit signed immediate
-    pub const IMM20_MAX: u32 = 0xFFFFF; // Maximum 20-bit unsigned immediate
-
-    // Shift amounts
-    pub const SHIFT_0: u32 = 0;
-    pub const SHIFT_1: u32 = 1;
-    pub const SHIFT_31: u32 = 31;
-    pub const SHIFT_32: u32 = 32; // Tests 5-bit masking
-}
+// Re-export common test values to avoid duplication
+// The common module is at the test crate root (tests/common)
+pub use super::super::common::values;
 
 /// Builder pattern for setting up CPU state
 pub struct CpuBuilder {

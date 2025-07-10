@@ -160,9 +160,5 @@ fn refresh_line(prompt: &str, input: &str, cursor_pos: usize) -> io::Result<()> 
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    // Note: Testing terminal interaction is complex and typically
-    // requires mocking or integration tests. The core logic is tested
-    // in the CommandHistory tests.
-}
+// Terminal interaction tests would require mocking.
+// Core functionality is tested in tests/unit/repl_history.rs

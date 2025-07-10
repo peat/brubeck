@@ -82,7 +82,17 @@ Making Brubeck more beginner-friendly and educational based on user feedback.
 - `/regs x1-x5` - Show register range
 - `/memory 0x1000-0x2000` - Memory range syntax
 
-#### 9. Command History with Arrow Keys ⏱️ ~8 hours
+#### 9. Consolidate Test Organization ⏱️ ~2 hours
+**Status**: ✅ Completed  
+**Why**: Better test organization and maintainability  
+**Changes**:
+- Moved CSR tests from `src/rv32_i/cpu.rs` to `tests/unit/components/csr.rs`
+- Moved pseudo-instruction tests from `src/rv32_i/pseudo_instructions.rs` to `tests/unit/instructions/pseudo.rs`
+- Created `tests/unit_tests.rs` as entry point for unit tests
+- All tests now follow consistent organization pattern
+- Source files no longer contain test modules
+
+#### 10. Command History with Arrow Keys ⏱️ ~8 hours
 **Status**: ✅ Completed  
 **Why**: Essential REPL feature for productivity  
 **Implementation**:
@@ -94,7 +104,7 @@ Making Brubeck more beginner-friendly and educational based on user feedback.
 - Feature-gated in binary only
 - Future enhancement: persist to `.brubeck_history` in working directory
 
-#### 10. Tab Completion ⏱️ ~6 hours
+#### 11. Tab Completion ⏱️ ~6 hours
 **Status**: Not started  
 **Why**: Speeds up instruction entry and reduces typos  
 **Specification**:

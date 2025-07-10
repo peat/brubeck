@@ -144,6 +144,7 @@ impl TestContext<Interpreter> {
 // ==================== CONVERSION HELPERS ====================
 
 /// Create an Interpreter test context
+#[allow(dead_code)]
 pub fn interpreter_context() -> TestContext<Interpreter> {
     TestContext::new()
 }

@@ -222,22 +222,4 @@ impl Cli {
 
 // Execute and script mode functions are implemented in main.rs
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_memory_size_basic() {
-        assert_eq!(parse_memory_size("1024").unwrap(), 1024);
-        assert_eq!(parse_memory_size("1k").unwrap(), 1024);
-        assert_eq!(parse_memory_size("1M").unwrap(), 1024 * 1024);
-    }
-
-    #[test]
-    fn test_parse_memory_size_errors() {
-        assert!(parse_memory_size("").is_err());
-        assert!(parse_memory_size("abc").is_err());
-        assert!(parse_memory_size("1.5M").is_err());
-        assert!(parse_memory_size("-1k").is_err());
-    }
-}
+// Tests have been moved to tests/unit/cli.rs

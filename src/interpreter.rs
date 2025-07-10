@@ -150,39 +150,4 @@ impl Interpreter {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::rv32_i::{Instruction, RType, Register};
-
-    #[test]
-    fn parse_command() {
-        let a = "ADD x1, x2, x3";
-        let result = parser::parse(a);
-
-        assert!(result.is_ok());
-
-        let rtype = RType {
-            rd: Register::X1,
-            rs1: Register::X2,
-            rs2: Register::X3,
-            ..Default::default()
-        };
-
-        assert_eq!(result.unwrap(), Command::Exec(Instruction::ADD(rtype)));
-    }
-
-    #[test]
-    fn trivial_add() {
-        let mut i = Interpreter::default();
-        i.cpu.x2 = 3;
-        i.cpu.x3 = 5;
-
-        assert_eq!(i.cpu.x1, 0);
-
-        let input = "ADD x1, x2, x3";
-        assert!(i.interpret(input).is_ok());
-
-        assert_eq!(i.cpu.x1, 8);
-    }
-}
+// Tests have been moved to tests/parser.rs and tests/unit/instructions/

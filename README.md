@@ -1,8 +1,6 @@
 # Brubeck!
 
-Brubeck is a **teaching-focused** RISC-V assembly language REPL and emulator library. It's designed as a playground for learning RISC-V architecture, assembly programming, and compiler construction - prioritizing educational value over performance.
-
-The project features a **production-grade parser** with comprehensive validation and educational error messages, making it an excellent resource for students and educators.
+Brubeck is a RISC-V assembly language REPL and emulator library designed for learning RISC-V architecture and assembly programming. It includes a parser with validation and helpful error messages.
 
 Please follow this repo if you're interested in the project! I'm also very keen on feedback and thoughts on what you think would be awesome to see in a RISC-V assembly playground.
 
@@ -14,19 +12,19 @@ Please follow this repo if you're interested in the project! I'm also very keen 
 * **8 pseudo-instructions**: MV, NOT, LI, J, JR, RET, SEQZ, SNEZ for convenience
 * **System instructions**: FENCE, ECALL, EBREAK for system-level operations
 
-### 🎓 **Teaching-Focused Features**
-* **Production-grade parser** with educational error messages
-* **Standard RISC-V syntax**: `LW x1, 4(x2)` with backward compatibility
-* **Comprehensive documentation** explaining compiler concepts
-* **Rich error messages** with contextual tips and RISC-V education
+### 🎓 **Features**
+* Parser with helpful error messages
+* Standard RISC-V syntax: `LW x1, 4(x2)` with backward compatibility
+* Documentation explaining implementation concepts
+* Error messages with contextual tips
 * **Multiple formats**: Hex (0x), binary (0b), and decimal immediates
-* **Undo/Redo support**: Step back and forward through instruction history
-* **Flexible CLI**: Script files, one-liners, and verbose execution traces
+* **History navigation** (`/previous`, `/next`): Step back and forward through execution history
+* CLI support: Script files, one-liners, and execution traces
 
-### 🧪 **Robust Testing**
-* **350+ tests** covering all instructions and edge cases
-* **Comprehensive validation** for immediates, registers, and instruction formats
-* **Educational test structure** demonstrating testing best practices
+### 🧪 **Testing**
+* 350+ tests covering all instructions and edge cases
+* Validation for immediates, registers, and instruction formats
+* Structured test organization
 
 Implementation strictly follows the RISC-V ISA specification (see `riscv-isa-manual/src/rv32.adoc`).
 
@@ -51,8 +49,8 @@ Ctrl-C to quit
 [0x0000000c]> /regs x3
 ● x 3 (gp  ): 0x00000096
 
-[0x0000000c]> /undo
-Undid: ADD
+[0x0000000c]> /p
+● Navigated to previous state: ADD
 
 [0x00000008]> /regs x3
 ● x 3 (gp  ): 0x00000000
@@ -78,11 +76,11 @@ x 3 (gp  ): 0x000001f4
 # Custom memory size
 $ brubeck -m 64k
 
-# Disable undo/redo for minimal overhead
+# Disable history tracking for minimal overhead
 $ brubeck --no-undo
 ```
 
-### Educational Error Messages
+### Error Messages
 ```
 ADDI x1, zero, 5000     # Out of range immediate
 => ❌ Immediate value 5000 out of range for ADDI (valid range: -2048 to 2047)
@@ -123,8 +121,8 @@ Usage: brubeck [OPTIONS]
 
 Options:
   -m, --memory <SIZE>      Memory size (e.g., 1M, 256k, 1024) [default: 1M]
-      --undo-limit <N>     Maximum undo/redo depth [default: 1000]
-      --no-undo            Disable undo/redo functionality
+      --undo-limit <N>     Maximum history depth [default: 1000]
+      --no-undo            Disable history navigation
   -e, --execute <CMDS>     Execute commands and exit (semicolon-separated)
   -s, --script <FILE>      Execute script file and exit
   -q, --quiet              Suppress banner and descriptions (REPL only)

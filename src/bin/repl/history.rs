@@ -124,6 +124,7 @@ impl CommandHistory {
     }
 
     /// Clears all history
+    #[allow(dead_code)]
     pub fn clear(&mut self) {
         self.entries.clear();
         self.current_position = None;
@@ -131,11 +132,13 @@ impl CommandHistory {
     }
 
     /// Returns the number of entries in history
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.entries.len()
     }
 
     /// Returns true if history is empty
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }

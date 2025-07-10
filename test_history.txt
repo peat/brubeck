@@ -1,0 +1,36 @@
+# Manual Test Plan for Command History
+
+1. Build and run:
+   cargo run --features repl
+
+2. Test basic history:
+   - Type: ADDI x1, x0, 42
+   - Type: ADDI x2, x0, 100
+   - Type: ADD x3, x1, x2
+   - Press UP arrow - should show "ADD x3, x1, x2"
+   - Press UP arrow - should show "ADDI x2, x0, 100"  
+   - Press UP arrow - should show "ADDI x1, x0, 42"
+   - Press DOWN arrow - should show "ADDI x2, x0, 100"
+   - Press ENTER to execute
+
+3. Test escape:
+   - Type: /regs
+   - Press UP arrow several times
+   - Press ESCAPE - should return to "/regs"
+   - Press ENTER
+
+4. Test deduplication:
+   - Type: NOP
+   - Press ENTER
+   - Type: NOP
+   - Press ENTER
+   - Type: NOP
+   - Press ENTER
+   - Press UP arrow - should only see one "NOP" in history
+
+5. Test empty commands not added:
+   - Press ENTER (empty line)
+   - Press UP arrow - should not see empty line
+
+6. Test Ctrl+C exit:
+   - Press Ctrl+C - should exit cleanly

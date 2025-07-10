@@ -105,6 +105,19 @@ The parser is designed as an educational resource demonstrating compiler front-e
 - No support for labels or assembler directives
 - REPL lacks advanced features like command history or tab completion
 
+## Current Project: Undo/Redo Functionality
+
+**Status**: Specification complete, implementation starting
+
+We are implementing a comprehensive undo/redo system for the REPL that will:
+- Allow users to undo instruction execution with `/undo` or `/u`
+- Support redo with `/redo` 
+- Use efficient delta compression for memory changes
+- Maintain a configurable history (default: 1000 states)
+- Only track successfully executed instructions
+
+See `UNDO_REDO_SPEC.md` for detailed specification and test plan.
+
 ## Recent Improvements: REPL Usability
 
 **Status**: Completed based on user feedback from hands-on testing

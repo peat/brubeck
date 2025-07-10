@@ -3,3 +3,7 @@
 //! Run with: cargo test --test unit_components
 
 mod unit;
+
+#[cfg(feature = "repl")]
+#[path = "unit/history.rs"]
+mod history;

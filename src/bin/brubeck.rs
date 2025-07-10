@@ -176,6 +176,9 @@ fn execute_and_print(
                     stdout.execute(SetForegroundColor(Color::Green))?;
                     stdout.execute(Print("● "))?;
                     stdout.execute(ResetColor)?;
+                } else {
+                    // Add blank line before slash command output
+                    println!();
                 }
                 println!("{s}");
             } else {

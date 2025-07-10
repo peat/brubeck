@@ -1,7 +1,9 @@
 use brubeck::interpreter::Interpreter;
 
 use std::fs;
-use std::io::{self, BufRead, Write};
+#[cfg(not(feature = "repl"))]
+use std::io::Write;
+use std::io::{self, BufRead};
 
 #[cfg(feature = "repl")]
 use brubeck::cli::{should_show_banner, Cli, ExecutionMode};
@@ -15,6 +17,9 @@ use crossterm::{
     tty::IsTty,
     ExecutableCommand,
 };
+
+#[cfg(feature = "repl")]
+mod repl;
 
 fn main() -> io::Result<()> {
     #[cfg(feature = "repl")]
@@ -72,20 +77,46 @@ fn run_interactive(interpreter: &mut Interpreter, quiet: bool) -> io::Result<()>
         println!("Ctrl-C to quit\n");
     }
 
+    // Initialize command history
+    #[cfg(feature = "repl")]
+    let mut history = repl::CommandHistory::new(1000); // TODO: Make configurable
+
     loop {
         // Show PC address prompt
-        print!("[0x{:08x}]> ", interpreter.get_pc());
-        io::stdout().flush()?;
+        let prompt = format!("[0x{:08x}]> ", interpreter.get_pc());
 
-        let mut buffer = String::new();
-        io::stdin().read_line(&mut buffer)?;
+        #[cfg(feature = "repl")]
+        let buffer = match repl::read_line_with_history(&prompt, &mut history) {
+            Ok(line) => line,
+            Err(e) if e.kind() == io::ErrorKind::Interrupted => {
+                // Ctrl+C - clean exit
+                println!();
+                return Ok(());
+            }
+            Err(e) => return Err(e),
+        };
+
+        #[cfg(not(feature = "repl"))]
+        let buffer = {
+            print!("{}", prompt);
+            io::stdout().flush()?;
+            let mut buffer = String::new();
+            io::stdin().read_line(&mut buffer)?;
+            buffer
+        };
 
         // Skip empty lines
         if buffer.trim().is_empty() {
             continue;
         }
 
-        execute_and_print(interpreter, &buffer, true, quiet, false)?;
+        // Execute the command
+        let input = buffer.trim();
+        execute_and_print(interpreter, input, true, quiet, false)?;
+
+        // Add to history (all commands, even if they fail - this is what shells do)
+        #[cfg(feature = "repl")]
+        history.add(input.to_string());
     }
 }
 

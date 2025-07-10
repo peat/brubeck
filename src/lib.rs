@@ -124,6 +124,9 @@ pub mod rv32_i;
 #[cfg(feature = "repl")]
 pub mod history;
 
+#[cfg(feature = "repl")]
+pub mod cli;
+
 pub use immediate::Immediate;
 pub use interpreter::Interpreter;
 pub use rv32_i::PseudoInstruction;

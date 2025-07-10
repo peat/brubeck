@@ -105,20 +105,43 @@ The parser is designed as an educational resource demonstrating compiler front-e
 - No support for labels or assembler directives
 - REPL lacks advanced features like command history or tab completion
 
-## Current Project: Undo/Redo Functionality
+## Current Project: Command-Line Interface
 
-**Status**: Specification complete, implementation starting
+**Status**: In progress - implementing command-line argument parsing
 
-We are implementing a comprehensive undo/redo system for the REPL that will:
-- Allow users to undo instruction execution with `/undo` or `/u`
-- Support redo with `/redo` 
-- Use efficient delta compression for memory changes
-- Maintain a configurable history (default: 1000 states)
-- Only track successfully executed instructions
+We are currently adding command-line argument support to Brubeck using the `clap` crate. This will allow users to configure memory size, undo/redo limits, and run scripts or one-liner commands.
 
-See `UNDO_REDO_SPEC.md` for detailed specification and test plan.
+### Planned CLI Arguments
+- **Memory configuration**: `-m, --memory <size>` (e.g., 1M, 256k)
+- **History configuration**: `--undo-limit <n>`, `--no-undo`
+- **Execution modes**: `-e, --execute <commands>`, `-s, --script <file>`
+- **Standard options**: `-h, --help`, `-V, --version`
 
-## Recent Improvements: REPL Usability
+### Implementation Progress
+See `docs/specs/CLI_ARGS_SPEC.md` for the implementation specification.
+
+### Related Improvements
+- Adding semicolon support to parser for multi-command lines
+- Automatic banner suppression in non-interactive modes
+- Human-friendly memory size parsing (1k, 5M, etc.)
+
+## Recent Improvements
+
+### Undo/Redo Functionality
+
+**Status**: Completed
+
+We have implemented a comprehensive undo/redo system for the REPL that:
+- Allows users to undo instruction execution with `/undo` or `/u`
+- Supports redo with `/redo`
+- Uses efficient delta compression for memory changes
+- Maintains a configurable history (default: 1000 states)
+- Only tracks successfully executed instructions
+- Has comprehensive test coverage for all RV32I instructions
+
+See `docs/specs/UNDO_REDO_SPEC.md` for the implementation specification.
+
+### REPL Usability
 
 **Status**: Completed based on user feedback from hands-on testing
 
@@ -167,7 +190,7 @@ Tests have been reorganized into a structured hierarchy under the `tests/` direc
 
 **Total Test Count**: 350+ tests across unit, integration, and comprehensive test suites.
 
-For detailed testing goals and coverage status, see `TESTING_GOALS.md` and `tests/TEST_COVERAGE.md`.
+For detailed testing goals and coverage status, see `docs/specs/TESTING_GOALS.md` and `tests/TEST_COVERAGE.md`.
 
 ## Implementing New Instructions
 

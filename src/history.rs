@@ -87,6 +87,11 @@ impl HistoryManager {
     
     /// Adds a new state snapshot to history
     pub fn push(&mut self, snapshot: StateSnapshot) {
+        // If undo limit is 0, history is disabled
+        if self.max_history == 0 {
+            return;
+        }
+        
         // If we're not at the latest position, we need to clear redo history
         if self.current_position >= 0 && self.current_position < (self.history.len() - 1) as isize {
             // Remove everything after current position

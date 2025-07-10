@@ -20,6 +20,11 @@ include = ["**/*.rs", "Cargo.toml"]
 version = "0.27"
 optional = true
 
+[dependencies.clap]
+version = "4.5"
+features = ["derive"]
+optional = true
+
 [features]
 default = ["repl"]
-repl = ["crossterm"]
+repl = ["crossterm", "clap"]

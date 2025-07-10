@@ -53,11 +53,56 @@ impl Interpreter {
             history: HistoryManager::new(1000), // Default history size
         }
     }
+    
+    /// Creates a new Interpreter with custom configuration
+    #[cfg(feature = "repl")]
+    pub fn with_config(config: crate::cli::Config) -> Self {
+        Self {
+            cpu: CPU::new(config.memory_size),
+            history: HistoryManager::new(config.undo_limit),
+        }
+    }
+    
+    /// Returns the configured memory size
+    #[cfg(feature = "repl")]
+    pub fn memory_size(&self) -> usize {
+        self.cpu.memory.len()
+    }
 
     /// Interprets a single command, which could be an instruction (eg: `ADDI x1, zero, 3`) or an
     /// inspection for registers (eg: `PC` or `X1`). Returns a String representation of the 
     /// result or an Error.
+    /// 
+    /// Supports semicolon-separated commands for batch execution.
     pub fn interpret(&mut self, input: &str) -> Result<String, Error> {
+        // Check if input contains semicolons
+        if input.contains(';') {
+            // Split by semicolons and execute each command
+            let mut results = Vec::new();
+            
+            #[cfg(feature = "repl")]
+            let commands = crate::cli::split_commands(input);
+            #[cfg(not(feature = "repl"))]
+            let commands: Vec<&str> = input.split(';')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .collect();
+            
+            for command in commands {
+                match self.interpret_single(command) {
+                    Ok(result) => results.push(result),
+                    Err(e) => return Err(e), // Stop on first error
+                }
+            }
+            
+            Ok(results.join("\n"))
+        } else {
+            self.interpret_single(input)
+        }
+    }
+    
+    /// Interprets a single command (no semicolons)
+    fn interpret_single(&mut self, input: &str) -> Result<String, Error> {
         let command = parse(input)?;
         self.run_command(command)
     }

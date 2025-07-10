@@ -1,6 +1,13 @@
 use brubeck::interpreter::Interpreter;
 
 use std::io::{self, BufRead, Write};
+use std::fs;
+
+#[cfg(feature = "repl")]
+use brubeck::cli::{Cli, ExecutionMode, should_show_banner};
+
+#[cfg(feature = "repl")]
+use clap::Parser;
 
 #[cfg(feature = "repl")]
 use crossterm::{
@@ -10,24 +17,59 @@ use crossterm::{
 };
 
 fn main() -> io::Result<()> {
-    let mut interpreter = Interpreter::new();
-    
-    // Check if stdin is a terminal (interactive mode) or pipe
     #[cfg(feature = "repl")]
-    let is_interactive = io::stdin().is_tty();
-    #[cfg(not(feature = "repl"))]
-    let is_interactive = true; // Assume interactive if crossterm not available
+    {
+        // Parse command-line arguments
+        let cli = Cli::parse();
+        
+        // Create interpreter with configuration
+        let config = cli.to_config()
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
+        let mut interpreter = Interpreter::with_config(config);
+        
+        // Determine execution mode
+        match cli.execution_mode() {
+            ExecutionMode::Execute => {
+                let commands = cli.execute.unwrap();
+                run_execute_mode(&mut interpreter, &commands, cli.verbose)
+            }
+            ExecutionMode::Script => {
+                let path = cli.script.unwrap();
+                run_script_mode(&mut interpreter, &path, cli.verbose)
+            }
+            ExecutionMode::Interactive => {
+                // Check if stdin is a terminal (interactive mode) or pipe
+                let is_interactive = io::stdin().is_tty();
+                
+                if is_interactive {
+                    run_interactive(&mut interpreter, cli.quiet)
+                } else {
+                    run_batch(&mut interpreter)
+                }
+            }
+        }
+    }
     
-    if is_interactive {
-        run_interactive(&mut interpreter)
-    } else {
-        run_batch(&mut interpreter)
+    #[cfg(not(feature = "repl"))]
+    {
+        let mut interpreter = Interpreter::new();
+        run_interactive(&mut interpreter, false)
     }
 }
 
-fn run_interactive(interpreter: &mut Interpreter) -> io::Result<()> {
-    println!("Brubeck: A RISC-V REPL");
-    println!("Ctrl-C to quit\n");
+fn run_interactive(interpreter: &mut Interpreter, quiet: bool) -> io::Result<()> {
+    // Only show banner if not in quiet mode
+    #[cfg(feature = "repl")]
+    if !quiet && should_show_banner(ExecutionMode::Interactive) && io::stdin().is_tty() {
+        println!("Brubeck: A RISC-V REPL");
+        println!("Ctrl-C to quit\n");
+    }
+    
+    #[cfg(not(feature = "repl"))]
+    if !quiet {
+        println!("Brubeck: A RISC-V REPL");
+        println!("Ctrl-C to quit\n");
+    }
 
     loop {
         // Show PC address prompt
@@ -42,7 +84,7 @@ fn run_interactive(interpreter: &mut Interpreter) -> io::Result<()> {
             continue;
         }
 
-        execute_and_print(interpreter, &buffer, true)?;
+        execute_and_print(interpreter, &buffer, true, quiet, false)?;
     }
 }
 
@@ -58,30 +100,50 @@ fn run_batch(interpreter: &mut Interpreter) -> io::Result<()> {
             continue;
         }
         
-        execute_and_print(interpreter, &line, false)?;
+        execute_and_print(interpreter, &line, false, false, false)?;
     }
     
     Ok(())
 }
 
 #[cfg(feature = "repl")]
-fn execute_and_print(interpreter: &mut Interpreter, input: &str, use_color: bool) -> io::Result<()> {
-    // Check if this is a slash command
-    let is_slash_command = input.trim().starts_with('/');
+fn execute_and_print(interpreter: &mut Interpreter, input: &str, use_color: bool, quiet: bool, verbose: bool) -> io::Result<()> {
+    let trimmed = input.trim();
+    let is_slash_command = trimmed.starts_with('/');
+    let is_register_query = trimmed.len() <= 3 && (trimmed.starts_with('x') || trimmed.starts_with('X') || trimmed == "PC" || trimmed == "pc");
+    let is_explicit_output = is_slash_command || is_register_query;
+    
+    // Store PC before execution for verbose mode
+    let pc_before = if verbose { Some(interpreter.get_pc()) } else { None };
     
     match interpreter.interpret(input) {
         Ok(s) => {
-            if use_color && !is_slash_command {
-                let mut stdout = io::stdout();
-                stdout.execute(SetForegroundColor(Color::Green))?;
-                stdout.execute(Print("● "))?;
-                stdout.execute(ResetColor)?;
+            if use_color {  // Interactive REPL mode
+                if quiet && !is_explicit_output {
+                    // In quiet mode, only show explicit output
+                    return Ok(());
+                }
+                
+                if !is_slash_command {
+                    let mut stdout = io::stdout();
+                    stdout.execute(SetForegroundColor(Color::Green))?;
+                    stdout.execute(Print("● "))?;
+                    stdout.execute(ResetColor)?;
+                }
                 println!("{}", s);
-            } else if use_color && is_slash_command {
-                // Slash commands: no dot prefix
-                println!("{}", s);
-            } else {
-                println!("OK: {}", s);
+            } else {  // Script/execute mode
+                if verbose && !is_explicit_output {
+                    // Show trace format: instruction # PC description
+                    if let Some(pc) = pc_before {
+                        println!("{:<20} # 0x{:08x} {}", trimmed, pc, s);
+                    } else {
+                        println!("{:<20} # {}", trimmed, s);
+                    }
+                } else if is_explicit_output {
+                    // Always show explicit output
+                    println!("{}", s);
+                }
+                // Otherwise, silent (default script mode)
             }
         }
         Err(s) => {
@@ -101,10 +163,42 @@ fn execute_and_print(interpreter: &mut Interpreter, input: &str, use_color: bool
 }
 
 #[cfg(not(feature = "repl"))]
-fn execute_and_print(interpreter: &mut Interpreter, input: &str, _use_color: bool) -> io::Result<()> {
+fn execute_and_print(interpreter: &mut Interpreter, input: &str, _use_color: bool, _quiet: bool, _verbose: bool) -> io::Result<()> {
     match interpreter.interpret(input) {
-        Ok(s) => println!("OK: {}", s),
+        Ok(s) => println!("{}", s),  // No prefix in non-interactive mode
         Err(s) => eprintln!("ERROR: {}", s),
+    }
+    
+    Ok(())
+}
+
+#[cfg(feature = "repl")]
+fn run_execute_mode(interpreter: &mut Interpreter, commands: &str, verbose: bool) -> io::Result<()> {
+    use brubeck::cli::split_commands;
+    
+    // Split by semicolons and execute each command
+    for command in split_commands(commands) {
+        execute_and_print(interpreter, command, false, false, verbose)?;
+    }
+    
+    Ok(())
+}
+
+#[cfg(feature = "repl")]
+fn run_script_mode(interpreter: &mut Interpreter, path: &str, verbose: bool) -> io::Result<()> {
+    // Read the script file
+    let contents = fs::read_to_string(path)?;
+    
+    // Execute each line
+    for line in contents.lines() {
+        let line = line.trim();
+        
+        // Skip empty lines and comments
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        
+        execute_and_print(interpreter, line, false, false, verbose)?;
     }
     
     Ok(())

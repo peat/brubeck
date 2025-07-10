@@ -7,3 +7,7 @@ mod unit;
 #[cfg(feature = "repl")]
 #[path = "unit/history.rs"]
 mod history;
+
+#[cfg(feature = "repl")]
+#[path = "unit/cli.rs"]
+mod cli;

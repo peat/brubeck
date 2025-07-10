@@ -193,7 +193,7 @@ fn prop_multiple_undo_consistency() {
 ### Phase 1: Core Infrastructure
 1. Create `StateSnapshot` and `MemoryDelta` types
 2. Implement `HistoryManager` with ring buffer
-3. Write comprehensive unit tests
+3. Write unit tests
 4. Add state capture hooks to CPU
 
 ### Phase 2: Integration

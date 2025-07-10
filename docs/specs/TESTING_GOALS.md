@@ -1,6 +1,6 @@
 # Brubeck Testing Goals
 
-This document describes our aspirational testing strategy for Brubeck. It represents our "big hairy audacious goal" for comprehensive, educational testing that serves both correctness and learning.
+This document describes our aspirational testing strategy for Brubeck. It outlines our goals for thorough testing that serves both correctness and learning.
 
 ## Overview
 Brubeck is an educational RISC-V emulator designed to help users understand how the RISC-V ISA works. Our testing strategy prioritizes:
@@ -191,7 +191,7 @@ tests/
 
 ### Fuzzing
 - Random instruction generation
-- Parser fuzzing for robustness
+- Parser fuzzing for reliability
 - Memory access pattern fuzzing
 
 ### Educational Test Modes

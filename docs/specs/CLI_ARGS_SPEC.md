@@ -42,7 +42,7 @@ This document tracks the implementation of command-line argument parsing for Bru
 - [x] Add clap dependency to Cargo.toml
 - [x] Create CLI argument structure
 - [x] Implement memory size parser
-- [x] Write comprehensive tests
+- [x] Write tests
 - [x] Update main.rs to use CLI args
 - [x] Update Interpreter to accept configurable parameters
 - [x] Add semicolon support to parser

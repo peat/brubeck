@@ -1,6 +1,6 @@
 # Brubeck Project Status & Roadmap
 
-Last Updated: 2024-01-10
+Last Updated: 2025-07-10
 
 ## 🎯 Current Focus: REPL Usability Phase 2
 
@@ -11,7 +11,7 @@ Making Brubeck more beginner-friendly and educational based on user feedback.
 ### 🔴 High Priority (User Experience)
 
 #### 1. Rename Undo/Redo Commands ⏱️ ~2 hours
-**Status**: Not started  
+**Status**: ✅ Completed  
 **Why**: Current names imply "fixing mistakes" rather than "navigating history"  
 **Changes**:
 - `/undo` → `/previous` (aliases: `/prev`, `/p`)
@@ -60,17 +60,35 @@ Making Brubeck more beginner-friendly and educational based on user feedback.
 - Show PC, instruction, and effect
 - Alias: `/hist`
 
+#### 6. Review and Update README.md ⏱️ ~1 hour
+**Status**: Not started  
+**Why**: Ensure README accurately reflects current features and capabilities  
+**Tasks**:
+- Review for accuracy and clarity
+- Update features list
+- Ensure examples work
+- Remove outdated information
+
+#### 7. Remove Hype from Strings ⏱️ ~2 hours
+**Status**: Not started  
+**Why**: Make the project more professional and concise  
+**Tasks**:
+- Review all user-facing strings
+- Remove overstatements and excessive adjectives
+- Make error messages more concise
+- Focus on clarity over enthusiasm
+
 ### 🟢 Low Priority (Nice to Have)
 
-#### 6. Range Support
+#### 8. Range Support
 - `/regs x1-x5` - Show register range
 - `/memory 0x1000-0x2000` - Memory range syntax
 
-#### 7. Tab Completion
+#### 9. Tab Completion
 - Instructions, registers, commands
 - Context-aware suggestions
 
-#### 8. Command History
+#### 10. Command History
 - Up/down arrows for previous commands
 - Persistent across sessions
 

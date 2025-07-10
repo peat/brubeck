@@ -25,6 +25,9 @@ pub enum Command {
     /// Navigate to next state in history (REPL feature)
     #[cfg(feature = "repl")]
     Next,
+    /// Reset CPU state with confirmation (REPL feature)
+    #[cfg(feature = "repl")]
+    Reset,
 }
 
 /// Represents a token in the parsed assembly

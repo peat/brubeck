@@ -38,6 +38,8 @@ pub fn run_command(
         Command::Previous => handle_previous(interpreter),
         #[cfg(feature = "repl")]
         Command::Next => handle_next(interpreter),
+        #[cfg(feature = "repl")]
+        Command::Reset => handle_reset(interpreter),
     }
 }
 
@@ -222,4 +224,65 @@ fn handle_next(interpreter: &mut crate::interpreter::Interpreter) -> Result<Stri
     }
 
     Ok(format!("Navigated to next state: {}", snapshot.instruction))
+}
+
+/// Handles the /reset command
+///
+/// # Reset Operation
+///
+/// Prompts for confirmation then resets the entire CPU state:
+/// - All registers to 0
+/// - Program counter to 0
+/// - Memory cleared
+/// - History cleared
+#[cfg(feature = "repl")]
+fn handle_reset(interpreter: &mut crate::interpreter::Interpreter) -> Result<String, Error> {
+    use std::io::{self, Write};
+
+    // Print confirmation prompt
+    print!("Reset CPU? This will clear all registers, memory, and history. (y/N): ");
+    io::stdout()
+        .flush()
+        .map_err(|e| Error::Generic(format!("Failed to flush stdout: {e}")))?;
+
+    // Read user input
+    let mut input = String::new();
+    io::stdin()
+        .read_line(&mut input)
+        .map_err(|e| Error::Generic(format!("Failed to read input: {e}")))?;
+
+    // Check if user confirmed
+    let confirmed = input.trim().eq_ignore_ascii_case("y");
+
+    if confirmed {
+        // Reset CPU state
+        let cpu = interpreter.cpu_mut();
+
+        // Reset all registers to 0
+        for i in 0..32 {
+            cpu.set_register(crate::rv32_i::Register::from_u32(i), 0);
+        }
+
+        // Reset PC
+        cpu.pc = 0;
+
+        // Clear memory
+        cpu.memory.fill(0);
+
+        // Clear CSRs to their initial state
+        cpu.csrs = [0; 4096];
+        cpu.csr_exists = [false; 4096];
+        cpu.csr_readonly = [false; 4096];
+        cpu.init_csrs();
+
+        // Clear tracking
+        cpu.clear_tracking();
+
+        // Clear history
+        interpreter.history_mut().clear();
+
+        Ok("CPU state reset".to_string())
+    } else {
+        Ok("Reset cancelled".to_string())
+    }
 }

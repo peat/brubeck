@@ -83,6 +83,8 @@ pub fn parse(input: &str) -> Result<Command, Error> {
                 "/PREVIOUS" | "/PREV" | "/P" => Ok(Command::Previous),
                 #[cfg(feature = "repl")]
                 "/NEXT" | "/N" => Ok(Command::Next),
+                #[cfg(feature = "repl")]
+                "/RESET" => Ok(Command::Reset),
                 _ => Err(Error::Generic(format!("Unknown command: {first_word}"))),
             };
         }

@@ -321,6 +321,7 @@ Other Commands:
   /h, /help        Show this help message
   /p, /prev, /previous  Navigate to previous state in history
   /n, /next        Navigate to next state in history
+  /reset           Reset CPU state (with confirmation)
   
 Examples:
   ADDI x1, x0, 42  # Load 42 into x1

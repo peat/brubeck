@@ -149,4 +149,10 @@ impl HistoryManager {
     pub fn current_position(&self) -> isize {
         self.current_position
     }
+
+    /// Clears all history
+    pub fn clear(&mut self) {
+        self.history.clear();
+        self.current_position = -1;
+    }
 }

@@ -180,13 +180,15 @@ We have implemented significant REPL usability improvements to make Brubeck more
 - **Direct register inspection removed**: Must use `/regs x1` instead of `x1`
 - **Flexible syntax**: `/regs x1 x2 sp` shows specific registers
 
-### Still Planned
-- **`/memory` command**: View memory contents for debugging
-- **`/reset` command**: Reset CPU state with confirmation
-- **Command renaming**: Change `/undo`→`/previous` and `/redo`→`/next`
-- **Enhanced error messages**: More educational context
+### Current Development
 
-See `TODO_PHASE2.md` for the roadmap and `REPL_USABILITY_FEEDBACK.md` for the original analysis.
+See `PROJECT_STATUS.md` for the consolidated task list and roadmap.
+
+Key priorities:
+1. Rename history navigation commands for clarity
+2. Add `/memory` command for debugging
+3. Add `/reset` command with safety confirmation
+4. Enhance error messages with educational content
 
 ## Testing Approach
 

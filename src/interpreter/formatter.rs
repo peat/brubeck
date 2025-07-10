@@ -317,6 +317,11 @@ Register Inspection:
   /r, /regs        Show all registers
   /r <regs...>     Show specific registers (e.g., /r x1 x2 sp)
   
+Memory Inspection:
+  /m, /memory      Show 64 bytes around PC
+  /m <addr>        Show 64 bytes at address
+  /m <start> <end> Show memory range (max 256 bytes)
+  
 Other Commands:
   /h, /help        Show this help message
   /p, /prev, /previous  Navigate to previous state in history
@@ -329,6 +334,83 @@ Examples:
   /r x1 x2 x3      # Show x1, x2, and x3
   /p               # Go to previous state"#
         .to_string()
+}
+
+/// Formats memory contents for display
+///
+/// Shows memory in hex format with ASCII representation:
+/// ```text
+/// 0x00001000: 48 65 6c 6c 6f 20 57 6f | 72 6c 64 21 00 00 00 00  Hello World!....
+/// ```
+pub fn format_memory(cpu: &CPU, start: Option<u32>, end: Option<u32>) -> String {
+    let mut output = String::new();
+
+    // Determine the range to display
+    let (start_addr, end_addr) = match (start, end) {
+        (None, None) => {
+            // Show 64 bytes around PC (32 before, 32 after)
+            let pc = cpu.pc;
+            let start = pc.saturating_sub(32) & !0xF; // Align to 16-byte boundary
+            let end = start + 64;
+            (start, end.min(cpu.memory.len() as u32))
+        }
+        (Some(addr), None) => {
+            // Show 64 bytes starting at address
+            let start = addr & !0xF; // Align to 16-byte boundary
+            let end = start + 64;
+            (start, end.min(cpu.memory.len() as u32))
+        }
+        (Some(start), Some(end)) => {
+            // Show specified range
+            let start = start & !0xF; // Align to 16-byte boundary
+            let end = ((end + 15) & !0xF).min(cpu.memory.len() as u32); // Round up to 16-byte boundary
+            (start, end)
+        }
+        (None, Some(_)) => unreachable!(), // Parser prevents this
+    };
+
+    // Display memory in 16-byte rows
+    let mut addr = start_addr;
+    while addr < end_addr {
+        output.push_str(&format!("0x{addr:08x}: "));
+
+        // Hex bytes
+        let mut ascii = String::new();
+        for i in 0..16 {
+            if addr + i < end_addr && (addr + i) < cpu.memory.len() as u32 {
+                let byte = cpu.memory[(addr + i) as usize];
+                output.push_str(&format!("{byte:02x} "));
+
+                // ASCII representation
+                if (0x20..=0x7E).contains(&byte) {
+                    ascii.push(byte as char);
+                } else {
+                    ascii.push('.');
+                }
+            } else {
+                output.push_str("   "); // Pad if beyond memory
+                ascii.push(' ');
+            }
+
+            // Add separator in the middle
+            if i == 7 {
+                output.push_str("| ");
+            }
+        }
+
+        // Add ASCII representation
+        output.push_str(&format!(" {ascii}\n"));
+
+        addr += 16;
+    }
+
+    // Add current PC indicator if it's in the displayed range
+    if cpu.pc >= start_addr && cpu.pc < end_addr {
+        let pc = cpu.pc;
+        output.push_str(&format!("Current PC: 0x{pc:08x}\n"));
+    }
+
+    output
 }
 
 /// Gets the ABI name for a register

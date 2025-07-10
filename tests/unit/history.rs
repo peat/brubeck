@@ -56,9 +56,18 @@ mod history_manager {
         }
 
         // Undo all three
-        assert_eq!(history.go_previous().unwrap().instruction, "ADDI x3, x0, 12");
-        assert_eq!(history.go_previous().unwrap().instruction, "ADDI x2, x0, 11");
-        assert_eq!(history.go_previous().unwrap().instruction, "ADDI x1, x0, 10");
+        assert_eq!(
+            history.go_previous().unwrap().instruction,
+            "ADDI x3, x0, 12"
+        );
+        assert_eq!(
+            history.go_previous().unwrap().instruction,
+            "ADDI x2, x0, 11"
+        );
+        assert_eq!(
+            history.go_previous().unwrap().instruction,
+            "ADDI x1, x0, 10"
+        );
         assert!(history.go_previous().is_none());
 
         // Redo all three

@@ -40,6 +40,10 @@ pub fn run_command(
         Command::Next => handle_next(interpreter),
         #[cfg(feature = "repl")]
         Command::Reset => handle_reset(interpreter),
+        #[cfg(feature = "repl")]
+        Command::ShowMemory { start, end } => {
+            Ok(formatter::format_memory(interpreter.cpu(), start, end))
+        }
     }
 }
 

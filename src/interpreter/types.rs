@@ -28,6 +28,14 @@ pub enum Command {
     /// Reset CPU state with confirmation (REPL feature)
     #[cfg(feature = "repl")]
     Reset,
+    /// Show memory contents (REPL feature)
+    #[cfg(feature = "repl")]
+    ShowMemory {
+        /// Starting address (None means around PC)
+        start: Option<u32>,
+        /// End address (for range display)
+        end: Option<u32>,
+    },
 }
 
 /// Represents a token in the parsed assembly

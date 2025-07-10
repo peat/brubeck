@@ -481,3 +481,82 @@ fn test_parse_navigation_commands() {
         }
     }
 }
+
+#[test]
+#[cfg(feature = "repl")]
+fn test_parse_memory_command() {
+    let mut i = Interpreter::new();
+
+    // Test /memory with no arguments (around PC)
+    let result = i.interpret("/memory");
+    assert!(result.is_ok(), "Should recognize /memory command");
+    assert!(result.unwrap().contains("0x00000000:")); // PC starts at 0
+
+    // Test /m alias
+    let result = i.interpret("/m");
+    assert!(result.is_ok(), "Should recognize /m alias");
+
+    // Test /memory with single address
+    let result = i.interpret("/memory 0x1000");
+    assert!(result.is_ok(), "Should accept memory address");
+    assert!(result.unwrap().contains("0x00001000:"));
+
+    // Test /memory with hex address
+    let result = i.interpret("/m 0xFF00");
+    assert!(result.is_ok(), "Should accept hex address");
+    assert!(result.unwrap().contains("0x0000ff00:"));
+
+    // Test /memory with range
+    let result = i.interpret("/memory 0x100 0x180");
+    assert!(result.is_ok(), "Should accept memory range");
+    let output = result.unwrap();
+    assert!(output.contains("0x00000100:"));
+    assert!(output.contains("0x00000170:")); // Should show up to 0x180
+
+    // Test error cases
+    let result = i.interpret("/memory invalid");
+    assert!(result.is_err(), "Should reject invalid address");
+
+    let result = i.interpret("/memory 0x200 0x100");
+    assert!(result.is_err(), "Should reject reversed range");
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("End address must be greater"));
+
+    let result = i.interpret("/memory 0x0 0x200");
+    assert!(result.is_err(), "Should reject too large range");
+    assert!(result.unwrap_err().to_string().contains("max 256 bytes"));
+
+    let result = i.interpret("/memory 0x100 0x200 0x300");
+    assert!(result.is_err(), "Should reject too many arguments");
+}
+
+#[test]
+#[cfg(feature = "repl")]
+fn test_memory_display_with_data() {
+    let mut i = Interpreter::new();
+
+    // Store some data in memory
+    i.interpret("ADDI x1, x0, 0x100").unwrap(); // Base address
+    i.interpret("ADDI x2, x0, 72").unwrap(); // ASCII 'H'
+    i.interpret("SB x2, 0(x1)").unwrap();
+    i.interpret("ADDI x2, x0, 101").unwrap(); // ASCII 'e'
+    i.interpret("SB x2, 1(x1)").unwrap();
+    i.interpret("ADDI x2, x0, 108").unwrap(); // ASCII 'l'
+    i.interpret("SB x2, 2(x1)").unwrap();
+    i.interpret("SB x2, 3(x1)").unwrap(); // Another 'l'
+    i.interpret("ADDI x2, x0, 111").unwrap(); // ASCII 'o'
+    i.interpret("SB x2, 4(x1)").unwrap();
+
+    // Check memory display
+    let result = i.interpret("/memory 0x100");
+    assert!(result.is_ok());
+    let output = result.unwrap();
+
+    // Should show hex bytes
+    assert!(output.contains("48 65 6c 6c 6f")); // "Hello" in hex
+
+    // Should show ASCII representation
+    assert!(output.contains("Hello"));
+}

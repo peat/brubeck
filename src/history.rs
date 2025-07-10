@@ -25,6 +25,12 @@ pub struct StateSnapshot {
     /// PC value BEFORE execution
     pub pc: u32,
     
+    /// Register values AFTER execution (for redo)
+    pub registers_after: [u32; 32],
+    
+    /// PC value AFTER execution (for redo)
+    pub pc_after: u32,
+    
     /// CSR changes: (address, old_value, new_value)
     pub csr_changes: Vec<(u32, u32, u32)>,
     
@@ -37,9 +43,9 @@ impl StateSnapshot {
     pub fn capture_changes(
         instruction: &str,
         old_registers: &[u32; 32],
-        _new_registers: &[u32; 32],
+        new_registers: &[u32; 32],
         old_pc: u32,
-        _new_pc: u32,
+        new_pc: u32,
         csr_changes: Vec<(u32, u32, u32)>,
         memory_changes: Vec<MemoryDelta>,
     ) -> Self {
@@ -47,6 +53,8 @@ impl StateSnapshot {
             instruction: instruction.to_string(),
             registers: *old_registers,
             pc: old_pc,
+            registers_after: *new_registers,
+            pc_after: new_pc,
             csr_changes,
             memory_changes,
         }

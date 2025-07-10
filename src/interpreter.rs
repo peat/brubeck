@@ -29,9 +29,19 @@ use std::fmt::Display;
 
 use crate::rv32_i::{BType, IType, Instruction, JType, PseudoInstruction, RType, Register, SType, UType, ABI, CPU};
 
-#[derive(Default)]
+#[cfg(feature = "repl")]
+use crate::history::{HistoryManager, StateSnapshot};
+
 pub struct Interpreter {
     cpu: CPU,
+    #[cfg(feature = "repl")]
+    history: HistoryManager,
+}
+
+impl Default for Interpreter {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Interpreter {
@@ -39,6 +49,8 @@ impl Interpreter {
     pub fn new() -> Self {
         Self {
             cpu: CPU::default(), // initializes with 1 mebibyte of memory
+            #[cfg(feature = "repl")]
+            history: HistoryManager::new(1000), // Default history size
         }
     }
 
@@ -52,8 +64,51 @@ impl Interpreter {
 
     /// Executes an [Instruction] directly, skipping the parsing steps.
     pub fn execute(&mut self, instruction: Instruction) -> Result<String, Error> {
+        self.execute_with_tracking(instruction, None)
+    }
+    
+    /// Internal method that executes with state tracking
+    fn execute_with_tracking(
+        &mut self, 
+        instruction: Instruction,
+        display_name: Option<String>
+    ) -> Result<String, Error> {
+        // Capture state before execution (only if REPL feature is enabled)
+        #[cfg(feature = "repl")]
+        let (old_registers, old_pc, instruction_text) = {
+            self.cpu.clear_tracking();
+            let regs = self.cpu.get_all_registers();
+            let pc = self.cpu.pc;
+            // Use provided display name or generate one
+            let text = display_name.unwrap_or_else(|| {
+                // Use the mnemonic for the instruction
+                instruction.mnemonic().to_string()
+            });
+            (regs, pc, text)
+        };
+        
+        // Execute the instruction
         match self.cpu.execute(instruction) {
-            Ok(()) => Ok(self.humanize_instruction(instruction)),
+            Ok(()) => {
+                // Capture state after successful execution
+                #[cfg(feature = "repl")]
+                {
+                    let new_registers = self.cpu.get_all_registers();
+                    let new_pc = self.cpu.pc;
+                    let snapshot = StateSnapshot {
+                        instruction: instruction_text,
+                        registers: old_registers,
+                        pc: old_pc,
+                        registers_after: new_registers,
+                        pc_after: new_pc,
+                        csr_changes: self.cpu.csr_changes.clone(),
+                        memory_changes: self.cpu.memory_changes.clone(),
+                    };
+                    self.history.push(snapshot);
+                }
+                
+                Ok(self.humanize_instruction(instruction))
+            }
             e => Err(Error::Generic(format!("{e:?}"))),
         }
     }
@@ -180,6 +235,10 @@ impl Interpreter {
             Command::ShowRegs => Ok(self.show_registers()),
             Command::ShowSpecificRegs(regs) => Ok(self.show_specific_registers(regs)),
             Command::ShowHelp => Ok(self.show_help()),
+            #[cfg(feature = "repl")]
+            Command::Undo => self.handle_undo(),
+            #[cfg(feature = "repl")]
+            Command::Redo => self.handle_redo(),
         }
     }
 
@@ -311,15 +370,19 @@ Number formats:
         &mut self,
         pseudo: PseudoInstruction,
     ) -> Result<String, Error> {
+        // Get a nice display name for the pseudo-instruction
+        let pseudo_name = format!("{pseudo:?}"); // We'll improve this later
+        
         let instructions = pseudo
             .expand()
             .map_err(|e| Error::Generic(format!("Failed to expand pseudo-instruction: {e}")))?;
 
         let mut results = Vec::new();
         for inst in instructions {
-            match self.cpu.execute(inst) {
-                Ok(()) => results.push(self.humanize_instruction(inst)),
-                Err(e) => return Err(Error::Generic(format!("{e:?}"))),
+            // Execute with the pseudo-instruction name for history
+            match self.execute_with_tracking(inst, Some(pseudo_name.clone())) {
+                Ok(result) => results.push(result),
+                Err(e) => return Err(e),
             }
         }
 
@@ -337,6 +400,56 @@ Number formats:
     pub fn get_pc(&self) -> u32 {
         self.cpu.pc
     }
+    
+    /// Handles the /undo command
+    #[cfg(feature = "repl")]
+    fn handle_undo(&mut self) -> Result<String, Error> {
+        match self.history.undo() {
+            Some(snapshot) => {
+                // Restore CPU state
+                self.cpu.set_all_registers(&snapshot.registers);
+                self.cpu.pc = snapshot.pc;
+                
+                // Restore memory changes
+                self.cpu.restore_memory(&snapshot.memory_changes);
+                
+                // Restore CSR changes
+                self.cpu.restore_csrs(&snapshot.csr_changes);
+                
+                Ok(format!("Undid: {}", snapshot.instruction))
+            }
+            None => Err(Error::Generic("Nothing to undo".to_string())),
+        }
+    }
+    
+    /// Handles the /redo command
+    #[cfg(feature = "repl")]
+    fn handle_redo(&mut self) -> Result<String, Error> {
+        match self.history.redo() {
+            Some(snapshot) => {
+                // Restore to the state AFTER the instruction
+                self.cpu.set_all_registers(&snapshot.registers_after);
+                self.cpu.pc = snapshot.pc_after;
+                
+                // Apply the memory changes
+                for delta in &snapshot.memory_changes {
+                    if (delta.address as usize) < self.cpu.memory.len() {
+                        self.cpu.memory[delta.address as usize] = delta.new_value;
+                    }
+                }
+                
+                // Apply the CSR changes
+                for &(addr, _old_val, new_val) in &snapshot.csr_changes {
+                    if self.cpu.csr_exists[addr as usize] && !self.cpu.csr_readonly[addr as usize] {
+                        self.cpu.csrs[addr as usize] = new_val;
+                    }
+                }
+                
+                Ok(format!("Redid: {}", snapshot.instruction))
+            }
+            None => Err(Error::Generic("Nothing to redo".to_string())),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -347,6 +460,10 @@ pub enum Command {
     ShowRegs,
     ShowSpecificRegs(Vec<Register>),
     ShowHelp,
+    #[cfg(feature = "repl")]
+    Undo,
+    #[cfg(feature = "repl")]
+    Redo,
 }
 
 #[derive(Debug, PartialEq)]
@@ -514,6 +631,10 @@ fn parse(input: &str) -> Result<Command, Error> {
                     }
                 },
                 "/HELP" | "/H" => Ok(Command::ShowHelp),
+                #[cfg(feature = "repl")]
+                "/UNDO" | "/U" => Ok(Command::Undo),
+                #[cfg(feature = "repl")]
+                "/REDO" => Ok(Command::Redo),
                 _ => Err(Error::Generic(format!("Unknown command: {first_word}"))),
             };
         }

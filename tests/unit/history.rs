@@ -20,6 +20,8 @@ mod history_manager {
             instruction: "ADDI x1, x0, 42".to_string(),
             registers: [0; 32],
             pc: 0,
+            registers_after: [0; 32],
+            pc_after: 4,
             csr_changes: vec![],
             memory_changes: vec![],
         };
@@ -45,6 +47,8 @@ mod history_manager {
                 instruction: format!("ADDI x{}, x0, {}", i+1, i+10),
                 registers: [0; 32],
                 pc: i * 4,
+                registers_after: [0; 32],
+                pc_after: (i + 1) * 4,
                 csr_changes: vec![],
                 memory_changes: vec![],
             };
@@ -74,6 +78,8 @@ mod history_manager {
                 instruction: format!("Instruction {}", i),
                 registers: [0; 32],
                 pc: i * 4,
+                registers_after: [0; 32],
+                pc_after: (i + 1) * 4,
                 csr_changes: vec![],
                 memory_changes: vec![],
             };
@@ -96,6 +102,8 @@ mod history_manager {
             instruction: "First".to_string(),
             registers: [0; 32],
             pc: 0,
+            registers_after: [0; 32],
+            pc_after: 4,
             csr_changes: vec![],
             memory_changes: vec![],
         });
@@ -104,6 +112,8 @@ mod history_manager {
             instruction: "Second".to_string(),
             registers: [0; 32],
             pc: 4,
+            registers_after: [0; 32],
+            pc_after: 8,
             csr_changes: vec![],
             memory_changes: vec![],
         });
@@ -119,6 +129,8 @@ mod history_manager {
             instruction: "Third".to_string(),
             registers: [0; 32],
             pc: 8,
+            registers_after: [0; 32],
+            pc_after: 12,
             csr_changes: vec![],
             memory_changes: vec![],
         });
@@ -176,6 +188,8 @@ mod state_capture {
             instruction: "SB x1, 0(x2)".to_string(),
             registers: [0; 32],
             pc: 0,
+            registers_after: [0; 32],
+            pc_after: 4,
             csr_changes: vec![],
             memory_changes: memory_changes.clone(),
         };
@@ -195,6 +209,8 @@ mod state_capture {
             instruction: "CSRRW x1, mscratch, x2".to_string(),
             registers: [0; 32],
             pc: 0,
+            registers_after: [0; 32],
+            pc_after: 4,
             csr_changes,
             memory_changes: vec![],
         };
@@ -210,6 +226,8 @@ mod state_capture {
             instruction: "JAL x1, 0x100".to_string(),
             registers: [0; 32],
             pc: 0x1000,  // PC before the jump
+            registers_after: [0; 32],
+            pc_after: 0x1100,  // PC after the jump
             csr_changes: vec![],
             memory_changes: vec![],
         };
@@ -234,6 +252,8 @@ mod state_restoration {
             instruction: "Test".to_string(),
             registers: [0; 32], // All zeros
             pc: 0,
+            registers_after: [0; 32],
+            pc_after: 4,
             csr_changes: vec![],
             memory_changes: vec![],
         };
@@ -257,6 +277,8 @@ mod state_restoration {
             instruction: "Test".to_string(),
             registers: [0; 32],
             pc: 0,
+            registers_after: [0; 32],
+            pc_after: 4,
             csr_changes: vec![],
             memory_changes,
         };
@@ -276,6 +298,8 @@ mod state_restoration {
             instruction: "Test".to_string(),
             registers: [0; 32],
             pc: 0,
+            registers_after: [0; 32],
+            pc_after: 4,
             csr_changes,
             memory_changes: vec![],
         };
@@ -295,6 +319,8 @@ mod state_restoration {
             instruction: "Complex instruction".to_string(),
             registers,
             pc: 0x2000,
+            registers_after: registers,
+            pc_after: 0x2004,
             csr_changes: vec![(0x340, 0x1111, 0x2222)],
             memory_changes: vec![
                 MemoryDelta {

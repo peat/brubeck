@@ -63,6 +63,12 @@ pub struct CPU {
     pub csrs: [u32; 4096],          // CSR values indexed by address
     pub csr_exists: [bool; 4096],   // Which CSR addresses are implemented
     pub csr_readonly: [bool; 4096], // Which CSRs are read-only
+    
+    // State tracking for undo/redo (only when REPL feature is enabled)
+    #[cfg(feature = "repl")]
+    pub memory_changes: Vec<crate::history::MemoryDelta>,
+    #[cfg(feature = "repl")]
+    pub csr_changes: Vec<(u32, u32, u32)>, // (address, old_value, new_value)
 }
 
 impl Default for CPU {
@@ -115,6 +121,10 @@ impl CPU {
             csrs: [0; 4096],
             csr_exists: [false; 4096],
             csr_readonly: [false; 4096],
+            #[cfg(feature = "repl")]
+            memory_changes: Vec::new(),
+            #[cfg(feature = "repl")]
+            csr_changes: Vec::new(),
         };
         
         // Initialize standard CSRs
@@ -294,6 +304,12 @@ impl CPU {
             }
             _ => value,
         };
+        
+        // Track CSR change if needed
+        #[cfg(feature = "repl")]
+        if legal_value != old_value {
+            self.csr_changes.push((addr as u32, old_value, legal_value));
+        }
         
         self.csrs[addr as usize] = legal_value;
         Ok(old_value)
@@ -1000,7 +1016,21 @@ impl CPU {
 
         for (byte_index, byte) in src.to_le_bytes().into_iter().enumerate() {
             if byte_index < bytes {
-                self.memory[index] = byte;
+                #[cfg(feature = "repl")]
+                {
+                    // Track the memory change
+                    let old_value = self.memory[index];
+                    self.memory[index] = byte;
+                    self.memory_changes.push(crate::history::MemoryDelta {
+                        address: index as u32,
+                        old_value,
+                        new_value: byte,
+                    });
+                }
+                #[cfg(not(feature = "repl"))]
+                {
+                    self.memory[index] = byte;
+                }
                 index += 1;
             }
         }
@@ -1279,6 +1309,83 @@ pub enum Error {
     EnvironmentCall,
     Breakpoint,
     IllegalInstruction(String),
+}
+
+impl CPU {
+    /// Gets all 32 registers as an array (for state capture)
+    #[cfg(feature = "repl")]
+    pub fn get_all_registers(&self) -> [u32; 32] {
+        [
+            self.x0, self.x1, self.x2, self.x3, self.x4, self.x5, self.x6, self.x7,
+            self.x8, self.x9, self.x10, self.x11, self.x12, self.x13, self.x14, self.x15,
+            self.x16, self.x17, self.x18, self.x19, self.x20, self.x21, self.x22, self.x23,
+            self.x24, self.x25, self.x26, self.x27, self.x28, self.x29, self.x30, self.x31,
+        ]
+    }
+    
+    /// Sets all 32 registers from an array (for state restoration)
+    #[cfg(feature = "repl")]
+    pub fn set_all_registers(&mut self, regs: &[u32; 32]) {
+        self.x0 = 0; // x0 is always zero
+        self.x1 = regs[1];
+        self.x2 = regs[2];
+        self.x3 = regs[3];
+        self.x4 = regs[4];
+        self.x5 = regs[5];
+        self.x6 = regs[6];
+        self.x7 = regs[7];
+        self.x8 = regs[8];
+        self.x9 = regs[9];
+        self.x10 = regs[10];
+        self.x11 = regs[11];
+        self.x12 = regs[12];
+        self.x13 = regs[13];
+        self.x14 = regs[14];
+        self.x15 = regs[15];
+        self.x16 = regs[16];
+        self.x17 = regs[17];
+        self.x18 = regs[18];
+        self.x19 = regs[19];
+        self.x20 = regs[20];
+        self.x21 = regs[21];
+        self.x22 = regs[22];
+        self.x23 = regs[23];
+        self.x24 = regs[24];
+        self.x25 = regs[25];
+        self.x26 = regs[26];
+        self.x27 = regs[27];
+        self.x28 = regs[28];
+        self.x29 = regs[29];
+        self.x30 = regs[30];
+        self.x31 = regs[31];
+    }
+    
+    /// Clears the tracking vectors (call before each instruction)
+    #[cfg(feature = "repl")]
+    pub fn clear_tracking(&mut self) {
+        self.memory_changes.clear();
+        self.csr_changes.clear();
+    }
+    
+    /// Restores memory from a set of deltas (for undo)
+    #[cfg(feature = "repl")]
+    pub fn restore_memory(&mut self, deltas: &[crate::history::MemoryDelta]) {
+        for delta in deltas {
+            if (delta.address as usize) < self.memory.len() {
+                self.memory[delta.address as usize] = delta.old_value;
+            }
+        }
+    }
+    
+    /// Restores CSRs from a set of changes (for undo)
+    #[cfg(feature = "repl")]
+    pub fn restore_csrs(&mut self, changes: &[(u32, u32, u32)]) {
+        for &(addr, old_value, _new_value) in changes {
+            if (addr as usize) < 4096 && self.csr_exists[addr as usize] {
+                self.csrs[addr as usize] = old_value;
+            }
+        }
+    }
 }
 
 #[cfg(test)]

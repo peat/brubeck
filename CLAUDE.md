@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Important Instructions
+
+1. **Always use PROJECT_STATUS.md** to track current work and planned tasks. Do not create multiple tracking files - consolidate everything in PROJECT_STATUS.md.
+2. **Always write comprehensive tests first** before implementing new features or making changes. Follow TDD (Test-Driven Development) practices.
+
 ## Project Overview
 
 Brubeck is a RISC-V assembly language REPL and emulation library written in Rust. It implements the RV32I (32-bit integer) instruction set and provides both a library interface and an interactive REPL for executing RISC-V assembly instructions.
@@ -29,6 +34,7 @@ The implementation follows the official RISC-V ISA specification, available as A
 - `cargo fmt` - Format code according to Rust standards
 - `cargo clippy` - Run linter for code improvements
 - `cargo check` - Quick error check without building
+- `cargo clippy -- -D warnings` - Ensure no clippy warnings (CI requirement)
 
 ### Documentation
 - `cargo doc --open` - Generate and open documentation
@@ -46,37 +52,50 @@ The codebase is organized as both a library and binary application:
    - `registers.rs` - Register definitions with ABI names (x0-x31, zero, ra, sp, etc.)
    - `pseudo_instructions.rs` - RV32I-specific pseudo-instructions (MV, NOT, LI, etc.)
 
-2. **REPL Interface (`src/`)**
-   - `interpreter.rs` - Production-grade parser with comprehensive validation and educational error messages
-   - `bin/brubeck.rs` - Binary entry point for the REPL application
-   - `lib.rs` - Library entry point exposing public API
+2. **Interpreter System (`src/interpreter/`)** - Modular architecture for parsing and execution
+   - `parser.rs` (643 lines) - Four-phase parsing pipeline with educational error messages
+   - `builder.rs` (819 lines) - Instruction building and validation logic
+   - `executor.rs` (252 lines) - Command execution and state management
+   - `formatter.rs` (403 lines) - Human-readable output formatting
+   - `validator.rs` (174 lines) - Common validation functions
+   - `types.rs` (128 lines) - Shared types (Command, Token, Error)
+   - `interpreter.rs` (188 lines) - Main interpreter orchestration
 
-3. **Utilities**
+3. **REPL Infrastructure (`src/`)**
+   - `cli.rs` (232 lines) - Command-line argument parsing with clap
+   - `history.rs` (286 lines) - Undo/redo state management with delta compression
+   - `bin/brubeck.rs` (233 lines) - Binary entry point with terminal features
+   - `lib.rs` (30 lines) - Library entry point exposing public API
+   - `interpreter.rs` (188 lines) - Main interpreter orchestration
+
+4. **Utilities**
    - `immediate.rs` - Sign extension utilities for immediate values
 
 ### Key Design Patterns
 
 - The CPU struct maintains state with registers and memory
 - Instructions are decoded using pattern matching on opcode/funct3/funct7 fields
-- The interpreter handles both assembly instruction parsing and REPL commands
-- Comprehensive unit tests in `rv32_i/mod.rs` validate instruction implementations
+- The interpreter is split into focused modules for maintainability
+- Commands use `/` prefix to distinguish from instructions
+- Comprehensive unit tests validate all instruction implementations
 
 ### Parser Architecture (Teaching-Focused)
 
 The parser is designed as an educational resource demonstrating compiler front-end techniques:
 
-**Four-Phase Parsing Process:**
-1. **Normalize**: Clean input (whitespace, case conversion, punctuation)
-2. **Tokenize**: Convert strings to typed tokens (instructions, registers, values)
-3. **Build Commands**: Construct validated instruction objects
-4. **Execute**: Run instructions on the CPU emulator
+**Modular Architecture:**
+- **Parser Module**: Four-phase parsing (normalize → tokenize → build → execute)
+- **Builder Module**: Type-specific instruction builders with validation
+- **Executor Module**: Command dispatch and state tracking
+- **Formatter Module**: Human-readable output generation
+- **Validator Module**: Reusable validation logic
 
 **Educational Features:**
 - Comprehensive function documentation with examples
-- Helper functions demonstrating common compiler patterns
-- Rich error messages with contextual tips and RISC-V education
-- Comments explaining "why" behind design decisions
-- Single-file architecture for easy linear reading
+- Helper functions demonstrating compiler patterns
+- Rich error messages with contextual tips
+- Comments explaining design decisions
+- Clear module boundaries for learning
 
 **Validation & Error Handling:**
 - PC register protection (prevents misuse)
@@ -97,7 +116,9 @@ The parser is designed as an educational resource demonstrating compiler front-e
 - **Production-grade parser** with comprehensive validation and educational error messages
 - **Standard RISC-V assembly syntax**: Both `LW x1, 4(x2)` and legacy `LW x1, x2, 4` formats
 - **Robust validation**: PC register protection, immediate range checking, argument validation
-- **Memory**: 1 MiB address space with proper load/store operations
+- **Memory**: Configurable size (default 1 MiB) with proper load/store operations
+- **Command system**: `/regs`, `/help`, `/undo`, `/redo` with aliases
+- **CLI support**: Script files, one-liners, memory configuration
 
 ### Limitations
 
@@ -109,15 +130,15 @@ The parser is designed as an educational resource demonstrating compiler front-e
 
 **Status**: Completed - interpreter split into modular architecture
 
-The interpreter.rs file (previously 1785 lines) has been refactored into 6 focused modules:
+The interpreter.rs file (previously 1785 lines, now 188 lines) has been refactored into 6 focused modules:
 
 ### New Interpreter Architecture (`src/interpreter/`)
-- **`parser.rs`** (642 lines) - Complete parsing pipeline
-- **`builder.rs`** (725 lines) - Instruction building and validation
-- **`executor.rs`** (213 lines) - Command execution and state management
-- **`formatter.rs`** (370 lines) - Human-readable output formatting
-- **`validator.rs`** (72 lines) - Input validation functions
-- **`types.rs`** (140 lines) - Common types (Command, Token, Error)
+- **`parser.rs`** (643 lines) - Complete parsing pipeline
+- **`builder.rs`** (819 lines) - Instruction building and validation
+- **`executor.rs`** (252 lines) - Command execution and state management
+- **`formatter.rs`** (403 lines) - Human-readable output formatting
+- **`validator.rs`** (174 lines) - Input validation functions
+- **`types.rs`** (128 lines) - Common types (Command, Token, Error)
 
 ### Key Improvements
 - **Better separation of concerns**: Each module has a single responsibility
@@ -152,7 +173,7 @@ We have implemented a comprehensive undo/redo system for the REPL that:
 - Only tracks successfully executed instructions
 - Has comprehensive test coverage for all RV32I instructions
 
-See `docs/specs/UNDO_REDO_SPEC.md` for the implementation specification.
+Implementation uses `src/history.rs` for state management with efficient delta compression.
 
 ### REPL Usability
 
@@ -211,7 +232,7 @@ Tests have been reorganized into a structured hierarchy under the `tests/` direc
 
 **Total Test Count**: 350+ tests across unit, integration, and comprehensive test suites.
 
-For detailed testing goals and coverage status, see `docs/specs/TESTING_GOALS.md` and `tests/TEST_COVERAGE.md`.
+For test coverage details, see `tests/TEST_COVERAGE.md`.
 
 ## Implementing New Instructions
 
@@ -222,3 +243,46 @@ When adding new RISC-V instructions, follow the systematic process documented in
 - References to relevant specification sections
 
 The process ensures each instruction is correctly implemented across all layers: definition, decoding, execution, parsing, and testing.
+
+## Code Quality Requirements
+
+**IMPORTANT**: Before marking any task as complete, you MUST run the following commands to ensure code quality:
+
+1. `cargo fmt` - Format code according to Rust standards
+2. `cargo clippy -- -D warnings` - Ensure no clippy warnings
+3. `cargo test` - Run all tests to ensure nothing is broken
+
+Only proceed with marking a task complete if all three commands pass successfully. If any fail, fix the issues before continuing.
+
+## Git Workflow
+
+**IMPORTANT**: Follow these Git practices for all development work:
+
+1. **Commit frequently** - Make small, focused commits rather than large ones
+   - Easier to review and understand changes
+   - Simpler to cherry-pick specific changes
+   - Reduces merge conflicts with other contributors
+
+2. **Write clear commit messages** - Describe what changed and why
+
+3. **Use branches for larger features** - For tasks requiring multiple commits:
+   - Create a feature branch for the work
+   - Make regular commits as you progress
+   - Keep commits atomic and focused
+
+4. **Never commit without testing** - Always run `cargo fmt`, `cargo clippy`, and `cargo test` before committing
+
+Example workflow:
+```bash
+# After making a small, focused change
+cargo fmt
+cargo clippy -- -D warnings
+cargo test
+git add -p  # Review changes
+git commit -m "Add validation for CSR addresses"
+
+# For larger features
+git checkout -b feature/memory-inspection
+# ... make changes, commit frequently ...
+git push origin feature/memory-inspection
+```

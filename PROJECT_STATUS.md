@@ -92,6 +92,7 @@ Making Brubeck more beginner-friendly and educational based on user feedback.
 - Configurable history size
 - Event-based terminal input
 - Feature-gated in binary only
+- Future: persist to `.brubeck_history` in working directory
 
 #### 10. Tab Completion ⏱️ ~6 hours
 **Status**: Not started  

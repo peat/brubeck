@@ -82,13 +82,25 @@ Making Brubeck more beginner-friendly and educational based on user feedback.
 - `/regs x1-x5` - Show register range
 - `/memory 0x1000-0x2000` - Memory range syntax
 
-#### 9. Tab Completion
-- Instructions, registers, commands
-- Context-aware suggestions
+#### 9. Command History with Arrow Keys ⏱️ ~8 hours
+**Status**: Not started  
+**Why**: Essential REPL feature for productivity  
+**Specification**:
+- Up/down arrows navigate command history
+- Escape cancels browsing
+- Automatic deduplication
+- Configurable history size
+- Event-based terminal input
+- Feature-gated in binary only
 
-#### 10. Command History
-- Up/down arrows for previous commands
-- Persistent across sessions
+#### 10. Tab Completion ⏱️ ~6 hours
+**Status**: Not started  
+**Why**: Speeds up instruction entry and reduces typos  
+**Specification**:
+- Tab completes instructions, registers, commands
+- Context-aware (e.g., after "ADD" suggest registers)
+- Multiple matches show options
+- Feature-gated in binary only
 
 ## 📊 Progress Summary
 

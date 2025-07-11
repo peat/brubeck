@@ -180,35 +180,39 @@ impl Interpreter {
         let command = parser::parse(input)?;
         let delta = executor::run_command(command, self)?;
 
-        // Temporary: convert delta to string for compatibility
-        // This will be removed when we update the public API
-        let mut result = String::new();
-        if !delta.register_changes.is_empty() {
-            result.push_str(&format!(
-                "{} register changes",
-                delta.register_changes.len()
-            ));
-        }
-        if !delta.memory_changes.is_empty() {
-            if !result.is_empty() {
-                result.push_str(", ");
+        // Format the state delta for display
+        let mut changes = Vec::new();
+
+        // Format register changes (show the most important ones)
+        let mut has_pc_change = false;
+        for (reg, old, new) in &delta.register_changes {
+            if *reg == crate::rv32_i::Register::PC {
+                changes.push(format!("PC: 0x{:08x} → 0x{:08x}", old, new));
+                has_pc_change = true;
+            } else {
+                changes.push(format!("{:?}: {} → {}", reg, *old as i32, *new as i32));
             }
-            result.push_str(&format!("{} memory changes", delta.memory_changes.len()));
         }
-        if delta.pc_change.0 != delta.pc_change.1 {
-            if !result.is_empty() {
-                result.push_str(", ");
-            }
-            result.push_str(&format!(
-                "PC: {} -> {}",
-                delta.pc_change.0, delta.pc_change.1
-            ));
+        
+        // Always show PC change from delta
+        if !has_pc_change && delta.pc_change.0 != delta.pc_change.1 {
+            changes.push(format!("PC: 0x{:08x} → 0x{:08x}", delta.pc_change.0, delta.pc_change.1));
         }
 
-        if result.is_empty() {
+        // Show memory changes summary
+        if !delta.memory_changes.is_empty() {
+            changes.push(format!("{} memory bytes changed", delta.memory_changes.len()));
+        }
+
+        // Show CSR changes
+        for (csr, old, new) in &delta.csr_changes {
+            changes.push(format!("CSR[0x{:03x}]: 0x{:08x} → 0x{:08x}", csr, old, new));
+        }
+
+        if changes.is_empty() {
             Ok("No state changes".to_string())
         } else {
-            Ok(result)
+            Ok(changes.join(", "))
         }
     }
 

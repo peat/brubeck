@@ -212,23 +212,21 @@ impl Interpreter {
 - [x] Library/Binary separation (no feature flags in library)
 - [x] Clean library API (previous_state, next_state, cpu access)
 - [x] All REPL features moved to binary
+- [x] Interpreter Public API Refactoring (returns structured data, not strings)
 
 ### 🚧 In Progress
 
-#### Interpreter Public API Refactoring ⏱️ ~16 hours
-**Status**: Phases 1-5 Complete! (Tests and binary updates remaining)  
-**Specification**: See `INTERPRETER_REFACTOR_SPEC.md`  
-**Progress**: See `REFACTORING_PROGRESS.md`  
-**Why**: Current API returns strings instead of data, mixes concerns  
-**Completed**:
-- ✅ New error types (`ParseError`, `HistoryError`, `ExecutionError`)
-- ✅ Removed string formatting from library
-- ✅ Static `parse()` method returns `Vec<Instruction>`
-- ✅ Methods return `StateDelta` instead of strings
-- ✅ Public `cpu` field, added `reset()` method
-**TODO**:
-- Update tests to use new API
-- Update binary to handle formatting
+#### Binary Formatting Implementation ⏱️ ~8 hours
+**Status**: Starting  
+**Why**: After refactoring interpreter to return structured data, need to implement formatting in binary  
+**Tasks**:
+- Create formatting module structure in binary
+- Implement StateDelta formatter
+- Implement error formatters with helpful context
+- Create memory display formatter
+- Create register display formatter
+- Update REPL to use formatters
+- Add tests for formatting functions
 
 #### Register Output Colorization ⏱️ ~4 hours  
 **Status**: PAUSED - Basic implementation done, needs refinement  

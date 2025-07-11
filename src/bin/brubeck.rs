@@ -15,6 +15,7 @@ use crossterm::{
 };
 
 mod cli;
+mod formatting;
 mod repl;
 
 // REPL module with commands and formatting

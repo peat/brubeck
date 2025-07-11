@@ -3,6 +3,7 @@
 //! This module handles the parsing and execution of REPL-specific slash commands
 //! that are not part of the core library.
 
+use crate::formatting;
 use crate::repl_formatter;
 use brubeck::interpreter::Interpreter;
 use brubeck::rv32_i::Register;
@@ -117,11 +118,8 @@ fn execute_repl_command(cmd: ReplCommand, interpreter: &mut Interpreter) -> Resu
 fn handle_previous(interpreter: &mut Interpreter) -> Result<String, String> {
     // Use the new API and format the delta
     match interpreter.previous_state() {
-        Ok(delta) => Ok(format!(
-            "Navigated back: {} changes",
-            delta.register_changes.len() + delta.memory_changes.len()
-        )),
-        Err(e) => Err(format!("{e:?}")),
+        Ok(delta) => Ok(format!("Navigated back: {}", formatting::state_delta::format_state_delta_compact(&delta))),
+        Err(e) => Err(formatting::errors::format_history_error(&e, true)),
     }
 }
 
@@ -129,11 +127,8 @@ fn handle_previous(interpreter: &mut Interpreter) -> Result<String, String> {
 fn handle_next(interpreter: &mut Interpreter) -> Result<String, String> {
     // Use the new API and format the delta
     match interpreter.next_state() {
-        Ok(delta) => Ok(format!(
-            "Navigated forward: {} changes",
-            delta.register_changes.len() + delta.memory_changes.len()
-        )),
-        Err(e) => Err(format!("{e:?}")),
+        Ok(delta) => Ok(format!("Navigated forward: {}", formatting::state_delta::format_state_delta_compact(&delta))),
+        Err(e) => Err(formatting::errors::format_history_error(&e, true)),
     }
 }
 

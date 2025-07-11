@@ -3,10 +3,16 @@
 //! This module contains formatting functions for interactive REPL output,
 //! including register display, memory inspection, and help text.
 
+use crate::repl::colors::{color_register_name, color_register_value};
 use brubeck::rv32_i::{Register, CPU};
 
 /// Shows all register values in a formatted table
 pub fn format_all_registers(cpu: &CPU) -> String {
+    format_all_registers_with_color(cpu, true)
+}
+
+/// Shows all register values in a formatted table with optional color
+pub fn format_all_registers_with_color(cpu: &CPU, use_color: bool) -> String {
     let mut output = String::new();
 
     for i in 0..32 {
@@ -49,20 +55,54 @@ pub fn format_all_registers(cpu: &CPU) -> String {
         let val = cpu.get_register(reg);
         let abi_name = get_abi_name(reg);
 
-        if i % 2 == 0 && i < 31 {
-            output.push_str(&format!("x{i:2} ({abi_name:4}): 0x{val:08x}    "));
+        // Format the register name and value
+        let reg_name = if use_color {
+            color_register_name(&format!("x{i:2}"), abi_name)
         } else {
-            output.push_str(&format!("x{i:2} ({abi_name:4}): 0x{val:08x}\n"));
+            format!("x{i:2} ({abi_name:4})")
+        };
+
+        // Determine special register type for coloring
+        let special_type = match abi_name {
+            "sp" => Some("sp"),
+            "s0" => Some("fp"),
+            _ => None,
+        };
+
+        let val_str = if use_color {
+            color_register_value(val, false, special_type)
+        } else {
+            format!("0x{val:08x}")
+        };
+
+        if i % 2 == 0 && i < 31 {
+            output.push_str(&format!("{reg_name}: {val_str}    "));
+        } else {
+            output.push_str(&format!("{reg_name}: {val_str}\n"));
         }
     }
 
     // Add PC at the end
-    output.push_str(&format!("pc      : 0x{:08x}\n", cpu.pc));
+    if use_color {
+        let pc_val = color_register_value(cpu.pc, false, Some("pc"));
+        output.push_str(&format!("pc      : {pc_val}\n"));
+    } else {
+        output.push_str(&format!("pc      : 0x{:08x}\n", cpu.pc));
+    }
     output
 }
 
 /// Shows specific register values
 pub fn format_specific_registers(cpu: &CPU, regs: Vec<Register>) -> String {
+    format_specific_registers_with_color(cpu, regs, true)
+}
+
+/// Shows specific register values with optional color
+pub fn format_specific_registers_with_color(
+    cpu: &CPU,
+    regs: Vec<Register>,
+    use_color: bool,
+) -> String {
     let mut output = String::new();
 
     for (idx, reg) in regs.iter().enumerate() {
@@ -70,8 +110,14 @@ pub fn format_specific_registers(cpu: &CPU, regs: Vec<Register>) -> String {
         let abi_name = get_abi_name(*reg);
 
         // Format register with ABI name
-        let reg_str = match reg {
-            Register::PC => "pc".to_string(),
+        let (reg_str, special_type) = match reg {
+            Register::PC => {
+                if use_color {
+                    ("pc".to_string(), Some("pc"))
+                } else {
+                    ("pc".to_string(), None)
+                }
+            }
             _ => {
                 let reg_num = match reg {
                     Register::X0 => 0,
@@ -108,15 +154,35 @@ pub fn format_specific_registers(cpu: &CPU, regs: Vec<Register>) -> String {
                     Register::X31 => 31,
                     Register::PC => unreachable!(),
                 };
-                format!("x{reg_num:2} ({abi_name:4})")
+
+                let special = match abi_name {
+                    "sp" => Some("sp"),
+                    "s0" => Some("fp"),
+                    _ => None,
+                };
+
+                if use_color {
+                    (
+                        color_register_name(&format!("x{reg_num:2}"), abi_name),
+                        special,
+                    )
+                } else {
+                    (format!("x{reg_num:2} ({abi_name:4})"), None)
+                }
             }
+        };
+
+        let val_str = if use_color {
+            color_register_value(val, false, special_type)
+        } else {
+            format!("0x{val:08x}")
         };
 
         // Two registers per line, or last register
         if idx % 2 == 0 && idx < regs.len() - 1 {
-            output.push_str(&format!("{reg_str}: 0x{val:08x}    "));
+            output.push_str(&format!("{reg_str}: {val_str}    "));
         } else {
-            output.push_str(&format!("{reg_str}: 0x{val:08x}\n"));
+            output.push_str(&format!("{reg_str}: {val_str}\n"));
         }
     }
 
@@ -144,6 +210,7 @@ Other Commands:
   /p, /prev, /previous  Navigate to previous state in history
   /n, /next        Navigate to next state in history
   /reset           Reset CPU state (with confirmation)
+  /q, /quit, /e, /exit  Exit the REPL
   
 Examples:
   ADDI x1, x0, 42  # Load 42 into x1

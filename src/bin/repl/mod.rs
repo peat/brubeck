@@ -3,10 +3,9 @@
 //! This module contains features that enhance the interactive REPL experience
 //! but are not part of the core emulation library.
 
-mod colors;
+pub mod colors;
 mod history;
 mod input;
 
-// Color module functions may be used in the future
 pub use history::CommandHistory;
 pub use input::read_line_with_history;

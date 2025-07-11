@@ -3,8 +3,6 @@
 //! This module provides color formatting functions to enhance the visual
 //! feedback of the REPL, making it easier to see state changes.
 
-#![allow(dead_code)]
-
 use crossterm::style::{Color, Stylize};
 
 /// Colors a register value based on its state
@@ -46,6 +44,7 @@ pub fn color_register_name(name: &str, abi_name: &str) -> String {
 }
 
 /// Colors a memory byte based on whether it changed
+#[allow(dead_code)]
 pub fn color_memory_byte(byte: u8, is_changed: bool, is_pc_location: bool) -> String {
     let hex_str = format!("{byte:02x}");
 
@@ -61,6 +60,7 @@ pub fn color_memory_byte(byte: u8, is_changed: bool, is_pc_location: bool) -> St
 }
 
 /// Colors an ASCII character in memory display
+#[allow(dead_code)]
 pub fn color_ascii_char(byte: u8, is_changed: bool) -> String {
     let ch = if (0x20..=0x7E).contains(&byte) {
         byte as char
@@ -78,24 +78,29 @@ pub fn color_ascii_char(byte: u8, is_changed: bool) -> String {
 }
 
 /// Colors an immediate value in instruction output
+#[allow(dead_code)]
 pub fn color_immediate(value: i32) -> String {
     format!("{value}").with(Color::Cyan).to_string()
 }
 
 /// Colors a branch target
+#[allow(dead_code)]
 pub fn color_branch_target(address: u32) -> String {
     format!("0x{address:x}").with(Color::Magenta).to_string()
 }
 
 /// Colors error message components
+#[allow(dead_code)]
 pub fn color_error_header(text: &str) -> String {
     text.with(Color::Red).bold().to_string()
 }
 
+#[allow(dead_code)]
 pub fn color_error_detail(text: &str) -> String {
     text.with(Color::Yellow).to_string()
 }
 
+#[allow(dead_code)]
 pub fn color_suggestion(text: &str) -> String {
     text.with(Color::Green).to_string()
 }

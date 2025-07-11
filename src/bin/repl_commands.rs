@@ -20,6 +20,7 @@ pub enum ReplCommand {
         start: Option<u32>,
         end: Option<u32>,
     },
+    Quit,
 }
 
 /// Parse and execute a REPL command
@@ -57,6 +58,7 @@ fn parse_repl_command(parts: &[&str]) -> Result<ReplCommand, String> {
         "/PREVIOUS" | "/PREV" | "/P" => Ok(ReplCommand::Previous),
         "/NEXT" | "/N" => Ok(ReplCommand::Next),
         "/RESET" => Ok(ReplCommand::Reset),
+        "/QUIT" | "/Q" | "/EXIT" | "/E" => Ok(ReplCommand::Quit),
         "/MEMORY" | "/M" => match parts.len() {
             1 => Ok(ReplCommand::ShowMemory {
                 start: None,
@@ -103,6 +105,10 @@ fn execute_repl_command(cmd: ReplCommand, interpreter: &mut Interpreter) -> Resu
         ReplCommand::Reset => handle_reset(interpreter),
         ReplCommand::ShowMemory { start, end } => {
             Ok(repl_formatter::format_memory(interpreter.cpu(), start, end))
+        }
+        ReplCommand::Quit => {
+            // Return a special error that signals the main loop to exit
+            Err("QUIT".to_string())
         }
     }
 }

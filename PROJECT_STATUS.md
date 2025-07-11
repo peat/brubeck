@@ -2,9 +2,9 @@
 
 Last Updated: 2025-07-11
 
-## 🎯 Current Focus: Enhanced Learning Features
+## 🎯 Current Focus: Interpreter Public API Refactoring
 
-With the library/binary separation complete, focusing on educational improvements and usability.
+Major refactoring to provide a cleaner, data-focused API that separates parsing from execution.
 
 ## ✅ Major Refactoring: Library/Binary Separation [COMPLETED]
 
@@ -214,13 +214,38 @@ impl Interpreter {
 - [x] All REPL features moved to binary
 
 ### 🚧 In Progress
-- [ ] Enhanced Learning Features (error messages, instruction history)
+
+#### Interpreter Public API Refactoring ⏱️ ~16 hours
+**Status**: Planning  
+**Specification**: See `INTERPRETER_REFACTOR_SPEC.md`  
+**Why**: Current API returns strings instead of data, mixes concerns  
+**Key Changes**:
+- Separate `parse()` and `execute()` methods
+- Return `StateDelta` instead of strings
+- Structured error types (`ParseError`, `HistoryError`)
+- Remove string formatting from library
+- Static parse method for validation without execution
+
+#### Register Output Colorization ⏱️ ~4 hours  
+**Status**: PAUSED - Basic implementation done, needs refinement  
+**Specification**: See `COLORIZATION_STATUS.md`  
+**Why**: Visual feedback for register changes improves debugging  
+**Completed**:
+- Basic colorization working (but not to spec)
+- Zero values show in grey
+- Tests updated for color output
+**TODO**:
+- Remove special register colors (pc, sp, ra)
+- Implement change tracking (yellow for changed values)
+- Simplify color functions
 
 ### 📚 Documentation Status
 - `REPL_USABILITY_FEEDBACK.md` - Original user feedback and analysis
 - `REFACTORING_SUMMARY.md` - Details of interpreter modularization
 - `INSTRUCTION_IMPLEMENTATION.md` - Guide for adding new instructions
 - `CLAUDE.md` - AI assistant context (keep updated!)
+- `INTERPRETER_REFACTOR_SPEC.md` - Detailed spec for API refactoring
+- `COLORIZATION_STATUS.md` - Status of register colorization work
 
 ## 🎯 Success Metrics
 
@@ -267,4 +292,4 @@ impl Interpreter {
 
 ---
 
-**Next Action**: Instruction History Command - Show last n instructions with PC and effect
+**Next Action**: Begin implementing Interpreter API refactoring - Start with Phase 1 (Error Types)

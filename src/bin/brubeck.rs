@@ -77,7 +77,7 @@ fn run_interactive(
     if !quiet && should_show_banner(ExecutionMode::Interactive) && io::stdin().is_tty() {
         println!("Brubeck: A RISC-V REPL");
         println!("Type /help for help, or start with --tips for richer assistance");
-        println!("Ctrl-C to quit\n");
+        println!("Type /quit or press Ctrl-C to exit\n");
     }
 
     // Initialize command history
@@ -104,7 +104,17 @@ fn run_interactive(
 
         // Execute the command
         let input = buffer.trim();
-        execute_and_print(interpreter, input, true, quiet, false, tips)?;
+
+        // Check if it's a quit command before adding to history
+        if let Err(e) = execute_and_print(interpreter, input, true, quiet, false, tips) {
+            // Check if this is our special quit signal
+            if e.to_string() == "QUIT" {
+                println!(); // Add newline for clean exit
+                return Ok(());
+            }
+            // Otherwise propagate the error
+            return Err(e);
+        }
 
         // Add to history (all commands, even if they fail - this is what shells do)
         history.add(input.to_string());
@@ -215,6 +225,11 @@ fn execute_and_print(
             }
         }
         Err(s) => {
+            // Check if this is the special QUIT error
+            if s == "QUIT" {
+                return Err(io::Error::other("QUIT"));
+            }
+
             let formatted_error = format_error(&s, tips);
             if use_color {
                 let mut stdout = io::stdout();

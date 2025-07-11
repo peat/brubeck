@@ -21,6 +21,9 @@ mod repl;
 mod repl_commands;
 mod repl_formatter;
 
+#[cfg(test)]
+mod repl_commands_test;
+
 fn main() -> io::Result<()> {
     // Parse command-line arguments
     let cli = Cli::parse();

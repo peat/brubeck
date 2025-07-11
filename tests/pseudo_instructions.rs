@@ -17,10 +17,12 @@ fn test_mv_pseudo_instruction() {
     assert!(result.is_ok(), "MV should execute successfully");
 
     // Verify the value was moved
-    let x1_result = interpreter.interpret("/regs x1").unwrap();
-    assert!(
-        x1_result.contains("x 1 (ra  ): 0x0000002a"),
-        "x1 should contain 42 (0x2a)"
+    assert_eq!(
+        interpreter
+            .cpu()
+            .get_register(brubeck::rv32_i::Register::X1),
+        42,
+        "x1 should contain 42"
     );
 }
 
@@ -36,10 +38,12 @@ fn test_not_pseudo_instruction() {
     assert!(result.is_ok(), "NOT should execute successfully");
 
     // Verify the result (NOT 5 = -6 in two's complement)
-    let x2_result = interpreter.interpret("/regs x2").unwrap();
     // NOT 0x00000005 = 0xFFFFFFFA = -6 in signed interpretation = 4294967290 unsigned
-    assert!(
-        x2_result.contains("x 2 (sp  ): 0xfffffffa"),
+    assert_eq!(
+        interpreter
+            .cpu()
+            .get_register(brubeck::rv32_i::Register::X2),
+        0xfffffffa,
         "x2 should contain 0xfffffffa"
     );
 }
@@ -53,9 +57,11 @@ fn test_seqz_pseudo_instruction() {
     let result = interpreter.interpret("SEQZ x2, x1");
     assert!(result.is_ok(), "SEQZ should execute successfully");
 
-    let x2_result = interpreter.interpret("/regs x2").unwrap();
-    assert!(
-        x2_result.contains("x 2 (sp  ): 0x00000001"),
+    assert_eq!(
+        interpreter
+            .cpu()
+            .get_register(brubeck::rv32_i::Register::X2),
+        0x00000001,
         "SEQZ of 0 should be 1"
     );
 
@@ -63,9 +69,11 @@ fn test_seqz_pseudo_instruction() {
     interpreter.interpret("ADDI x3, zero, 5").unwrap();
     interpreter.interpret("SEQZ x4, x3").unwrap();
 
-    let x4_result = interpreter.interpret("/regs x4").unwrap();
-    assert!(
-        x4_result.contains("x 4 (tp  ): 0x00000000"),
+    assert_eq!(
+        interpreter
+            .cpu()
+            .get_register(brubeck::rv32_i::Register::X4),
+        0x00000000,
         "SEQZ of 5 should be 0"
     );
 }
@@ -79,9 +87,11 @@ fn test_snez_pseudo_instruction() {
     let result = interpreter.interpret("SNEZ x2, x1");
     assert!(result.is_ok(), "SNEZ should execute successfully");
 
-    let x2_result = interpreter.interpret("/regs x2").unwrap();
-    assert!(
-        x2_result.contains("x 2 (sp  ): 0x00000000"),
+    assert_eq!(
+        interpreter
+            .cpu()
+            .get_register(brubeck::rv32_i::Register::X2),
+        0x00000000,
         "SNEZ of 0 should be 0"
     );
 
@@ -89,9 +99,11 @@ fn test_snez_pseudo_instruction() {
     interpreter.interpret("ADDI x3, zero, 5").unwrap();
     interpreter.interpret("SNEZ x4, x3").unwrap();
 
-    let x4_result = interpreter.interpret("/regs x4").unwrap();
-    assert!(
-        x4_result.contains("x 4 (tp  ): 0x00000001"),
+    assert_eq!(
+        interpreter
+            .cpu()
+            .get_register(brubeck::rv32_i::Register::X4),
+        0x00000001,
         "SNEZ of 5 should be 1"
     );
 }
@@ -105,11 +117,7 @@ fn test_j_pseudo_instruction() {
     assert!(result.is_ok(), "J should execute successfully");
 
     // Check PC has jumped
-    let pc_result = interpreter.interpret("/regs PC").unwrap();
-    assert!(
-        pc_result.contains("pc: 0x00000008"),
-        "PC should be 8 after J 8"
-    );
+    assert_eq!(interpreter.get_pc(), 8, "PC should be 8 after J 8");
 }
 
 #[test]
@@ -124,9 +132,9 @@ fn test_jr_pseudo_instruction() {
     assert!(result.is_ok(), "JR should execute successfully");
 
     // Check PC has jumped to register value
-    let pc_result = interpreter.interpret("/regs PC").unwrap();
-    assert!(
-        pc_result.contains("pc: 0x00000064"),
+    assert_eq!(
+        interpreter.get_pc(),
+        100,
         "PC should be 100 (0x64) after JR x1"
     );
 }
@@ -143,9 +151,9 @@ fn test_ret_pseudo_instruction() {
     assert!(result.is_ok(), "RET should execute successfully");
 
     // Check PC has jumped to return address
-    let pc_result = interpreter.interpret("/regs PC").unwrap();
-    assert!(
-        pc_result.contains("pc: 0x000000c8"),
+    assert_eq!(
+        interpreter.get_pc(),
+        200,
         "PC should be 200 (0xc8) after RET"
     );
 }
@@ -158,9 +166,11 @@ fn test_li_small_immediate() {
     let result = interpreter.interpret("LI x1, 42");
     assert!(result.is_ok(), "LI with small immediate should work");
 
-    let x1_result = interpreter.interpret("/regs x1").unwrap();
-    assert!(
-        x1_result.contains("x 1 (ra  ): 0x0000002a"),
+    assert_eq!(
+        interpreter
+            .cpu()
+            .get_register(brubeck::rv32_i::Register::X1),
+        0x0000002a,
         "x1 should contain 42 (0x2a)"
     );
 }
@@ -173,9 +183,11 @@ fn test_li_large_immediate() {
     let result = interpreter.interpret("LI x1, 0x12345");
     assert!(result.is_ok(), "LI with large immediate should work");
 
-    let x1_result = interpreter.interpret("/regs x1").unwrap();
-    assert!(
-        x1_result.contains("x 1 (ra  ): 0x00012345"),
+    assert_eq!(
+        interpreter
+            .cpu()
+            .get_register(brubeck::rv32_i::Register::X1),
+        0x00012345,
         "x1 should contain 0x12345 (74565)"
     );
 }
@@ -188,9 +200,11 @@ fn test_li_negative_immediate() {
     let result = interpreter.interpret("LI x1, -1");
     assert!(result.is_ok(), "LI with -1 should work");
 
-    let x1_result = interpreter.interpret("/regs x1").unwrap();
-    assert!(
-        x1_result.contains("x 1 (ra  ): 0xffffffff"),
+    assert_eq!(
+        interpreter
+            .cpu()
+            .get_register(brubeck::rv32_i::Register::X1),
+        0xffffffff,
         "x1 should contain 0xffffffff (-1)"
     );
 }
@@ -203,9 +217,11 @@ fn test_pseudo_instruction_with_abi_names() {
     interpreter.interpret("ADDI sp, zero, 1000").unwrap();
     interpreter.interpret("MV fp, sp").unwrap();
 
-    let fp_result = interpreter.interpret("/regs fp").unwrap();
-    assert!(
-        fp_result.contains("x 8 (s0  ): 0x000003e8"),
+    assert_eq!(
+        interpreter
+            .cpu()
+            .get_register(brubeck::rv32_i::Register::X8),
+        0x000003e8,
         "fp (x8) should contain 1000 (0x3e8)"
     );
 
@@ -213,9 +229,9 @@ fn test_pseudo_instruction_with_abi_names() {
     interpreter.interpret("LI ra, 0x2000").unwrap();
     interpreter.interpret("RET").unwrap();
 
-    let pc_result = interpreter.interpret("/regs PC").unwrap();
-    assert!(
-        pc_result.contains("pc: 0x00002000"),
+    assert_eq!(
+        interpreter.get_pc(),
+        8192,
         "PC should be 0x2000 (8192) after RET"
     );
 }

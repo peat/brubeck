@@ -21,9 +21,9 @@ impl Immediate {
         }
     }
 
-    pub fn set_unsigned(&mut self, value: u32) -> Result<(), Error> {
+    pub fn set_unsigned(&mut self, value: u32) -> Result<(), ImmediateError> {
         if value > self.unsigned_max() {
-            return Err(Error::OutOfRange(format!(
+            return Err(ImmediateError::OutOfRange(format!(
                 "Unsigned value {} is too big for {} bits.",
                 value, self.bits
             )));
@@ -33,16 +33,16 @@ impl Immediate {
         Ok(())
     }
 
-    pub fn set_signed(&mut self, value: i32) -> Result<(), Error> {
+    pub fn set_signed(&mut self, value: i32) -> Result<(), ImmediateError> {
         if value > self.signed_max() {
-            return Err(Error::OutOfRange(format!(
+            return Err(ImmediateError::OutOfRange(format!(
                 "Signed value {} is too big for {} bits.",
                 value, self.bits
             )));
         }
 
         if value < self.signed_min() {
-            return Err(Error::OutOfRange(format!(
+            return Err(ImmediateError::OutOfRange(format!(
                 "Signed value {} is too small for {} bits.",
                 value, self.bits
             )));
@@ -74,7 +74,7 @@ impl Immediate {
 }
 
 #[derive(Debug, Clone)]
-pub enum Error {
+pub enum ImmediateError {
     OutOfRange(String),
 }
 

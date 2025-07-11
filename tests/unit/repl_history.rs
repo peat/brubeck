@@ -7,9 +7,9 @@
 
 // Import the REPL-specific history module
 #[path = "../../src/bin/repl/history.rs"]
-mod repl_history;
+mod history;
 
-use repl_history::CommandHistory;
+use history::CommandHistory;
 
 #[test]
 fn test_empty_history() {

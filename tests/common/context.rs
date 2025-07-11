@@ -4,7 +4,6 @@
 //! a CPU (for unit tests) or an Interpreter (for integration tests)
 //! with a consistent fluent API.
 
-use super::assertions::*;
 use brubeck::interpreter::Interpreter;
 
 /// Generic test context that provides a fluent API for testing
@@ -77,11 +76,63 @@ impl TestContext<Interpreter> {
     /// Check register contains value
     pub fn check_reg(&mut self, reg: &str, expected: &str) -> &mut Self {
         let ctx = self.context(&format!("Check {reg}"));
-        let result = self
-            .inner
-            .interpret(&format!("/regs {reg}"))
-            .unwrap_or_else(|e| panic!("{ctx}: Failed to read register: {e:?}"));
-        assert_contains_with_context(&result, expected, &ctx);
+
+        // Parse the register name
+        use brubeck::rv32_i::Register;
+        let register = match reg.to_uppercase().as_str() {
+            "X0" => Register::X0,
+            "X1" => Register::X1,
+            "X2" => Register::X2,
+            "X3" => Register::X3,
+            "X4" => Register::X4,
+            "X5" => Register::X5,
+            "X6" => Register::X6,
+            "X7" => Register::X7,
+            "X8" => Register::X8,
+            "X9" => Register::X9,
+            "X10" => Register::X10,
+            "X11" => Register::X11,
+            "X12" => Register::X12,
+            "X13" => Register::X13,
+            "X14" => Register::X14,
+            "X15" => Register::X15,
+            "X16" => Register::X16,
+            "X17" => Register::X17,
+            "X18" => Register::X18,
+            "X19" => Register::X19,
+            "X20" => Register::X20,
+            "X21" => Register::X21,
+            "X22" => Register::X22,
+            "X23" => Register::X23,
+            "X24" => Register::X24,
+            "X25" => Register::X25,
+            "X26" => Register::X26,
+            "X27" => Register::X27,
+            "X28" => Register::X28,
+            "X29" => Register::X29,
+            "X30" => Register::X30,
+            "X31" => Register::X31,
+            "PC" => Register::PC,
+            _ => panic!("{ctx}: Unknown register: {reg}"),
+        };
+
+        // Get the actual value
+        let value = self.inner.cpu().get_register(register);
+
+        // Parse expected value
+        let expected_val = if expected.starts_with("0x") || expected.starts_with("0X") {
+            u32::from_str_radix(&expected[2..], 16)
+                .unwrap_or_else(|_| panic!("{ctx}: Invalid hex value: {expected}"))
+        } else {
+            expected
+                .parse::<u32>()
+                .unwrap_or_else(|_| panic!("{ctx}: Invalid decimal value: {expected}"))
+        };
+
+        assert_eq!(
+            value, expected_val,
+            "{ctx}: Register {reg} has value 0x{value:08x}, expected 0x{expected_val:08x}"
+        );
         self
     }
 
@@ -103,20 +154,25 @@ impl TestContext<Interpreter> {
     pub fn undo(&mut self) -> &mut Self {
         let ctx = self.context("Previous");
         self.inner
-            .interpret("/previous")
+            .previous_state()
             .unwrap_or_else(|e| panic!("{ctx}: {e:?}"));
         self
     }
 
     /// Undo with expected content
     #[cfg(feature = "repl")]
-    pub fn undo_expect(&mut self, expected: &str) -> &mut Self {
+    pub fn undo_expect(&mut self, _expected: &str) -> &mut Self {
         let ctx = self.context("Undo");
         let result = self
             .inner
-            .interpret("/previous")
+            .previous_state()
             .unwrap_or_else(|e| panic!("{ctx}: {e:?}"));
-        assert_contains_with_context(&result, expected, &ctx);
+        // For now, just check that undo succeeded
+        // The library no longer returns instruction names
+        assert!(
+            result.contains("Undid"),
+            "{ctx}: Expected undo message, got: {result}"
+        );
         self
     }
 
@@ -125,7 +181,7 @@ impl TestContext<Interpreter> {
     pub fn redo(&mut self) -> &mut Self {
         let ctx = self.context("Next");
         self.inner
-            .interpret("/next")
+            .next_state()
             .unwrap_or_else(|e| panic!("{ctx}: {e:?}"));
         self
     }
@@ -134,7 +190,7 @@ impl TestContext<Interpreter> {
     #[cfg(feature = "repl")]
     pub fn undo_should_fail(&mut self) -> &mut Self {
         let ctx = self.context("Undo (expecting failure)");
-        if self.inner.interpret("/previous").is_ok() {
+        if self.inner.previous_state().is_ok() {
             panic!("{ctx}: Expected undo to fail but it succeeded");
         }
         self

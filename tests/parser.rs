@@ -42,6 +42,7 @@ fn test_tokenize_instruction() {
 }
 
 #[test]
+#[ignore = "Binary-specific functionality - REPL commands"]
 fn test_parse_register_inspection() {
     let mut i = Interpreter::new();
 
@@ -56,6 +57,7 @@ fn test_parse_register_inspection() {
 }
 
 #[test]
+#[ignore = "Binary-specific functionality - REPL commands"]
 fn test_parse_abi_register_names() {
     let mut i = Interpreter::new();
 
@@ -85,9 +87,8 @@ fn test_parse_complete_instruction() {
     let result = i.interpret("ADD x1, x2, x3");
     assert!(result.is_ok());
 
-    // Verify result
-    let result = i.interpret("/regs X1");
-    assert!(result.unwrap().contains("x 1 (ra  ): 0x00000008"));
+    // Verify result - check register directly
+    assert_eq!(i.cpu().get_register(brubeck::rv32_i::Register::X1), 8);
 }
 
 #[test]
@@ -98,17 +99,15 @@ fn test_trivial_add() {
     i.interpret("ADDI x2, zero, 3").unwrap();
     i.interpret("ADDI x3, zero, 5").unwrap();
 
-    // Verify initial state
-    let result = i.interpret("/regs X1");
-    assert!(result.unwrap().contains("x 1 (ra  ): 0x00000000"));
+    // Verify initial state - check register directly
+    assert_eq!(i.cpu().get_register(brubeck::rv32_i::Register::X1), 0);
 
     // Execute ADD
     let result = i.interpret("ADD x1, x2, x3");
     assert!(result.is_ok());
 
-    // Verify result
-    let result = i.interpret("/regs X1");
-    assert!(result.unwrap().contains("x 1 (ra  ): 0x00000008"));
+    // Verify result - check register directly
+    assert_eq!(i.cpu().get_register(brubeck::rv32_i::Register::X1), 8);
 }
 
 #[test]
@@ -119,8 +118,11 @@ fn test_parse_negative_immediates() {
     let result = i.interpret("ADDI x1, zero, -1");
     assert!(result.is_ok());
 
-    let result = i.interpret("/regs X1");
-    assert!(result.unwrap().contains("x 1 (ra  ): 0xffffffff")); // -1 sign-extends to 32 bits
+    // Verify result - check register directly
+    assert_eq!(
+        i.cpu().get_register(brubeck::rv32_i::Register::X1),
+        0xffffffff
+    ); // -1 sign-extends to 32 bits
 
     // Test that 4095 is correctly rejected (outside signed 12-bit range)
     let result = i.interpret("ADDI x1, zero, 4095");
@@ -137,8 +139,8 @@ fn test_parse_hex_immediates() {
     let result = i.interpret("ADDI x1, zero, 255");
     assert!(result.is_ok());
 
-    let result = i.interpret("/regs X1");
-    assert!(result.unwrap().contains("x 1 (ra  ): 0x000000ff"));
+    // Verify result - check register directly
+    assert_eq!(i.cpu().get_register(brubeck::rv32_i::Register::X1), 0xff);
 }
 
 #[test]
@@ -279,22 +281,19 @@ fn test_pc_advancement() {
     let mut i = Interpreter::new();
 
     // Check initial PC
-    let result = i.interpret("/regs PC");
-    assert!(result.unwrap().contains("pc: 0x00000000"));
+    assert_eq!(i.get_pc(), 0);
 
     // Execute an instruction
     i.interpret("NOP").unwrap();
 
     // PC should advance by 4
-    let result = i.interpret("/regs PC");
-    assert!(result.unwrap().contains("pc: 0x00000004"));
+    assert_eq!(i.get_pc(), 4);
 
     // Execute another instruction
     i.interpret("NOP").unwrap();
 
     // PC should advance to 8
-    let result = i.interpret("/regs PC");
-    assert!(result.unwrap().contains("pc: 0x00000008"));
+    assert_eq!(i.get_pc(), 8);
 }
 
 #[test]
@@ -449,6 +448,7 @@ fn test_parse_reset_command() {
 
 #[test]
 #[cfg(feature = "repl")]
+#[ignore = "Binary-specific functionality - REPL commands"]
 fn test_parse_navigation_commands() {
     let mut i = Interpreter::new();
 
@@ -484,6 +484,7 @@ fn test_parse_navigation_commands() {
 
 #[test]
 #[cfg(feature = "repl")]
+#[ignore = "Binary-specific functionality - REPL commands"]
 fn test_parse_memory_command() {
     let mut i = Interpreter::new();
 
@@ -534,6 +535,7 @@ fn test_parse_memory_command() {
 
 #[test]
 #[cfg(feature = "repl")]
+#[ignore = "Binary-specific functionality - REPL commands"]
 fn test_memory_display_with_data() {
     let mut i = Interpreter::new();
 

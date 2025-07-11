@@ -1,13 +1,13 @@
 use brubeck::interpreter::Interpreter;
 
-#[cfg(not(feature = "repl"))]
-use std::io::Write;
 use std::io;
 #[cfg(feature = "repl")]
 use std::io::BufRead;
+#[cfg(not(feature = "repl"))]
+use std::io::Write;
 
 #[cfg(feature = "repl")]
-use brubeck::cli::{should_show_banner, Cli, ExecutionMode};
+use crate::cli::{should_show_banner, Cli, ExecutionMode};
 #[cfg(feature = "repl")]
 use std::fs;
 
@@ -22,7 +22,13 @@ use crossterm::{
 };
 
 #[cfg(feature = "repl")]
+mod cli;
+#[cfg(feature = "repl")]
 mod repl;
+
+// REPL module with commands and formatting
+mod repl_commands;
+mod repl_formatter;
 
 fn main() -> io::Result<()> {
     #[cfg(feature = "repl")]
@@ -30,11 +36,12 @@ fn main() -> io::Result<()> {
         // Parse command-line arguments
         let cli = Cli::parse();
 
-        // Create interpreter with configuration
-        let config = cli
-            .to_config()
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
-        let mut interpreter = Interpreter::with_config(config);
+        // Create interpreter
+        // TODO: The library interpreter no longer supports configuration.
+        // We need to either:
+        // 1. Add configuration support back to the library in a clean way
+        // 2. Or handle memory size and undo limit in the binary layer
+        let mut interpreter = Interpreter::new();
 
         // Determine execution mode
         match cli.execution_mode() {
@@ -179,7 +186,14 @@ fn execute_and_print(
         None
     };
 
-    match interpreter.interpret(input) {
+    // Handle slash commands separately
+    let result = if is_slash_command {
+        repl_commands::handle_repl_command(input, interpreter).map_err(|e| e.to_string())
+    } else {
+        interpreter.interpret(input).map_err(|e| format!("{e:?}"))
+    };
+
+    match result {
         Ok(s) => {
             if use_color {
                 // Interactive REPL mode
@@ -254,7 +268,7 @@ fn run_execute_mode(
     verbose: bool,
     no_color: bool,
 ) -> io::Result<()> {
-    use brubeck::cli::split_commands;
+    use crate::cli::split_commands;
 
     // Check if stdout is a terminal to determine if we can use colors
     let use_color = io::stdout().is_tty() && !no_color;

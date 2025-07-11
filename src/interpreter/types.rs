@@ -13,29 +13,6 @@ pub enum Command {
     Exec(Instruction),
     /// Execute a pseudo-instruction
     ExecPseudo(PseudoInstruction),
-    /// Show all registers
-    ShowRegs,
-    /// Show specific registers
-    ShowSpecificRegs(Vec<Register>),
-    /// Show help information
-    ShowHelp,
-    /// Navigate to previous state in history (REPL feature)
-    #[cfg(feature = "repl")]
-    Previous,
-    /// Navigate to next state in history (REPL feature)
-    #[cfg(feature = "repl")]
-    Next,
-    /// Reset CPU state with confirmation (REPL feature)
-    #[cfg(feature = "repl")]
-    Reset,
-    /// Show memory contents (REPL feature)
-    #[cfg(feature = "repl")]
-    ShowMemory {
-        /// Starting address (None means around PC)
-        start: Option<u32>,
-        /// End address (for range display)
-        end: Option<u32>,
-    },
 }
 
 /// Represents a token in the parsed assembly
@@ -57,7 +34,7 @@ pub enum Token {
 #[derive(Debug)]
 pub enum Error {
     /// CPU execution error
-    CpuError(crate::rv32_i::Error),
+    CpuError(crate::rv32_i::CPUError),
     /// Generic error with a message
     Generic(String),
     /// Unrecognized token during parsing
@@ -83,8 +60,8 @@ pub enum Error {
     },
 }
 
-impl From<crate::rv32_i::Error> for Error {
-    fn from(err: crate::rv32_i::Error) -> Self {
+impl From<crate::rv32_i::CPUError> for Error {
+    fn from(err: crate::rv32_i::CPUError) -> Self {
         Error::CpuError(err)
     }
 }

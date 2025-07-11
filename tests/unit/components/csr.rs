@@ -9,7 +9,7 @@
 //!
 //! Reference: RISC-V ISA Manual, Volume II: Privileged Architecture
 
-use brubeck::rv32_i::{cpu::CPU, Error, Register};
+use brubeck::rv32_i::{cpu::CPU, CPUError, Register};
 
 #[test]
 fn test_csr_initialization() {
@@ -64,7 +64,10 @@ fn test_csr_read_nonexistent() {
     // Try to read non-existent CSR
     let result = cpu.read_csr(0x999);
     assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), Error::IllegalInstruction(_)));
+    assert!(matches!(
+        result.unwrap_err(),
+        CPUError::IllegalInstruction(_)
+    ));
 
     // Try to read at boundary
     let result = cpu.read_csr(0xFFF);
@@ -95,7 +98,10 @@ fn test_csr_write_readonly() {
     // Try to write to read-only CSRs
     let result = cpu.write_csr(0xC00, 0x1234); // cycle is read-only
     assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), Error::IllegalInstruction(_)));
+    assert!(matches!(
+        result.unwrap_err(),
+        CPUError::IllegalInstruction(_)
+    ));
 
     let result = cpu.write_csr(0x301, 0x5678); // misa is read-only
     assert!(result.is_err());
@@ -112,7 +118,10 @@ fn test_csr_write_nonexistent() {
     // Try to write to non-existent CSR
     let result = cpu.write_csr(0x999, 0x1234);
     assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), Error::IllegalInstruction(_)));
+    assert!(matches!(
+        result.unwrap_err(),
+        CPUError::IllegalInstruction(_)
+    ));
 }
 
 #[test]
@@ -405,39 +414,39 @@ fn test_comprehensive_error_handling() {
     // Non-existent CSR
     assert!(matches!(
         cpu.read_csr(0x999),
-        Err(Error::IllegalInstruction(_))
+        Err(CPUError::IllegalInstruction(_))
     ));
     assert!(matches!(
         cpu.write_csr(0x999, 0),
-        Err(Error::IllegalInstruction(_))
+        Err(CPUError::IllegalInstruction(_))
     ));
     assert!(matches!(
         cpu.set_csr_bits(0x999, 1),
-        Err(Error::IllegalInstruction(_))
+        Err(CPUError::IllegalInstruction(_))
     ));
     assert!(matches!(
         cpu.clear_csr_bits(0x999, 1),
-        Err(Error::IllegalInstruction(_))
+        Err(CPUError::IllegalInstruction(_))
     ));
 
     // Out of bounds CSR address
     assert!(matches!(
         cpu.read_csr(0x1000),
-        Err(Error::IllegalInstruction(_))
+        Err(CPUError::IllegalInstruction(_))
     ));
 
     // Read-only CSR writes (with non-zero mask/value)
     assert!(matches!(
         cpu.write_csr(0x301, 0x12345678), // misa is read-only
-        Err(Error::IllegalInstruction(_))
+        Err(CPUError::IllegalInstruction(_))
     ));
     assert!(matches!(
         cpu.set_csr_bits(0x301, 0xFF), // non-zero mask
-        Err(Error::IllegalInstruction(_))
+        Err(CPUError::IllegalInstruction(_))
     ));
     assert!(matches!(
         cpu.clear_csr_bits(0x301, 0xFF), // non-zero mask
-        Err(Error::IllegalInstruction(_))
+        Err(CPUError::IllegalInstruction(_))
     ));
 }
 

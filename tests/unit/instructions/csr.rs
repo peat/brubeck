@@ -13,7 +13,7 @@
 //! https://github.com/riscv/riscv-isa-manual/blob/main/src/zicsr.adoc
 
 use crate::unit::test_helpers::*;
-use brubeck::rv32_i::{Error, IType, Instruction, Register, CPU};
+use brubeck::rv32_i::{CPUError, IType, Instruction, Register, CPU};
 
 /// Tests for CSRRW (Atomic Read/Write CSR) instruction
 mod csrrw {
@@ -109,7 +109,7 @@ mod csrrw {
             0xFFF,
         )));
 
-        assert!(matches!(result, Err(Error::IllegalInstruction(_))));
+        assert!(matches!(result, Err(CPUError::IllegalInstruction(_))));
     }
 
     #[test]
@@ -125,7 +125,7 @@ mod csrrw {
             0xC00,
         )));
 
-        assert!(matches!(result, Err(Error::IllegalInstruction(_))));
+        assert!(matches!(result, Err(CPUError::IllegalInstruction(_))));
     }
 }
 

@@ -87,7 +87,7 @@ fn test_undo_limit() {
 
     // Try to undo all - should eventually fail
     let mut undo_count = 0;
-    while ctx.inner.interpret("/previous").is_ok() {
+    while ctx.inner.previous_state().is_ok() {
         undo_count += 1;
     }
 

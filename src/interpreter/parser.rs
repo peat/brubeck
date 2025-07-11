@@ -56,79 +56,12 @@ pub fn parse(input: &str) -> Result<Command, Error> {
         return Err(Error::Generic("No input provided".to_owned()));
     }
 
-    // Handle commands that start with '/'
+    // Reject slash commands - these should be handled by the binary
     if let Some(first_word) = normalized.first() {
         if first_word.starts_with('/') {
-            return match first_word.as_str() {
-                "/REGS" | "/R" => {
-                    if normalized.len() == 1 {
-                        // No arguments, show all registers
-                        Ok(Command::ShowRegs)
-                    } else {
-                        // Parse register arguments
-                        let mut regs = Vec::new();
-                        for arg in &normalized[1..] {
-                            match parse_register(arg) {
-                                Some(reg) => regs.push(reg),
-                                None => {
-                                    return Err(Error::Generic(format!("Invalid register: {arg}")))
-                                }
-                            }
-                        }
-                        Ok(Command::ShowSpecificRegs(regs))
-                    }
-                }
-                "/HELP" | "/H" => Ok(Command::ShowHelp),
-                #[cfg(feature = "repl")]
-                "/PREVIOUS" | "/PREV" | "/P" => Ok(Command::Previous),
-                #[cfg(feature = "repl")]
-                "/NEXT" | "/N" => Ok(Command::Next),
-                #[cfg(feature = "repl")]
-                "/RESET" => Ok(Command::Reset),
-                #[cfg(feature = "repl")]
-                "/MEMORY" | "/M" => {
-                    match normalized.len() {
-                        1 => {
-                            // No arguments - show memory around PC
-                            Ok(Command::ShowMemory {
-                                start: None,
-                                end: None,
-                            })
-                        }
-                        2 => {
-                            // One argument - show 64 bytes at address
-                            let addr = parse_address(&normalized[1])?;
-                            Ok(Command::ShowMemory {
-                                start: Some(addr),
-                                end: None,
-                            })
-                        }
-                        3 => {
-                            // Two arguments - show range
-                            let start = parse_address(&normalized[1])?;
-                            let end = parse_address(&normalized[2])?;
-                            if end <= start {
-                                return Err(Error::Generic(
-                                    "End address must be greater than start address".to_string(),
-                                ));
-                            }
-                            if end - start > 256 {
-                                return Err(Error::Generic(
-                                    "Memory range too large (max 256 bytes)".to_string(),
-                                ));
-                            }
-                            Ok(Command::ShowMemory {
-                                start: Some(start),
-                                end: Some(end),
-                            })
-                        }
-                        _ => Err(Error::Generic(
-                            "Too many arguments for /memory command".to_string(),
-                        )),
-                    }
-                }
-                _ => Err(Error::Generic(format!("Unknown command: {first_word}"))),
-            };
+            return Err(Error::Generic(
+                "Command not supported in library. Use the binary for REPL commands.".to_owned(),
+            ));
         }
     }
 
@@ -463,27 +396,6 @@ pub fn parse_number(input: &str) -> Result<i32, String> {
             .parse::<i32>()
             .map_err(|_| format!("Invalid decimal number: {input}"))
     }
-}
-
-/// Parses a memory address (unsigned 32-bit value)
-///
-/// Supports decimal, hexadecimal (0x), and binary (0b) formats
-#[cfg(feature = "repl")]
-fn parse_address(input: &str) -> Result<u32, Error> {
-    let input = input.trim();
-
-    let result = if input.starts_with("0x") || input.starts_with("0X") {
-        // Hexadecimal
-        u32::from_str_radix(&input[2..], 16)
-    } else if input.starts_with("0b") || input.starts_with("0B") {
-        // Binary
-        u32::from_str_radix(&input[2..], 2)
-    } else {
-        // Decimal
-        input.parse::<u32>()
-    };
-
-    result.map_err(|_| Error::Generic(format!("Invalid address: {input}")))
 }
 
 /// Parses a string as an instruction mnemonic or pseudo-instruction.

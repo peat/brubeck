@@ -1,7 +1,6 @@
 //! Encoding formats for RV32I instructions.
 
-use crate::rv32_i::Register;
-use crate::Immediate;
+use crate::rv32_i::{Immediate, Register};
 
 #[derive(Debug, Copy, Clone, Default, PartialEq)]
 pub struct RType {

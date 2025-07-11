@@ -17,9 +17,7 @@
 //! - ECALL: 000000000000 00000 000 00000 1110011
 //! - EBREAK: 000000000001 00000 000 00000 1110011
 
-use brubeck::rv32_i::{
-    cpu::Error as CpuError, formats::IType, instructions::Instruction, registers::Register,
-};
+use brubeck::rv32_i::{formats::IType, instructions::Instruction, registers::Register, CPUError};
 
 // Import test helpers
 use crate::unit::test_helpers::{CpuAssertions, CpuBuilder, ExecuteWithContext};
@@ -89,7 +87,7 @@ fn test_ecall_trap() {
 
     assert!(result.is_err(), "ECALL should trap");
     match result {
-        Err(CpuError::EnvironmentCall) => {
+        Err(CPUError::EnvironmentCall) => {
             // Expected behavior
         }
         _ => panic!("ECALL should generate EnvironmentCall error"),
@@ -119,7 +117,7 @@ fn test_ecall_syscall_convention() {
 
     let result = cpu.execute(ecall);
     assert!(
-        matches!(result, Err(CpuError::EnvironmentCall)),
+        matches!(result, Err(CPUError::EnvironmentCall)),
         "ECALL triggers system call"
     );
 }
@@ -139,7 +137,7 @@ fn test_ebreak_trap() {
 
     assert!(result.is_err(), "EBREAK should trap");
     match result {
-        Err(CpuError::Breakpoint) => {
+        Err(CPUError::Breakpoint) => {
             // Expected behavior
         }
         _ => panic!("EBREAK should generate Breakpoint error"),
@@ -168,7 +166,7 @@ fn test_ebreak_debugger_usage() {
 
     // Debugger can inspect state when breakpoint hits
     assert!(
-        matches!(result, Err(CpuError::Breakpoint)),
+        matches!(result, Err(CPUError::Breakpoint)),
         "EBREAK stops execution for debugging"
     );
 

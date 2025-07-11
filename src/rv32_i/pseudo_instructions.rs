@@ -16,7 +16,7 @@ use super::{
     instructions::Instruction,
     registers::Register,
 };
-use crate::Immediate;
+use crate::rv32_i::Immediate;
 
 /// Represents an RV32I pseudo-instruction
 ///

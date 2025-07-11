@@ -207,11 +207,12 @@ fn test_undo_limit_applied() {
     interpreter.interpret("ADDI x1, x0, 10").unwrap();
 
     // Undo should fail
-    let result = interpreter.interpret("/previous");
-    assert!(result.is_err() || result.unwrap().contains("No history"));
+    let result = interpreter.previous_state();
+    assert!(result.is_err());
 }
 
 #[test]
+#[ignore = "Binary-specific functionality - semicolon parsing with slash commands"]
 fn test_execute_mode_functionality() {
     // Test execute mode functionality through interpreter (implementation is in main.rs)
     use brubeck::interpreter::Interpreter;
@@ -230,6 +231,7 @@ fn test_execute_mode_functionality() {
 }
 
 #[test]
+#[ignore = "Binary-specific functionality - semicolon parsing with slash commands"]
 fn test_script_mode_functionality() {
     // Test script-like functionality through interpreter (implementation is in main.rs)
     use brubeck::interpreter::Interpreter;
@@ -243,6 +245,7 @@ fn test_script_mode_functionality() {
 }
 
 #[test]
+#[ignore = "Binary-specific functionality - semicolon parsing with slash commands"]
 fn test_script_mode_file_handling() {
     // This test would be for actual file handling, which is in main.rs
     // For now, just test that semicolon parsing works (which is the core functionality)
@@ -257,6 +260,7 @@ fn test_script_mode_file_handling() {
 // ==================== SEMICOLON PARSING TESTS ====================
 
 #[test]
+#[ignore = "Library no longer supports semicolon-separated commands"]
 fn test_semicolon_basic() {
     let mut ctx = common::interpreter_context();
     // Single line with multiple commands
@@ -267,6 +271,7 @@ fn test_semicolon_basic() {
 }
 
 #[test]
+#[ignore = "Library no longer supports semicolon-separated commands"]
 fn test_semicolon_spaces() {
     let mut ctx = common::interpreter_context();
     // Various spacing around semicolons
@@ -282,6 +287,7 @@ fn test_semicolon_spaces() {
 }
 
 #[test]
+#[ignore = "Binary-specific functionality - slash commands"]
 fn test_semicolon_inspection() {
     let mut ctx = common::interpreter_context();
     // Mix instructions and inspections
@@ -291,6 +297,7 @@ fn test_semicolon_inspection() {
 }
 
 #[test]
+#[ignore = "Library no longer supports semicolon-separated commands"]
 fn test_semicolon_empty() {
     let mut ctx = common::interpreter_context();
     // Empty commands should be ignored
@@ -304,6 +311,7 @@ fn test_semicolon_empty() {
 }
 
 #[test]
+#[ignore = "Library no longer supports semicolon-separated commands"]
 fn test_semicolon_errors() {
     let mut ctx = common::interpreter_context();
     // Error in middle shouldn't affect other commands

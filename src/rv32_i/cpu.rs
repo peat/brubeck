@@ -365,9 +365,9 @@ impl CPU {
     }
 
     /// Read a CSR value
-    pub fn read_csr(&self, addr: u16) -> Result<u32, Error> {
+    pub fn read_csr(&self, addr: u16) -> Result<u32, CPUError> {
         if addr >= 4096 || !self.csr_exists[addr as usize] {
-            return Err(Error::IllegalInstruction(format!(
+            return Err(CPUError::IllegalInstruction(format!(
                 "CSR address 0x{addr:03x} does not exist"
             )));
         }
@@ -394,15 +394,15 @@ impl CPU {
     }
 
     /// Write a CSR value (returns old value like CSRRW instruction)
-    pub fn write_csr(&mut self, addr: u16, value: u32) -> Result<u32, Error> {
+    pub fn write_csr(&mut self, addr: u16, value: u32) -> Result<u32, CPUError> {
         if addr >= 4096 || !self.csr_exists[addr as usize] {
-            return Err(Error::IllegalInstruction(format!(
+            return Err(CPUError::IllegalInstruction(format!(
                 "CSR address 0x{addr:03x} does not exist"
             )));
         }
 
         if self.csr_readonly[addr as usize] {
-            return Err(Error::IllegalInstruction(format!(
+            return Err(CPUError::IllegalInstruction(format!(
                 "CSR address 0x{addr:03x} is read-only"
             )));
         }
@@ -427,7 +427,7 @@ impl CPU {
     }
 
     /// Set bits in a CSR (for CSRRS instruction)
-    pub fn set_csr_bits(&mut self, addr: u16, mask: u32) -> Result<u32, Error> {
+    pub fn set_csr_bits(&mut self, addr: u16, mask: u32) -> Result<u32, CPUError> {
         let old_value = self.read_csr(addr)?;
         if mask != 0 {
             self.write_csr(addr, old_value | mask)?;
@@ -436,7 +436,7 @@ impl CPU {
     }
 
     /// Clear bits in a CSR (for CSRRC instruction)
-    pub fn clear_csr_bits(&mut self, addr: u16, mask: u32) -> Result<u32, Error> {
+    pub fn clear_csr_bits(&mut self, addr: u16, mask: u32) -> Result<u32, CPUError> {
         let old_value = self.read_csr(addr)?;
         if mask != 0 {
             self.write_csr(addr, old_value & !mask)?;
@@ -463,14 +463,14 @@ impl CPU {
     ///
     /// This method applies all the changes specified in the `Modify` struct
     /// and returns a `StateDelta` indicating what actually changed.
-    pub fn apply(&mut self, modify: &Modify) -> Result<StateDelta, Error> {
+    pub fn apply(&mut self, modify: &Modify) -> Result<StateDelta, CPUError> {
         // First, validate all operations without making changes (atomic validation)
 
         // Validate memory changes
         for (addr, new_data) in &modify.memory_changes {
             let addr = *addr as usize;
             if addr + new_data.len() > self.memory.len() {
-                return Err(Error::IllegalInstruction(format!(
+                return Err(CPUError::IllegalInstruction(format!(
                     "Memory modification out of bounds: address 0x{:x} + {} bytes",
                     addr,
                     new_data.len()
@@ -482,7 +482,7 @@ impl CPU {
         for (addr, _new_val) in &modify.csr_changes {
             let addr = *addr as u16;
             if addr >= 4096 || !self.csr_exists[addr as usize] {
-                return Err(Error::IllegalInstruction(format!(
+                return Err(CPUError::IllegalInstruction(format!(
                     "CSR address 0x{addr:03x} does not exist"
                 )));
             }
@@ -546,8 +546,19 @@ impl CPU {
     ///
     /// # Example
     /// ```
+    /// use brubeck::rv32_i::{CPU, Instruction, Register, IType};
+    /// use brubeck::Immediate;
+    ///
     /// let mut cpu = CPU::default();
-    /// let delta = cpu.execute(Instruction::ADDI(...))?;
+    /// // ADDI x1, x0, 42
+    /// let mut itype = IType::new();
+    /// itype.opcode = 0b0010011;  // ADDI opcode
+    /// itype.funct3 = 0b000;      // ADDI funct3
+    /// itype.rd = Register::X1;
+    /// itype.rs1 = Register::X0;
+    /// itype.imm.set_signed(42);
+    /// let inst = Instruction::ADDI(itype);
+    /// let delta = cpu.execute(inst)?;
     ///
     /// // See what changed
     /// println!("Modified {} registers", delta.register_changes.len());
@@ -555,8 +566,9 @@ impl CPU {
     /// // Perfect undo
     /// let undo = delta.to_reverse_modify();
     /// cpu.apply(&undo)?;
+    /// # Ok::<(), brubeck::rv32_i::CPUError>(())
     /// ```
-    pub fn execute(&mut self, instruction: Instruction) -> Result<StateDelta, Error> {
+    pub fn execute(&mut self, instruction: Instruction) -> Result<StateDelta, CPUError> {
         // Capture state before execution
         let old_pc = self.pc;
         let old_registers = self.get_all_registers_internal();
@@ -606,7 +618,7 @@ impl CPU {
     }
 
     /// Internal execute method (renamed from the original execute)
-    fn execute_internal(&mut self, instruction: Instruction) -> Result<(), Error> {
+    fn execute_internal(&mut self, instruction: Instruction) -> Result<(), CPUError> {
         match instruction {
             Instruction::ADD(i) => self.rv32i_add(i),
             Instruction::ADDI(i) => self.rv32i_addi(i),
@@ -668,26 +680,26 @@ impl CPU {
      *  Naming follows the convention isa_instruction (eg: rv32i_nop)
      */
 
-    fn increment_pc(&mut self) -> Result<(), Error> {
+    fn increment_pc(&mut self) -> Result<(), CPUError> {
         self.pc += Instruction::LENGTH;
         Ok(())
     }
 
-    fn rv32i_nop(&mut self) -> Result<(), Error> {
+    fn rv32i_nop(&mut self) -> Result<(), CPUError> {
         self.increment_pc()
     }
 
     /// ADD and SUB perform addition and subtraction respectively. Overflows
     /// are ignored and the low XLEN bits of results are written to the
     /// destination.
-    fn rv32i_add(&mut self, instruction: RType) -> Result<(), Error> {
+    fn rv32i_add(&mut self, instruction: RType) -> Result<(), CPUError> {
         let a = self.get_register(instruction.rs1);
         let b = self.get_register(instruction.rs2);
         self.set_register(instruction.rd, a.wrapping_add(b));
         self.increment_pc()
     }
 
-    fn rv32i_sub(&mut self, instruction: RType) -> Result<(), Error> {
+    fn rv32i_sub(&mut self, instruction: RType) -> Result<(), CPUError> {
         let a = self.get_register(instruction.rs1);
         let b = self.get_register(instruction.rs2);
         self.set_register(instruction.rd, a.wrapping_sub(b));
@@ -698,7 +710,7 @@ impl CPU {
     /// overflow is ignored and the result is simply the low XLEN bits of the
     /// result. ADDI rd, rs1, 0 is used to implement the MV rd, rs1 assembler
     /// pseudo-instruction.
-    fn rv32i_addi(&mut self, instruction: IType) -> Result<(), Error> {
+    fn rv32i_addi(&mut self, instruction: IType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1);
         let imm = instruction.imm.as_u32();
 
@@ -711,7 +723,7 @@ impl CPU {
     /// SLTI (set less than immediate) places the value 1 in register rd if
     /// register rs1 is less than the sign-extended immediate when both are
     /// treated as signed numbers, else 0 is written to rd.
-    fn rv32i_slti(&mut self, instruction: IType) -> Result<(), Error> {
+    fn rv32i_slti(&mut self, instruction: IType) -> Result<(), CPUError> {
         // rs1 and the immediate value are treated as signed
         let signed_rs1 = self.get_register(instruction.rs1) as i32;
         let signed_imm = instruction.imm.as_i32();
@@ -729,7 +741,7 @@ impl CPU {
     /// immediate is first sign-extended to XLEN bits then treated as an
     /// unsigned number). Note, SLTIU rd, rs1, 1 sets rd to 1 if rs1 equals
     /// zero, otherwise sets rd to 0 (assembler pseudo-op SEQZ rd, rs).
-    fn rv32i_sltiu(&mut self, instruction: IType) -> Result<(), Error> {
+    fn rv32i_sltiu(&mut self, instruction: IType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1);
         let imm = instruction.imm.as_u32();
 
@@ -746,7 +758,7 @@ impl CPU {
     /// and XOR on register rs1 and the sign-extended 12-bit immediate and place
     /// the result in rd. Note, XORI rd, rs1, -1 performs a bitwise logical
     /// inversion of register rs1 (assembler pseudo-instruction NOT rd, rs).
-    fn rv32i_andi(&mut self, instruction: IType) -> Result<(), Error> {
+    fn rv32i_andi(&mut self, instruction: IType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1);
         let imm = instruction.imm.as_u32();
 
@@ -756,7 +768,7 @@ impl CPU {
         self.increment_pc()
     }
 
-    fn rv32i_ori(&mut self, instruction: IType) -> Result<(), Error> {
+    fn rv32i_ori(&mut self, instruction: IType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1);
         let imm = instruction.imm.as_u32();
 
@@ -766,7 +778,7 @@ impl CPU {
         self.increment_pc()
     }
 
-    fn rv32i_xori(&mut self, instruction: IType) -> Result<(), Error> {
+    fn rv32i_xori(&mut self, instruction: IType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1);
         let imm = instruction.imm.as_u32();
 
@@ -780,7 +792,7 @@ impl CPU {
     /// the U-type format. LUI places the U-immediate value in the top 20 bits
     /// of the destination register rd, filling in the lowest 12 bits with
     /// zeros.
-    fn rv32i_lui(&mut self, instruction: UType) -> Result<(), Error> {
+    fn rv32i_lui(&mut self, instruction: UType) -> Result<(), CPUError> {
         let mut imm = instruction.imm.as_u32();
         imm <<= 12;
         self.set_register(instruction.rd, imm);
@@ -792,7 +804,7 @@ impl CPU {
     /// addresses and uses the U-type format. AUIPC forms a 32-bit offset from
     /// the 20-bit U-immediate, filling in the lowest 12 bits with zeros, adds
     /// this offset to the pc, then places the result in register rd.
-    fn rv32i_auipc(&mut self, instruction: UType) -> Result<(), Error> {
+    fn rv32i_auipc(&mut self, instruction: UType) -> Result<(), CPUError> {
         let mut imm = instruction.imm.as_u32();
         imm <<= 12;
         let pc = self.pc;
@@ -806,7 +818,7 @@ impl CPU {
     /// 1 to rd if rs1 < rs2, 0 otherwise. Note, SLTU rd, x0, rs2 sets rd to 1
     /// if rs2 is not equal to zero, otherwise sets rd to zero (assembler
     /// pseudo-op SNEZ rd, rs)
-    fn rv32i_slt(&mut self, instruction: RType) -> Result<(), Error> {
+    fn rv32i_slt(&mut self, instruction: RType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1) as i32;
         let rs2 = self.get_register(instruction.rs2) as i32;
 
@@ -819,7 +831,7 @@ impl CPU {
         self.increment_pc()
     }
 
-    fn rv32i_sltu(&mut self, instruction: RType) -> Result<(), Error> {
+    fn rv32i_sltu(&mut self, instruction: RType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1);
         let rs2 = self.get_register(instruction.rs2);
 
@@ -843,7 +855,7 @@ impl CPU {
     }
 
     /// AND, OR, and XOR perform bitwise logical operations
-    fn rv32i_and(&mut self, instruction: RType) -> Result<(), Error> {
+    fn rv32i_and(&mut self, instruction: RType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1);
         let rs2 = self.get_register(instruction.rs2);
 
@@ -853,7 +865,7 @@ impl CPU {
         self.increment_pc()
     }
 
-    fn rv32i_or(&mut self, instruction: RType) -> Result<(), Error> {
+    fn rv32i_or(&mut self, instruction: RType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1);
         let rs2 = self.get_register(instruction.rs2);
 
@@ -863,7 +875,7 @@ impl CPU {
         self.increment_pc()
     }
 
-    fn rv32i_xor(&mut self, instruction: RType) -> Result<(), Error> {
+    fn rv32i_xor(&mut self, instruction: RType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1);
         let rs2 = self.get_register(instruction.rs2);
 
@@ -876,7 +888,7 @@ impl CPU {
     /// SLL, SRL, and SRA perform logical left, logical right, and arithmetic
     /// right shifts on the value in register rs1 by the shift amount held in
     /// the lower 5 bits of register rs2.
-    fn rv32i_sll(&mut self, instruction: RType) -> Result<(), Error> {
+    fn rv32i_sll(&mut self, instruction: RType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1);
         let rs2 = self.get_register(instruction.rs2);
 
@@ -889,7 +901,7 @@ impl CPU {
         self.increment_pc()
     }
 
-    fn rv32i_srl(&mut self, instruction: RType) -> Result<(), Error> {
+    fn rv32i_srl(&mut self, instruction: RType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1);
         let rs2 = self.get_register(instruction.rs2);
 
@@ -903,7 +915,7 @@ impl CPU {
         self.increment_pc()
     }
 
-    fn rv32i_sra(&mut self, instruction: RType) -> Result<(), Error> {
+    fn rv32i_sra(&mut self, instruction: RType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1);
         let rs2 = self.get_register(instruction.rs2);
 
@@ -925,7 +937,7 @@ impl CPU {
     /// shifted into the lower bits); SRLI is a logical right shift (zeros
     /// are shifted into the upper bits); and SRAI is an arithmetic right shift
     /// (the original sign bit is copied into the vacated upper bits).
-    fn rv32i_slli(&mut self, instruction: IType) -> Result<(), Error> {
+    fn rv32i_slli(&mut self, instruction: IType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1);
         let imm = instruction.imm.as_u32();
 
@@ -938,7 +950,7 @@ impl CPU {
         self.increment_pc()
     }
 
-    fn rv32i_srli(&mut self, instruction: IType) -> Result<(), Error> {
+    fn rv32i_srli(&mut self, instruction: IType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1);
         let imm = instruction.imm.as_u32();
 
@@ -952,7 +964,7 @@ impl CPU {
         self.increment_pc()
     }
 
-    fn rv32i_srai(&mut self, instruction: IType) -> Result<(), Error> {
+    fn rv32i_srai(&mut self, instruction: IType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1);
         let imm = instruction.imm.as_u32();
 
@@ -976,7 +988,7 @@ impl CPU {
     /// address register and x5 as an alternate link register.
     /// Plain unconditional jumps (assembler pseudo-op J) are encoded as a JAL
     /// with rd=x0.
-    fn rv32i_jal(&mut self, instruction: JType) -> Result<(), Error> {
+    fn rv32i_jal(&mut self, instruction: JType) -> Result<(), CPUError> {
         let mut offset = instruction.imm.as_u32();
 
         // shift left one bit; multiply by 2
@@ -987,7 +999,7 @@ impl CPU {
 
         // validate the offset address is 32-bit aligned
         if offset_address % 4 != 0 {
-            return Err(Error::MisalignedJump(offset_address));
+            return Err(CPUError::MisalignedJump(offset_address));
         }
 
         // set the return address
@@ -1006,7 +1018,7 @@ impl CPU {
     /// instruction following the jump (pc+4) is written to register rd.
     /// Register x0 can be used as the destination if the result is not
     /// required.
-    fn rv32i_jalr(&mut self, instruction: IType) -> Result<(), Error> {
+    fn rv32i_jalr(&mut self, instruction: IType) -> Result<(), CPUError> {
         let offset = instruction.imm.as_u32();
         let rs1 = self.get_register(instruction.rs1);
 
@@ -1018,7 +1030,7 @@ impl CPU {
 
         // validate the offset address is 32-bit aligned
         if offset_address % 4 != 0 {
-            return Err(Error::MisalignedJump(offset_address));
+            return Err(CPUError::MisalignedJump(offset_address));
         }
 
         let return_address = self.pc.wrapping_add(Instruction::LENGTH);
@@ -1036,7 +1048,7 @@ impl CPU {
     ///
     /// BEQ and BNE take the branch if registers rs1 and rs2 are equal or
     /// unequal respectively.
-    fn rv32i_beq(&mut self, instruction: BType) -> Result<(), Error> {
+    fn rv32i_beq(&mut self, instruction: BType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1);
         let rs2 = self.get_register(instruction.rs2);
 
@@ -1051,7 +1063,7 @@ impl CPU {
         Ok(())
     }
 
-    fn rv32i_bne(&mut self, instruction: BType) -> Result<(), Error> {
+    fn rv32i_bne(&mut self, instruction: BType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1);
         let rs2 = self.get_register(instruction.rs2);
 
@@ -1068,7 +1080,7 @@ impl CPU {
 
     ///  BLT and BLTU take the branch if rs1 is less than rs2, using signed
     ///  and unsigned comparison respectively.
-    fn rv32i_blt(&mut self, instruction: BType) -> Result<(), Error> {
+    fn rv32i_blt(&mut self, instruction: BType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1) as i32;
         let rs2 = self.get_register(instruction.rs2) as i32;
 
@@ -1083,7 +1095,7 @@ impl CPU {
         Ok(())
     }
 
-    fn rv32i_bltu(&mut self, instruction: BType) -> Result<(), Error> {
+    fn rv32i_bltu(&mut self, instruction: BType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1);
         let rs2 = self.get_register(instruction.rs2);
 
@@ -1100,7 +1112,7 @@ impl CPU {
 
     ///  BGE and BGEU take the branch if rs1 is greater than or equal to rs2,
     ///  using signed and unsigned comparison respectively.
-    fn rv32i_bge(&mut self, instruction: BType) -> Result<(), Error> {
+    fn rv32i_bge(&mut self, instruction: BType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1) as i32;
         let rs2 = self.get_register(instruction.rs2) as i32;
 
@@ -1115,7 +1127,7 @@ impl CPU {
         Ok(())
     }
 
-    fn rv32i_bgeu(&mut self, instruction: BType) -> Result<(), Error> {
+    fn rv32i_bgeu(&mut self, instruction: BType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1);
         let rs2 = self.get_register(instruction.rs2);
 
@@ -1137,7 +1149,7 @@ impl CPU {
     /// rd. Stores copy the value in register rs2 to memory
     ///
     /// The LW instruction loads a 32-bit value from memory into rd.
-    fn rv32i_lw(&mut self, instruction: IType) -> Result<(), Error> {
+    fn rv32i_lw(&mut self, instruction: IType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1);
         let imm = instruction.imm.as_u32();
 
@@ -1145,7 +1157,7 @@ impl CPU {
         let index = offset as usize;
 
         if index >= self.memory.len() {
-            return Err(Error::AccessViolation(rs1));
+            return Err(CPUError::AccessViolation(rs1));
         }
 
         let mut value_buf = [0u8; 4];
@@ -1158,7 +1170,7 @@ impl CPU {
 
     /// LH loads a 16-bit value from memory, then sign-extends to 32-bits before
     /// storing in rd.
-    fn rv32i_lh(&mut self, instruction: IType) -> Result<(), Error> {
+    fn rv32i_lh(&mut self, instruction: IType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1);
         let imm = instruction.imm.as_u32();
 
@@ -1166,7 +1178,7 @@ impl CPU {
         let index = offset as usize;
 
         if index >= self.memory.len() {
-            return Err(Error::AccessViolation(rs1));
+            return Err(CPUError::AccessViolation(rs1));
         }
 
         let mut value_buf = [0u8; 2];
@@ -1181,7 +1193,7 @@ impl CPU {
 
     /// LHU loads a 16-bit value from memory but then zero extends to 32-bits
     /// before storing in rd.
-    fn rv32i_lhu(&mut self, instruction: IType) -> Result<(), Error> {
+    fn rv32i_lhu(&mut self, instruction: IType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1);
         let imm = instruction.imm.as_u32();
 
@@ -1189,7 +1201,7 @@ impl CPU {
         let index = offset as usize;
 
         if index >= self.memory.len() {
-            return Err(Error::AccessViolation(rs1));
+            return Err(CPUError::AccessViolation(rs1));
         }
 
         let mut value_buf = [0u8; 2];
@@ -1204,7 +1216,7 @@ impl CPU {
 
     /// LB loads a 8-bit value from memory, then sign-extends to 32-bits before
     /// storing in rd.
-    fn rv32i_lb(&mut self, instruction: IType) -> Result<(), Error> {
+    fn rv32i_lb(&mut self, instruction: IType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1);
         let imm = instruction.imm.as_u32();
 
@@ -1212,7 +1224,7 @@ impl CPU {
         let index = offset as usize;
 
         if index >= self.memory.len() {
-            return Err(Error::AccessViolation(rs1));
+            return Err(CPUError::AccessViolation(rs1));
         }
 
         let u8_value = self.memory[index];
@@ -1225,7 +1237,7 @@ impl CPU {
 
     /// LBU loads a 8-bit value from memory but then zero extends to 32-bits
     /// before storing in rd.
-    fn rv32i_lbu(&mut self, instruction: IType) -> Result<(), Error> {
+    fn rv32i_lbu(&mut self, instruction: IType) -> Result<(), CPUError> {
         let rs1 = self.get_register(instruction.rs1);
         let imm = instruction.imm.as_u32();
 
@@ -1233,7 +1245,7 @@ impl CPU {
         let index = offset as usize;
 
         if index >= self.memory.len() {
-            return Err(Error::AccessViolation(rs1));
+            return Err(CPUError::AccessViolation(rs1));
         }
 
         let u8_value = self.memory[index];
@@ -1245,22 +1257,22 @@ impl CPU {
 
     /// The SW, SH, and SB instructions store 32-bit, 16-bit, and 8-bit values
     /// from the low bits of register rs2 to memory
-    fn rv32i_sw(&mut self, instruction: SType) -> Result<(), Error> {
+    fn rv32i_sw(&mut self, instruction: SType) -> Result<(), CPUError> {
         self.store(instruction, 4)?;
         self.increment_pc()
     }
 
-    fn rv32i_sh(&mut self, instruction: SType) -> Result<(), Error> {
+    fn rv32i_sh(&mut self, instruction: SType) -> Result<(), CPUError> {
         self.store(instruction, 2)?;
         self.increment_pc()
     }
 
-    fn rv32i_sb(&mut self, instruction: SType) -> Result<(), Error> {
+    fn rv32i_sb(&mut self, instruction: SType) -> Result<(), CPUError> {
         self.store(instruction, 1)?;
         self.increment_pc()
     }
 
-    fn store(&mut self, instruction: SType, bytes: usize) -> Result<(), Error> {
+    fn store(&mut self, instruction: SType, bytes: usize) -> Result<(), CPUError> {
         let base = self.get_register(instruction.rs1);
         let src = self.get_register(instruction.rs2);
         let imm = instruction.imm.as_u32();
@@ -1269,7 +1281,7 @@ impl CPU {
         let mut index = address as usize;
 
         if index >= self.memory.len() {
-            return Err(Error::AccessViolation(address));
+            return Err(CPUError::AccessViolation(address));
         }
 
         for (byte_index, byte) in src.to_le_bytes().into_iter().enumerate() {
@@ -1287,7 +1299,7 @@ impl CPU {
     ///
     /// Reference: RISC-V ISA Manual, Volume I: Version 20191213
     /// Section 2.7 - Memory Ordering Instructions
-    fn rv32i_fence(&mut self) -> Result<(), Error> {
+    fn rv32i_fence(&mut self) -> Result<(), CPUError> {
         // For a simple single-threaded implementation, FENCE acts as NOP
         // In a more complex implementation, this would ensure memory ordering
         self.increment_pc()
@@ -1298,28 +1310,28 @@ impl CPU {
     ///
     /// Reference: RISC-V ISA Manual, Volume I: Version 20191213
     /// Section 2.8 - Environment Call and Breakpoints
-    fn rv32i_ecall(&mut self) -> Result<(), Error> {
+    fn rv32i_ecall(&mut self) -> Result<(), CPUError> {
         // For now, we'll treat this as an unhandled system call
         // In a real implementation, this would:
         // 1. Save PC to a CSR (mepc/sepc/uepc)
         // 2. Set mcause/scause/ucause to indicate an environment call
         // 3. Transfer control to the trap handler
         // For educational purposes, we'll return a specific error
-        Err(Error::EnvironmentCall)
+        Err(CPUError::EnvironmentCall)
     }
 
     /// EBREAK is used to return control to a debugging environment.
     ///
     /// Reference: RISC-V ISA Manual, Volume I: Version 20191213
     /// Section 2.8 - Environment Call and Breakpoints
-    fn rv32i_ebreak(&mut self) -> Result<(), Error> {
+    fn rv32i_ebreak(&mut self) -> Result<(), CPUError> {
         // For now, we'll treat this as a breakpoint trap
         // In a real implementation, this would:
         // 1. Save PC to a CSR (mepc/sepc/uepc)
         // 2. Set mcause/scause/ucause to indicate a breakpoint
         // 3. Transfer control to the debugger
         // For educational purposes, we'll return a specific error
-        Err(Error::Breakpoint)
+        Err(CPUError::Breakpoint)
     }
 
     /// CSR Instructions - Control and Status Register Operations
@@ -1329,7 +1341,7 @@ impl CPU {
     /// Atomically swaps values in the CSRs and integer registers.
     /// Old CSR value → rd, rs1 → CSR
     /// If rd=x0, then the instruction shall not read the CSR (avoids side effects)
-    fn rv32i_csrrw(&mut self, instruction: IType) -> Result<(), Error> {
+    fn rv32i_csrrw(&mut self, instruction: IType) -> Result<(), CPUError> {
         // For CSR instructions, the immediate field contains the CSR address (12 bits, unsigned)
         // We need to mask off the sign extension that was applied during parsing
         let csr_addr = (instruction.imm.as_u32() & 0xFFF) as u16;
@@ -1337,14 +1349,14 @@ impl CPU {
 
         // Check if CSR exists
         if csr_addr >= 4096 || !self.csr_exists[csr_addr as usize] {
-            return Err(Error::IllegalInstruction(format!(
+            return Err(CPUError::IllegalInstruction(format!(
                 "CSR address 0x{csr_addr:03x} does not exist"
             )));
         }
 
         // Check if writing to read-only CSR
         if self.csr_readonly[csr_addr as usize] {
-            return Err(Error::IllegalInstruction(format!(
+            return Err(CPUError::IllegalInstruction(format!(
                 "CSR address 0x{csr_addr:03x} is read-only"
             )));
         }
@@ -1371,7 +1383,7 @@ impl CPU {
     /// Reads the value of the CSR, then sets bits based on rs1.
     /// Old CSR value → rd, CSR | rs1 → CSR
     /// If rs1=x0, then the instruction will not write to the CSR (avoids side effects)
-    fn rv32i_csrrs(&mut self, instruction: IType) -> Result<(), Error> {
+    fn rv32i_csrrs(&mut self, instruction: IType) -> Result<(), CPUError> {
         // For CSR instructions, the immediate field contains the CSR address (12 bits, unsigned)
         // We need to mask off the sign extension that was applied during parsing
         let csr_addr = (instruction.imm.as_u32() & 0xFFF) as u16;
@@ -1379,7 +1391,7 @@ impl CPU {
 
         // Check if CSR exists
         if csr_addr >= 4096 || !self.csr_exists[csr_addr as usize] {
-            return Err(Error::IllegalInstruction(format!(
+            return Err(CPUError::IllegalInstruction(format!(
                 "CSR address 0x{csr_addr:03x} does not exist"
             )));
         }
@@ -1394,7 +1406,7 @@ impl CPU {
         if instruction.rs1 != Register::X0 {
             // Check if writing to read-only CSR
             if self.csr_readonly[csr_addr as usize] {
-                return Err(Error::IllegalInstruction(format!(
+                return Err(CPUError::IllegalInstruction(format!(
                     "CSR address 0x{csr_addr:03x} is read-only"
                 )));
             }
@@ -1410,7 +1422,7 @@ impl CPU {
     /// Reads the value of the CSR, then clears bits based on rs1.
     /// Old CSR value → rd, CSR & ~rs1 → CSR
     /// If rs1=x0, then the instruction will not write to the CSR (avoids side effects)
-    fn rv32i_csrrc(&mut self, instruction: IType) -> Result<(), Error> {
+    fn rv32i_csrrc(&mut self, instruction: IType) -> Result<(), CPUError> {
         // For CSR instructions, the immediate field contains the CSR address (12 bits, unsigned)
         // We need to mask off the sign extension that was applied during parsing
         let csr_addr = (instruction.imm.as_u32() & 0xFFF) as u16;
@@ -1418,7 +1430,7 @@ impl CPU {
 
         // Check if CSR exists
         if csr_addr >= 4096 || !self.csr_exists[csr_addr as usize] {
-            return Err(Error::IllegalInstruction(format!(
+            return Err(CPUError::IllegalInstruction(format!(
                 "CSR address 0x{csr_addr:03x} does not exist"
             )));
         }
@@ -1433,7 +1445,7 @@ impl CPU {
         if instruction.rs1 != Register::X0 {
             // Check if writing to read-only CSR
             if self.csr_readonly[csr_addr as usize] {
-                return Err(Error::IllegalInstruction(format!(
+                return Err(CPUError::IllegalInstruction(format!(
                     "CSR address 0x{csr_addr:03x} is read-only"
                 )));
             }
@@ -1449,7 +1461,7 @@ impl CPU {
     /// Atomically writes a zero-extended 5-bit immediate to a CSR.
     /// Old CSR value → rd, zero-extended uimm → CSR
     /// If rd=x0, then the instruction shall not read the CSR (avoids side effects)
-    fn rv32i_csrrwi(&mut self, instruction: IType) -> Result<(), Error> {
+    fn rv32i_csrrwi(&mut self, instruction: IType) -> Result<(), CPUError> {
         // For CSR instructions, the immediate field contains the CSR address (12 bits, unsigned)
         // We need to mask off the sign extension that was applied during parsing
         let csr_addr = (instruction.imm.as_u32() & 0xFFF) as u16;
@@ -1459,14 +1471,14 @@ impl CPU {
 
         // Check if CSR exists
         if csr_addr >= 4096 || !self.csr_exists[csr_addr as usize] {
-            return Err(Error::IllegalInstruction(format!(
+            return Err(CPUError::IllegalInstruction(format!(
                 "CSR address 0x{csr_addr:03x} does not exist"
             )));
         }
 
         // Check if writing to read-only CSR
         if self.csr_readonly[csr_addr as usize] {
-            return Err(Error::IllegalInstruction(format!(
+            return Err(CPUError::IllegalInstruction(format!(
                 "CSR address 0x{csr_addr:03x} is read-only"
             )));
         }
@@ -1493,7 +1505,7 @@ impl CPU {
     /// Reads the value of the CSR, then sets bits based on 5-bit immediate.
     /// Old CSR value → rd, CSR | zero-extended uimm → CSR
     /// If uimm=0, then the instruction will not write to the CSR (avoids side effects)
-    fn rv32i_csrrsi(&mut self, instruction: IType) -> Result<(), Error> {
+    fn rv32i_csrrsi(&mut self, instruction: IType) -> Result<(), CPUError> {
         // For CSR instructions, the immediate field contains the CSR address (12 bits, unsigned)
         // We need to mask off the sign extension that was applied during parsing
         let csr_addr = (instruction.imm.as_u32() & 0xFFF) as u16;
@@ -1502,7 +1514,7 @@ impl CPU {
 
         // Check if CSR exists
         if csr_addr >= 4096 || !self.csr_exists[csr_addr as usize] {
-            return Err(Error::IllegalInstruction(format!(
+            return Err(CPUError::IllegalInstruction(format!(
                 "CSR address 0x{csr_addr:03x} does not exist"
             )));
         }
@@ -1517,7 +1529,7 @@ impl CPU {
         if uimm != 0 {
             // Check if writing to read-only CSR
             if self.csr_readonly[csr_addr as usize] {
-                return Err(Error::IllegalInstruction(format!(
+                return Err(CPUError::IllegalInstruction(format!(
                     "CSR address 0x{csr_addr:03x} is read-only"
                 )));
             }
@@ -1533,7 +1545,7 @@ impl CPU {
     /// Reads the value of the CSR, then clears bits based on 5-bit immediate.
     /// Old CSR value → rd, CSR & ~zero-extended uimm → CSR
     /// If uimm=0, then the instruction will not write to the CSR (avoids side effects)
-    fn rv32i_csrrci(&mut self, instruction: IType) -> Result<(), Error> {
+    fn rv32i_csrrci(&mut self, instruction: IType) -> Result<(), CPUError> {
         // For CSR instructions, the immediate field contains the CSR address (12 bits, unsigned)
         // We need to mask off the sign extension that was applied during parsing
         let csr_addr = (instruction.imm.as_u32() & 0xFFF) as u16;
@@ -1542,7 +1554,7 @@ impl CPU {
 
         // Check if CSR exists
         if csr_addr >= 4096 || !self.csr_exists[csr_addr as usize] {
-            return Err(Error::IllegalInstruction(format!(
+            return Err(CPUError::IllegalInstruction(format!(
                 "CSR address 0x{csr_addr:03x} does not exist"
             )));
         }
@@ -1557,7 +1569,7 @@ impl CPU {
         if uimm != 0 {
             // Check if writing to read-only CSR
             if self.csr_readonly[csr_addr as usize] {
-                return Err(Error::IllegalInstruction(format!(
+                return Err(CPUError::IllegalInstruction(format!(
                     "CSR address 0x{csr_addr:03x} is read-only"
                 )));
             }
@@ -1571,7 +1583,7 @@ impl CPU {
 }
 
 #[derive(Debug, Clone)]
-pub enum Error {
+pub enum CPUError {
     MisalignedJump(u32),
     AccessViolation(u32),
     EnvironmentCall,
@@ -1579,16 +1591,16 @@ pub enum Error {
     IllegalInstruction(String),
 }
 
-impl std::fmt::Display for Error {
+impl std::fmt::Display for CPUError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::MisalignedJump(addr) => write!(f, "Misaligned jump to address 0x{addr:08x}"),
-            Error::AccessViolation(addr) => {
+            CPUError::MisalignedJump(addr) => write!(f, "Misaligned jump to address 0x{addr:08x}"),
+            CPUError::AccessViolation(addr) => {
                 write!(f, "Memory address out of bounds: 0x{addr:08x}")
             }
-            Error::EnvironmentCall => write!(f, "Environment call"),
-            Error::Breakpoint => write!(f, "Breakpoint"),
-            Error::IllegalInstruction(desc) => write!(f, "Illegal instruction: {desc}"),
+            CPUError::EnvironmentCall => write!(f, "Environment call"),
+            CPUError::Breakpoint => write!(f, "Breakpoint"),
+            CPUError::IllegalInstruction(desc) => write!(f, "Illegal instruction: {desc}"),
         }
     }
 }
@@ -1699,7 +1711,10 @@ mod tests {
         // Try to read non-existent CSR
         let result = cpu.read_csr(0x999);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), Error::IllegalInstruction(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            CPUError::IllegalInstruction(_)
+        ));
 
         // Try to read at boundary
         let result = cpu.read_csr(0xFFF);
@@ -1730,7 +1745,10 @@ mod tests {
         // Try to write to read-only CSRs
         let result = cpu.write_csr(0xC00, 0x1234); // cycle is read-only
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), Error::IllegalInstruction(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            CPUError::IllegalInstruction(_)
+        ));
 
         let result = cpu.write_csr(0x301, 0x5678); // misa is read-only
         assert!(result.is_err());
@@ -1747,7 +1765,10 @@ mod tests {
         // Try to write to non-existent CSR
         let result = cpu.write_csr(0x999, 0x1234);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), Error::IllegalInstruction(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            CPUError::IllegalInstruction(_)
+        ));
     }
 
     #[test]
@@ -2040,39 +2061,39 @@ mod tests {
         // Non-existent CSR
         assert!(matches!(
             cpu.read_csr(0x999),
-            Err(Error::IllegalInstruction(_))
+            Err(CPUError::IllegalInstruction(_))
         ));
         assert!(matches!(
             cpu.write_csr(0x999, 0),
-            Err(Error::IllegalInstruction(_))
+            Err(CPUError::IllegalInstruction(_))
         ));
         assert!(matches!(
             cpu.set_csr_bits(0x999, 1),
-            Err(Error::IllegalInstruction(_))
+            Err(CPUError::IllegalInstruction(_))
         ));
         assert!(matches!(
             cpu.clear_csr_bits(0x999, 1),
-            Err(Error::IllegalInstruction(_))
+            Err(CPUError::IllegalInstruction(_))
         ));
 
         // Out of bounds CSR address
         assert!(matches!(
             cpu.read_csr(0x1000),
-            Err(Error::IllegalInstruction(_))
+            Err(CPUError::IllegalInstruction(_))
         ));
 
         // Read-only CSR writes (with non-zero mask/value)
         assert!(matches!(
             cpu.write_csr(0x301, 0x12345678), // misa is read-only
-            Err(Error::IllegalInstruction(_))
+            Err(CPUError::IllegalInstruction(_))
         ));
         assert!(matches!(
             cpu.set_csr_bits(0x301, 0xFF), // non-zero mask
-            Err(Error::IllegalInstruction(_))
+            Err(CPUError::IllegalInstruction(_))
         ));
         assert!(matches!(
             cpu.clear_csr_bits(0x301, 0xFF), // non-zero mask
-            Err(Error::IllegalInstruction(_))
+            Err(CPUError::IllegalInstruction(_))
         ));
     }
 

@@ -81,7 +81,7 @@
 //!
 //! // ... Any execution errors will be caught.
 //! assert!(result.is_ok());
-//! 
+//!
 //! // The result is a StateDelta showing what changed
 //! let delta = result.unwrap();
 //! assert_eq!(delta.register_changes.len(), 1);
@@ -111,7 +111,7 @@
 //!
 //! // ... Any execution errors will be caught.
 //! assert!(result.is_ok());
-//! 
+//!
 //! // The delta shows memory was changed
 //! let delta = result.unwrap();
 //! assert!(!delta.memory_changes.is_empty());
@@ -122,15 +122,8 @@
 //! ```
 //!
 
-/// Provides immediate value checks, conversions, etc.
-mod immediate;
-
 pub mod interpreter;
 pub mod rv32_i;
 
-#[cfg(feature = "repl")]
-pub mod cli;
-
-pub use immediate::Immediate;
 pub use interpreter::Interpreter;
-pub use rv32_i::PseudoInstruction;
+pub use rv32_i::{Immediate, PseudoInstruction};

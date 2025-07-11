@@ -9,5 +9,6 @@ pub mod context;
 pub mod values;
 
 // Re-export commonly used types for active tests
-// TODO: Enable when needed
-// pub use context::{interpreter_context, TestContext};
+// Currently these are not used directly in tests but needed by extension traits
+#[allow(unused_imports)]
+pub use context::{interpreter_context, TestContext};

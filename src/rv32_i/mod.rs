@@ -11,12 +11,14 @@
 
 pub mod cpu;
 pub mod formats;
+pub mod immediate;
 pub mod instructions;
 pub mod pseudo_instructions;
 pub mod registers;
 
 pub use cpu::*;
 pub use formats::*;
+pub use immediate::*;
 pub use instructions::*;
 pub use pseudo_instructions::*;
 pub use registers::*;

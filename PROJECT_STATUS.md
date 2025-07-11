@@ -1,14 +1,92 @@
 # Brubeck Project Status & Roadmap
 
-Last Updated: 2025-07-10
+Last Updated: 2025-07-11
 
-## 🎯 Current Focus: REPL Usability Phase 2
+## 🎯 Current Focus: Library/Binary Architecture Refactoring
 
-Making Brubeck more beginner-friendly and educational based on user feedback.
+Separating core emulation library from REPL presentation layer to eliminate feature flag complexity.
+
+## 🚧 Major Refactoring: Library/Binary Separation
+
+### Background
+The codebase currently uses `#[cfg(feature = "repl")]` flags throughout the library to conditionally include REPL-specific functionality. This creates complexity and makes the library less suitable for embedding. We're refactoring to create a clean separation:
+
+- **Library**: Pure RISC-V emulation with state navigation (no feature flags)
+- **Binary**: All interactive REPL features
+
+### Architecture Design
+
+#### Library Interface (Minimal & Focused)
+```rust
+impl Interpreter {
+    pub fn interpret(&mut self, input: &str) -> Result<String, Error>  // Execute instruction
+    pub fn previous_state(&mut self) -> Result<String, Error>          // Navigate backward
+    pub fn next_state(&mut self) -> Result<String, Error>              // Navigate forward
+    pub fn cpu(&self) -> &CPU                                          // Access for inspection
+    pub fn cpu_mut(&mut self) -> &mut CPU                              // Mutable access
+}
+```
+
+#### Binary Responsibilities (All Interactive Features)
+- Parse and handle all slash commands (`/regs`, `/help`, `/memory`, `/reset`, `/previous`, `/next`)
+- Format output (registers, memory, help text)
+- Handle I/O (colors, prompts, confirmations)
+- Manage CLI arguments and configuration
+
+### Implementation Tasks
+
+#### Phase 1: Extract Command System ⏱️ ~4 hours
+**Status**: Not started
+1. Remove `Command` enum variants from library:
+   - Keep only `Exec` and `ExecPseudo` in library
+   - Move `ShowRegs`, `ShowSpecificRegs`, `ShowHelp`, `Previous`, `Next`, `Reset`, `ShowMemory` to binary
+2. Create binary-specific command parser for slash commands
+3. Update library parser to only handle instruction parsing
+
+#### Phase 2: Move Formatting to Binary ⏱️ ~3 hours
+**Status**: Not started
+1. Move from `src/interpreter/formatter.rs` to binary:
+   - `format_all_registers()`
+   - `format_specific_registers()`
+   - `format_help()`
+   - `format_memory()`
+2. Keep only `format_instruction_result()` in library
+3. Create `src/bin/repl_formatter.rs` for REPL-specific formatting
+
+#### Phase 3: Simplify Interpreter ⏱️ ~3 hours
+**Status**: Not started
+1. Remove `history: Option<HistoryManager>` field
+2. Rename methods:
+   - `undo()` → `previous_state()`
+   - `redo()` → `next_state()`
+3. Store simple `Vec<StateDelta>` with configurable limit
+4. Remove `with_config()` method - move configuration to binary
+
+#### Phase 4: Clean Up Library Modules ⏱️ ~2 hours
+**Status**: Not started
+1. Remove all `#[cfg(feature = "repl")]` from:
+   - `src/lib.rs`
+   - `src/interpreter.rs`
+   - `src/interpreter/*.rs`
+2. Move interactive functions (reset confirmation, etc.) to binary
+3. Remove `src/cli.rs` from library, keep only in binary
+
+#### Phase 5: Update Tests ⏱️ ~2 hours
+**Status**: Not started
+1. Update library tests to work without feature flags
+2. Move REPL-specific tests to binary tests
+3. Ensure integration tests still pass
+
+### Success Criteria
+- [ ] Library builds with zero feature flags
+- [ ] Library exports minimal, focused API
+- [ ] Binary contains all REPL/interactive features
+- [ ] All tests pass
+- [ ] No breaking changes for end users
 
 ## 📋 Task List
 
-### 🔴 High Priority (User Experience)
+### 🔴 High Priority (Architecture)
 
 #### 1. Rename Undo/Redo Commands ⏱️ ~2 hours
 **Status**: ✅ Completed  
@@ -162,4 +240,4 @@ Making Brubeck more beginner-friendly and educational based on user feedback.
 
 ---
 
-**Next Action**: Enhanced error messages (#4) is the next task on the list
+**Next Action**: Phase 1 - Extract Command System (see Major Refactoring section above)

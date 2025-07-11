@@ -126,6 +126,14 @@ impl Interpreter {
         }
     }
 
+    /// Creates a new Interpreter with custom memory size and history limit.
+    pub fn with_config(memory_size: usize, history_limit: usize) -> Self {
+        Self {
+            cpu: CPU::new(memory_size),
+            history: StateHistory::new(history_limit),
+        }
+    }
+
     /// Interprets a single command, which could be an instruction (eg: `ADDI x1, zero, 3`) or an
     /// inspection for registers (eg: `PC` or `X1`). Returns a String representation of the
     /// result or an Error.

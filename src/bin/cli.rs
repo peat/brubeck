@@ -56,13 +56,11 @@ pub struct Cli {
 
 /// Configuration derived from CLI arguments
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct Config {
     pub memory_size: usize,
     pub undo_limit: usize,
 }
 
-#[allow(dead_code)]
 impl Config {
     /// Creates a new configuration with validation
     pub fn new(memory_size: usize, undo_limit: usize) -> Result<Self, String> {
@@ -72,11 +70,6 @@ impl Config {
             memory_size,
             undo_limit,
         })
-    }
-
-    /// Returns the effective undo limit (0 means disabled)
-    pub fn effective_undo_limit(&self) -> usize {
-        self.undo_limit
     }
 }
 
@@ -95,7 +88,6 @@ impl fmt::Display for ParseMemoryError {
 impl std::error::Error for ParseMemoryError {}
 
 /// Maximum allowed memory size (1GB)
-#[allow(dead_code)]
 const MAX_MEMORY_SIZE: usize = 1024 * 1024 * 1024;
 
 /// Parses a human-readable memory size string into bytes
@@ -112,7 +104,6 @@ const MAX_MEMORY_SIZE: usize = 1024 * 1024 * 1024;
 /// assert_eq!(parse_memory_size("1m").unwrap(), 1048576);
 /// assert_eq!(parse_memory_size("1M").unwrap(), 1048576);
 /// ```
-#[allow(dead_code)]
 pub fn parse_memory_size(s: &str) -> Result<usize, ParseMemoryError> {
     let s = s.trim();
 
@@ -201,7 +192,6 @@ pub fn should_show_banner(mode: ExecutionMode) -> bool {
 
 impl Cli {
     /// Converts CLI arguments into a Config
-    #[allow(dead_code)]
     pub fn to_config(&self) -> Result<Config, ParseMemoryError> {
         let memory_size = parse_memory_size(&self.memory)?;
 

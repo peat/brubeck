@@ -28,12 +28,14 @@ fn main() -> io::Result<()> {
     // Parse command-line arguments
     let cli = Cli::parse();
 
-    // Create interpreter
-    // TODO: The library interpreter no longer supports configuration.
-    // We need to either:
-    // 1. Add configuration support back to the library in a clean way
-    // 2. Or handle memory size and undo limit in the binary layer
-    let mut interpreter = Interpreter::new();
+    // Create interpreter with configuration from CLI
+    let mut interpreter = match cli.to_config() {
+        Ok(config) => Interpreter::with_config(config.memory_size, config.undo_limit),
+        Err(e) => {
+            eprintln!("Error parsing configuration: {e}");
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string()));
+        }
+    };
 
     // Determine execution mode
     match cli.execution_mode() {

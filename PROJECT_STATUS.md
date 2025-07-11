@@ -243,4 +243,12 @@ impl Interpreter {
 
 ---
 
+**Recent Completion**: ✅ CLI Configuration Reconnected - Memory size and undo limit now work!
+- Added `Interpreter::with_config()` method for custom memory/history limits
+- Connected CLI args to interpreter configuration
+- Removed dead code warnings
+- Added comprehensive tests in `tests/cli_config.rs`
+
+---
+
 **Next Action**: Enhanced Error Messages - Add educational content to error messages

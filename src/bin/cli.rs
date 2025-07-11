@@ -5,11 +5,9 @@
 
 use std::fmt;
 
-#[cfg(feature = "repl")]
 use clap::Parser;
 
 /// Command-line arguments for Brubeck
-#[cfg(feature = "repl")]
 #[derive(Parser, Debug)]
 #[command(name = "brubeck")]
 #[command(about = "A RISC-V assembly REPL and emulator", long_about = None)]
@@ -201,7 +199,6 @@ pub fn should_show_banner(mode: ExecutionMode) -> bool {
     matches!(mode, ExecutionMode::Interactive)
 }
 
-#[cfg(feature = "repl")]
 impl Cli {
     /// Converts CLI arguments into a Config
     #[allow(dead_code)]

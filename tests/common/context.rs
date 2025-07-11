@@ -150,7 +150,6 @@ impl TestContext<Interpreter> {
     }
 
     /// Undo last operation
-    #[cfg(feature = "repl")]
     pub fn undo(&mut self) -> &mut Self {
         let ctx = self.context("Previous");
         self.inner
@@ -160,7 +159,6 @@ impl TestContext<Interpreter> {
     }
 
     /// Undo with expected content
-    #[cfg(feature = "repl")]
     pub fn undo_expect(&mut self, _expected: &str) -> &mut Self {
         let ctx = self.context("Undo");
         let result = self
@@ -177,7 +175,6 @@ impl TestContext<Interpreter> {
     }
 
     /// Redo last undone operation
-    #[cfg(feature = "repl")]
     pub fn redo(&mut self) -> &mut Self {
         let ctx = self.context("Next");
         self.inner
@@ -187,7 +184,6 @@ impl TestContext<Interpreter> {
     }
 
     /// Check undo should fail
-    #[cfg(feature = "repl")]
     pub fn undo_should_fail(&mut self) -> &mut Self {
         let ctx = self.context("Undo (expecting failure)");
         if self.inner.previous_state().is_ok() {

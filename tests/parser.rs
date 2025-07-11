@@ -431,7 +431,6 @@ fn test_parse_csr_errors() {
 }
 
 #[test]
-#[cfg(feature = "repl")]
 fn test_parse_reset_command() {
     let mut i = Interpreter::new();
 
@@ -447,7 +446,6 @@ fn test_parse_reset_command() {
 }
 
 #[test]
-#[cfg(feature = "repl")]
 #[ignore = "Binary-specific functionality - REPL commands"]
 fn test_parse_navigation_commands() {
     let mut i = Interpreter::new();
@@ -483,7 +481,6 @@ fn test_parse_navigation_commands() {
 }
 
 #[test]
-#[cfg(feature = "repl")]
 #[ignore = "Binary-specific functionality - REPL commands"]
 fn test_parse_memory_command() {
     let mut i = Interpreter::new();
@@ -534,7 +531,6 @@ fn test_parse_memory_command() {
 }
 
 #[test]
-#[cfg(feature = "repl")]
 #[ignore = "Binary-specific functionality - REPL commands"]
 fn test_memory_display_with_data() {
     let mut i = Interpreter::new();

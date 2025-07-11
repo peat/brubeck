@@ -1,29 +1,20 @@
 use brubeck::interpreter::Interpreter;
 
-use std::io;
-#[cfg(feature = "repl")]
-use std::io::BufRead;
-#[cfg(not(feature = "repl"))]
-use std::io::Write;
-
-#[cfg(feature = "repl")]
-use crate::cli::{should_show_banner, Cli, ExecutionMode};
-#[cfg(feature = "repl")]
 use std::fs;
+use std::io;
+use std::io::BufRead;
 
-#[cfg(feature = "repl")]
+use crate::cli::{should_show_banner, Cli, ExecutionMode};
+
 use clap::Parser;
 
-#[cfg(feature = "repl")]
 use crossterm::{
     style::{Color, Print, ResetColor, SetForegroundColor},
     tty::IsTty,
     ExecutableCommand,
 };
 
-#[cfg(feature = "repl")]
 mod cli;
-#[cfg(feature = "repl")]
 mod repl;
 
 // REPL module with commands and formatting
@@ -31,81 +22,58 @@ mod repl_commands;
 mod repl_formatter;
 
 fn main() -> io::Result<()> {
-    #[cfg(feature = "repl")]
-    {
-        // Parse command-line arguments
-        let cli = Cli::parse();
+    // Parse command-line arguments
+    let cli = Cli::parse();
 
-        // Create interpreter
-        // TODO: The library interpreter no longer supports configuration.
-        // We need to either:
-        // 1. Add configuration support back to the library in a clean way
-        // 2. Or handle memory size and undo limit in the binary layer
-        let mut interpreter = Interpreter::new();
+    // Create interpreter
+    // TODO: The library interpreter no longer supports configuration.
+    // We need to either:
+    // 1. Add configuration support back to the library in a clean way
+    // 2. Or handle memory size and undo limit in the binary layer
+    let mut interpreter = Interpreter::new();
 
-        // Determine execution mode
-        match cli.execution_mode() {
-            ExecutionMode::Execute => {
-                let commands = cli.execute.unwrap();
-                run_execute_mode(&mut interpreter, &commands, cli.verbose, cli.no_color)
-            }
-            ExecutionMode::Script => {
-                let path = cli.script.unwrap();
-                run_script_mode(&mut interpreter, &path, cli.verbose, cli.no_color)
-            }
-            ExecutionMode::Interactive => {
-                // Check if stdin is a terminal (interactive mode) or pipe
-                let is_interactive = io::stdin().is_tty();
+    // Determine execution mode
+    match cli.execution_mode() {
+        ExecutionMode::Execute => {
+            let commands = cli.execute.unwrap();
+            run_execute_mode(&mut interpreter, &commands, cli.verbose, cli.no_color)
+        }
+        ExecutionMode::Script => {
+            let path = cli.script.unwrap();
+            run_script_mode(&mut interpreter, &path, cli.verbose, cli.no_color)
+        }
+        ExecutionMode::Interactive => {
+            // Check if stdin is a terminal (interactive mode) or pipe
+            let is_interactive = io::stdin().is_tty();
 
-                if is_interactive {
-                    let history_size = if cli.no_history { 0 } else { cli.history_size };
-                    run_interactive(&mut interpreter, cli.quiet, history_size)
-                } else {
-                    run_batch(&mut interpreter, cli.no_color)
-                }
+            if is_interactive {
+                let history_size = if cli.no_history { 0 } else { cli.history_size };
+                run_interactive(&mut interpreter, cli.quiet, history_size)
+            } else {
+                run_batch(&mut interpreter, cli.no_color)
             }
         }
-    }
-
-    #[cfg(not(feature = "repl"))]
-    {
-        let mut interpreter = Interpreter::new();
-        run_interactive(
-            &mut interpreter,
-            false,
-            #[cfg(feature = "repl")]
-            1000,
-        )
     }
 }
 
 fn run_interactive(
     interpreter: &mut Interpreter,
     quiet: bool,
-    #[cfg(feature = "repl")] history_size: usize,
+    history_size: usize,
 ) -> io::Result<()> {
     // Only show banner if not in quiet mode
-    #[cfg(feature = "repl")]
     if !quiet && should_show_banner(ExecutionMode::Interactive) && io::stdin().is_tty() {
         println!("Brubeck: A RISC-V REPL");
         println!("Ctrl-C to quit\n");
     }
 
-    #[cfg(not(feature = "repl"))]
-    if !quiet {
-        println!("Brubeck: A RISC-V REPL");
-        println!("Ctrl-C to quit\n");
-    }
-
     // Initialize command history
-    #[cfg(feature = "repl")]
     let mut history = repl::CommandHistory::new(history_size);
 
     loop {
         // Show PC address prompt
         let prompt = format!("[0x{:08x}]> ", interpreter.get_pc());
 
-        #[cfg(feature = "repl")]
         let buffer = match repl::read_line_with_history(&prompt, &mut history) {
             Ok(line) => line,
             Err(e) if e.kind() == io::ErrorKind::Interrupted => {
@@ -114,15 +82,6 @@ fn run_interactive(
                 return Ok(());
             }
             Err(e) => return Err(e),
-        };
-
-        #[cfg(not(feature = "repl"))]
-        let buffer = {
-            print!("{}", prompt);
-            io::stdout().flush()?;
-            let mut buffer = String::new();
-            io::stdin().read_line(&mut buffer)?;
-            buffer
         };
 
         // Skip empty lines
@@ -135,12 +94,10 @@ fn run_interactive(
         execute_and_print(interpreter, input, true, quiet, false)?;
 
         // Add to history (all commands, even if they fail - this is what shells do)
-        #[cfg(feature = "repl")]
         history.add(input.to_string());
     }
 }
 
-#[cfg(feature = "repl")]
 fn run_batch(interpreter: &mut Interpreter, _no_color: bool) -> io::Result<()> {
     let stdin = io::stdin();
     let reader = stdin.lock();
@@ -162,7 +119,6 @@ fn run_batch(interpreter: &mut Interpreter, _no_color: bool) -> io::Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "repl")]
 fn execute_and_print(
     interpreter: &mut Interpreter,
     input: &str,
@@ -245,23 +201,6 @@ fn execute_and_print(
     Ok(())
 }
 
-#[cfg(not(feature = "repl"))]
-fn execute_and_print(
-    interpreter: &mut Interpreter,
-    input: &str,
-    _use_color: bool,
-    _quiet: bool,
-    _verbose: bool,
-) -> io::Result<()> {
-    match interpreter.interpret(input) {
-        Ok(s) => println!("{}", s), // No prefix in non-interactive mode
-        Err(s) => eprintln!("ERROR: {}", s),
-    }
-
-    Ok(())
-}
-
-#[cfg(feature = "repl")]
 fn run_execute_mode(
     interpreter: &mut Interpreter,
     commands: &str,
@@ -281,7 +220,6 @@ fn run_execute_mode(
     Ok(())
 }
 
-#[cfg(feature = "repl")]
 fn run_script_mode(
     interpreter: &mut Interpreter,
     path: &str,

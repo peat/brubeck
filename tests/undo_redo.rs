@@ -9,16 +9,13 @@
 #[path = "common/mod.rs"]
 mod common;
 
-#[cfg(feature = "repl")]
 #[path = "undo_redo/integration_tests.rs"]
 mod integration_tests;
 
-#[cfg(feature = "repl")]
 #[path = "undo_redo/comprehensive_tests.rs"]
 mod comprehensive_tests;
 
 // Re-export common helpers and add undo/redo specific extensions
-#[cfg(feature = "repl")]
 pub mod helpers {
     pub use crate::common::*;
 

@@ -19,16 +19,10 @@ autobins = false
 # Binary-only dependencies for the REPL
 [dependencies.crossterm]
 version = "0.27"
-optional = true
 
 [dependencies.clap]
 version = "4.5"
 features = ["derive"]
-optional = true
-
-[features]
-default = ["repl"]
-repl = ["crossterm", "clap"]
 
 [[bin]]
 name = "brubeck"

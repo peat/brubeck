@@ -2,11 +2,10 @@
 
 use brubeck::HistoryError;
 
-
 /// Formats a HistoryError
 pub fn format_history_error(error: &HistoryError, tips_enabled: bool) -> String {
     let mut output = error.to_string();
-    
+
     if tips_enabled {
         match error {
             HistoryError::AtBeginning => {
@@ -17,7 +16,6 @@ pub fn format_history_error(error: &HistoryError, tips_enabled: bool) -> String 
             }
         }
     }
-    
+
     output
 }
-

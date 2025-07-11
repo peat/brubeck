@@ -187,26 +187,32 @@ impl Interpreter {
         let mut has_pc_change = false;
         for (reg, old, new) in &delta.register_changes {
             if *reg == crate::rv32_i::Register::PC {
-                changes.push(format!("PC: 0x{:08x} → 0x{:08x}", old, new));
+                changes.push(format!("PC: 0x{old:08x} → 0x{new:08x}"));
                 has_pc_change = true;
             } else {
                 changes.push(format!("{:?}: {} → {}", reg, *old as i32, *new as i32));
             }
         }
-        
+
         // Always show PC change from delta
         if !has_pc_change && delta.pc_change.0 != delta.pc_change.1 {
-            changes.push(format!("PC: 0x{:08x} → 0x{:08x}", delta.pc_change.0, delta.pc_change.1));
+            changes.push(format!(
+                "PC: 0x{:08x} → 0x{:08x}",
+                delta.pc_change.0, delta.pc_change.1
+            ));
         }
 
         // Show memory changes summary
         if !delta.memory_changes.is_empty() {
-            changes.push(format!("{} memory bytes changed", delta.memory_changes.len()));
+            changes.push(format!(
+                "{} memory bytes changed",
+                delta.memory_changes.len()
+            ));
         }
 
         // Show CSR changes
         for (csr, old, new) in &delta.csr_changes {
-            changes.push(format!("CSR[0x{:03x}]: 0x{:08x} → 0x{:08x}", csr, old, new));
+            changes.push(format!("CSR[0x{csr:03x}]: 0x{old:08x} → 0x{new:08x}"));
         }
 
         if changes.is_empty() {

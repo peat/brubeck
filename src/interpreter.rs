@@ -28,7 +28,7 @@
 use crate::rv32_i::{Instruction, CPU};
 
 #[cfg(feature = "repl")]
-use crate::history::HistoryManager;
+use executor::HistoryManager;
 
 // Internal interpreter modules
 #[path = "interpreter/builder.rs"]
@@ -50,7 +50,7 @@ pub use types::{Command, Error, Token};
 pub struct Interpreter {
     cpu: CPU,
     #[cfg(feature = "repl")]
-    history: HistoryManager,
+    history: Option<HistoryManager>,
 }
 
 impl Default for Interpreter {
@@ -65,7 +65,7 @@ impl Interpreter {
         Self {
             cpu: CPU::default(), // initializes with 1 mebibyte of memory
             #[cfg(feature = "repl")]
-            history: HistoryManager::new(1000), // Default history size
+            history: Some(HistoryManager::new()), // Default history enabled
         }
     }
 
@@ -74,7 +74,11 @@ impl Interpreter {
     pub fn with_config(config: crate::cli::Config) -> Self {
         Self {
             cpu: CPU::new(config.memory_size),
-            history: HistoryManager::new(config.undo_limit),
+            history: if config.undo_limit == 0 {
+                None // No history when limit is 0
+            } else {
+                Some(HistoryManager::with_limit(config.undo_limit))
+            },
         }
     }
 
@@ -145,8 +149,8 @@ impl Interpreter {
 
     /// Gets a mutable reference to the history manager
     #[cfg(feature = "repl")]
-    pub(crate) fn history_mut(&mut self) -> &mut HistoryManager {
-        &mut self.history
+    pub(crate) fn history_mut(&mut self) -> Option<&mut HistoryManager> {
+        self.history.as_mut()
     }
 }
 

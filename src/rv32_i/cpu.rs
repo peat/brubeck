@@ -22,6 +22,112 @@ const CSR_MCAUSE: u16 = 0x342; // Machine trap cause
 const CSR_MTVAL: u16 = 0x343; // Machine trap value
 const CSR_MIP: u16 = 0x344; // Machine interrupt pending
 
+/// Represents a change to memory at a specific address
+#[derive(Debug, Clone, PartialEq)]
+pub struct MemoryDelta {
+    pub addr: u32,
+    pub old_data: Vec<u8>,
+    pub new_data: Vec<u8>,
+}
+
+/// Records what changed during instruction execution (observation)
+#[derive(Debug, Clone, PartialEq)]
+pub struct StateDelta {
+    pub register_changes: Vec<(Register, u32, u32)>, // (reg, old, new)
+    pub memory_changes: Vec<MemoryDelta>,
+    pub csr_changes: Vec<(u32, u32, u32)>, // (addr, old, new)
+    pub pc_change: (u32, u32),             // (old, new)
+}
+
+/// Specifies what changes to apply to CPU state (command)
+#[derive(Debug, Clone, PartialEq)]
+pub struct Modify {
+    pub register_changes: Vec<(Register, u32)>, // (reg, new_value)
+    pub memory_changes: Vec<(u32, Vec<u8>)>,    // (addr, new_data)
+    pub csr_changes: Vec<(u32, u32)>,           // (addr, new_value)
+    pub pc_change: Option<u32>,                 // new_pc
+}
+
+impl StateDelta {
+    /// Creates a new empty state delta
+    pub fn new() -> Self {
+        Self {
+            register_changes: Vec::new(),
+            memory_changes: Vec::new(),
+            csr_changes: Vec::new(),
+            pc_change: (0, 0),
+        }
+    }
+
+    /// Converts this delta to a Modify that will reverse the changes
+    pub fn to_reverse_modify(&self) -> Modify {
+        Modify {
+            register_changes: self
+                .register_changes
+                .iter()
+                .map(|(reg, old, _new)| (*reg, *old))
+                .collect(),
+            memory_changes: self
+                .memory_changes
+                .iter()
+                .map(|md| (md.addr, md.old_data.clone()))
+                .collect(),
+            csr_changes: self
+                .csr_changes
+                .iter()
+                .map(|(addr, old, _new)| (*addr, *old))
+                .collect(),
+            pc_change: Some(self.pc_change.0),
+        }
+    }
+
+    /// Converts this delta to a Modify that will apply the changes
+    pub fn to_forward_modify(&self) -> Modify {
+        Modify {
+            register_changes: self
+                .register_changes
+                .iter()
+                .map(|(reg, _old, new)| (*reg, *new))
+                .collect(),
+            memory_changes: self
+                .memory_changes
+                .iter()
+                .map(|md| (md.addr, md.new_data.clone()))
+                .collect(),
+            csr_changes: self
+                .csr_changes
+                .iter()
+                .map(|(addr, _old, new)| (*addr, *new))
+                .collect(),
+            pc_change: Some(self.pc_change.1),
+        }
+    }
+}
+
+impl Default for StateDelta {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Modify {
+    /// Creates a new empty modify command
+    pub fn new() -> Self {
+        Self {
+            register_changes: Vec::new(),
+            memory_changes: Vec::new(),
+            csr_changes: Vec::new(),
+            pc_change: None,
+        }
+    }
+}
+
+impl Default for Modify {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct CPU {
     pub memory: Vec<u8>,
@@ -63,14 +169,6 @@ pub struct CPU {
     pub csrs: [u32; 4096],          // CSR values indexed by address
     pub csr_exists: [bool; 4096],   // Which CSR addresses are implemented
     pub csr_readonly: [bool; 4096], // Which CSRs are read-only
-
-    // State tracking for undo/redo (only when REPL feature is enabled)
-    #[cfg(feature = "repl")]
-    pub memory_changes: Vec<crate::history::MemoryDelta>,
-    #[cfg(feature = "repl")]
-    pub csr_changes: Vec<(u32, u32, u32)>, // (address, old_value, new_value)
-    #[cfg(feature = "repl")]
-    pub register_changes: Vec<(Register, u32, u32)>, // (register, old_value, new_value)
 }
 
 impl Default for CPU {
@@ -123,12 +221,6 @@ impl CPU {
             csrs: [0; 4096],
             csr_exists: [false; 4096],
             csr_readonly: [false; 4096],
-            #[cfg(feature = "repl")]
-            memory_changes: Vec::new(),
-            #[cfg(feature = "repl")]
-            csr_changes: Vec::new(),
-            #[cfg(feature = "repl")]
-            register_changes: Vec::new(),
         };
 
         // Initialize standard CSRs
@@ -181,9 +273,11 @@ impl CPU {
     ///
     /// `Register::X0` will always remain zero
     pub fn set_register(&mut self, r: Register, v: u32) {
-        #[cfg(feature = "repl")]
-        let old_value = self.get_register(r);
+        self.set_register_direct(r, v);
+    }
 
+    /// Sets a register directly without any tracking (internal use)
+    fn set_register_direct(&mut self, r: Register, v: u32) {
         match r {
             Register::X0 => self.x0 = 0,
             Register::X1 => self.x1 = v,
@@ -219,14 +313,16 @@ impl CPU {
             Register::X31 => self.x31 = v,
             Register::PC => self.pc = v,
         }
+    }
 
-        #[cfg(feature = "repl")]
-        {
-            let new_value = self.get_register(r);
-            if old_value != new_value {
-                self.register_changes.push((r, old_value, new_value));
-            }
-        }
+    /// Gets all 32 registers as an array (internal use)
+    fn get_all_registers_internal(&self) -> [u32; 32] {
+        [
+            self.x0, self.x1, self.x2, self.x3, self.x4, self.x5, self.x6, self.x7, self.x8,
+            self.x9, self.x10, self.x11, self.x12, self.x13, self.x14, self.x15, self.x16,
+            self.x17, self.x18, self.x19, self.x20, self.x21, self.x22, self.x23, self.x24,
+            self.x25, self.x26, self.x27, self.x28, self.x29, self.x30, self.x31,
+        ]
     }
 
     /// Gets the content of a register by it's ABI name
@@ -326,12 +422,6 @@ impl CPU {
             _ => value,
         };
 
-        // Track CSR change if needed
-        #[cfg(feature = "repl")]
-        if legal_value != old_value {
-            self.csr_changes.push((addr as u32, old_value, legal_value));
-        }
-
         self.csrs[addr as usize] = legal_value;
         Ok(old_value)
     }
@@ -369,7 +459,154 @@ impl CPU {
     /// // PC should be incremented by the length of the NOP instruction
     /// assert_eq!(cpu.pc, Instruction::LENGTH);
     /// ```
-    pub fn execute(&mut self, instruction: Instruction) -> Result<(), Error> {
+    /// Apply a set of modifications to the CPU state atomically
+    ///
+    /// This method applies all the changes specified in the `Modify` struct
+    /// and returns a `StateDelta` indicating what actually changed.
+    pub fn apply(&mut self, modify: &Modify) -> Result<StateDelta, Error> {
+        // First, validate all operations without making changes (atomic validation)
+
+        // Validate memory changes
+        for (addr, new_data) in &modify.memory_changes {
+            let addr = *addr as usize;
+            if addr + new_data.len() > self.memory.len() {
+                return Err(Error::IllegalInstruction(format!(
+                    "Memory modification out of bounds: address 0x{:x} + {} bytes",
+                    addr,
+                    new_data.len()
+                )));
+            }
+        }
+
+        // Validate CSR changes
+        for (addr, _new_val) in &modify.csr_changes {
+            let addr = *addr as u16;
+            if addr >= 4096 || !self.csr_exists[addr as usize] {
+                return Err(Error::IllegalInstruction(format!(
+                    "CSR address 0x{addr:03x} does not exist"
+                )));
+            }
+        }
+
+        // All validations passed, now apply changes atomically
+        let mut delta = StateDelta::new();
+
+        // Apply register changes
+        for (reg, new_val) in &modify.register_changes {
+            let old_val = self.get_register(*reg);
+            self.set_register_direct(*reg, *new_val);
+            if old_val != *new_val {
+                delta.register_changes.push((*reg, old_val, *new_val));
+            }
+        }
+
+        // Apply memory changes
+        for (addr, new_data) in &modify.memory_changes {
+            let addr = *addr as usize;
+            let old_data = self.memory[addr..addr + new_data.len()].to_vec();
+            if old_data != *new_data {
+                self.memory[addr..addr + new_data.len()].copy_from_slice(new_data);
+                delta.memory_changes.push(MemoryDelta {
+                    addr: addr as u32,
+                    old_data,
+                    new_data: new_data.clone(),
+                });
+            }
+        }
+
+        // Apply CSR changes
+        for (addr, new_val) in &modify.csr_changes {
+            let old_val = self.read_csr(*addr as u16)?;
+            self.write_csr(*addr as u16, *new_val)?;
+            if old_val != *new_val {
+                delta.csr_changes.push((*addr, old_val, *new_val));
+            }
+        }
+
+        // Apply PC change
+        if let Some(new_pc) = modify.pc_change {
+            let old_pc = self.pc;
+            self.pc = new_pc;
+            delta.pc_change = (old_pc, new_pc);
+        }
+
+        Ok(delta)
+    }
+
+    /// Executes a RISC-V instruction and returns detailed information about what changed.
+    ///
+    /// This method provides complete visibility into instruction execution by returning
+    /// a `StateDelta` that records all state changes: register modifications, memory writes,
+    /// CSR updates, and PC changes. This enables powerful features like:
+    ///
+    /// - **Perfect undo/redo**: Use `StateDelta.to_reverse_modify()` with `apply()`
+    /// - **Debugging**: See exactly what each instruction modified
+    /// - **Scripting**: Compose complex state changes atomically
+    /// - **Analysis**: Track program behavior over time
+    ///
+    /// # Example
+    /// ```
+    /// let mut cpu = CPU::default();
+    /// let delta = cpu.execute(Instruction::ADDI(...))?;
+    ///
+    /// // See what changed
+    /// println!("Modified {} registers", delta.register_changes.len());
+    ///
+    /// // Perfect undo
+    /// let undo = delta.to_reverse_modify();
+    /// cpu.apply(&undo)?;
+    /// ```
+    pub fn execute(&mut self, instruction: Instruction) -> Result<StateDelta, Error> {
+        // Capture state before execution
+        let old_pc = self.pc;
+        let old_registers = self.get_all_registers_internal();
+        let old_memory = self.memory.clone(); // This is expensive but simple for now
+        let old_csrs = self.csrs;
+
+        // Execute the instruction using the existing logic
+        let result = self.execute_internal(instruction);
+
+        // If execution failed, don't return a delta
+        result?;
+
+        // Capture state after execution and build delta
+        let mut delta = StateDelta::new();
+        delta.pc_change = (old_pc, self.pc);
+
+        // Track register changes
+        let new_registers = self.get_all_registers_internal();
+        for (i, (&old_val, &new_val)) in old_registers.iter().zip(new_registers.iter()).enumerate()
+        {
+            if old_val != new_val {
+                delta
+                    .register_changes
+                    .push((Register::from_u32(i as u32), old_val, new_val));
+            }
+        }
+
+        // Track memory changes (simplified - this could be optimized)
+        for (i, (&old_byte, &new_byte)) in old_memory.iter().zip(self.memory.iter()).enumerate() {
+            if old_byte != new_byte {
+                delta.memory_changes.push(MemoryDelta {
+                    addr: i as u32,
+                    old_data: vec![old_byte],
+                    new_data: vec![new_byte],
+                });
+            }
+        }
+
+        // Track CSR changes
+        for (i, (&old_val, &new_val)) in old_csrs.iter().zip(self.csrs.iter()).enumerate() {
+            if old_val != new_val {
+                delta.csr_changes.push((i as u32, old_val, new_val));
+            }
+        }
+
+        Ok(delta)
+    }
+
+    /// Internal execute method (renamed from the original execute)
+    fn execute_internal(&mut self, instruction: Instruction) -> Result<(), Error> {
         match instruction {
             Instruction::ADD(i) => self.rv32i_add(i),
             Instruction::ADDI(i) => self.rv32i_addi(i),
@@ -1037,21 +1274,7 @@ impl CPU {
 
         for (byte_index, byte) in src.to_le_bytes().into_iter().enumerate() {
             if byte_index < bytes {
-                #[cfg(feature = "repl")]
-                {
-                    // Track the memory change
-                    let old_value = self.memory[index];
-                    self.memory[index] = byte;
-                    self.memory_changes.push(crate::history::MemoryDelta {
-                        address: index as u32,
-                        old_value,
-                        new_value: byte,
-                    });
-                }
-                #[cfg(not(feature = "repl"))]
-                {
-                    self.memory[index] = byte;
-                }
+                self.memory[index] = byte;
                 index += 1;
             }
         }
@@ -1356,63 +1579,21 @@ pub enum Error {
     IllegalInstruction(String),
 }
 
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::MisalignedJump(addr) => write!(f, "Misaligned jump to address 0x{addr:08x}"),
+            Error::AccessViolation(addr) => {
+                write!(f, "Memory address out of bounds: 0x{addr:08x}")
+            }
+            Error::EnvironmentCall => write!(f, "Environment call"),
+            Error::Breakpoint => write!(f, "Breakpoint"),
+            Error::IllegalInstruction(desc) => write!(f, "Illegal instruction: {desc}"),
+        }
+    }
+}
+
 impl CPU {
-    /// Gets all 32 registers as an array (for state capture)
-    #[cfg(feature = "repl")]
-    pub fn get_all_registers(&self) -> [u32; 32] {
-        [
-            self.x0, self.x1, self.x2, self.x3, self.x4, self.x5, self.x6, self.x7, self.x8,
-            self.x9, self.x10, self.x11, self.x12, self.x13, self.x14, self.x15, self.x16,
-            self.x17, self.x18, self.x19, self.x20, self.x21, self.x22, self.x23, self.x24,
-            self.x25, self.x26, self.x27, self.x28, self.x29, self.x30, self.x31,
-        ]
-    }
-
-    /// Sets all 32 registers from an array (for state restoration)
-    #[cfg(feature = "repl")]
-    pub fn set_all_registers(&mut self, regs: &[u32; 32]) {
-        self.x0 = 0; // x0 is always zero
-        self.x1 = regs[1];
-        self.x2 = regs[2];
-        self.x3 = regs[3];
-        self.x4 = regs[4];
-        self.x5 = regs[5];
-        self.x6 = regs[6];
-        self.x7 = regs[7];
-        self.x8 = regs[8];
-        self.x9 = regs[9];
-        self.x10 = regs[10];
-        self.x11 = regs[11];
-        self.x12 = regs[12];
-        self.x13 = regs[13];
-        self.x14 = regs[14];
-        self.x15 = regs[15];
-        self.x16 = regs[16];
-        self.x17 = regs[17];
-        self.x18 = regs[18];
-        self.x19 = regs[19];
-        self.x20 = regs[20];
-        self.x21 = regs[21];
-        self.x22 = regs[22];
-        self.x23 = regs[23];
-        self.x24 = regs[24];
-        self.x25 = regs[25];
-        self.x26 = regs[26];
-        self.x27 = regs[27];
-        self.x28 = regs[28];
-        self.x29 = regs[29];
-        self.x30 = regs[30];
-        self.x31 = regs[31];
-    }
-
-    /// Clears the tracking vectors (call before each instruction)
-    #[cfg(feature = "repl")]
-    pub fn clear_tracking(&mut self) {
-        self.memory_changes.clear();
-        self.csr_changes.clear();
-        self.register_changes.clear();
-    }
-
     /// Resets the CPU to its initial state
     pub fn reset(&mut self) {
         // Reset all registers to 0
@@ -1458,30 +1639,924 @@ impl CPU {
         self.csr_exists = [false; 4096];
         self.csr_readonly = [false; 4096];
         self.init_csrs();
-
-        // Clear tracking if REPL feature is enabled
-        #[cfg(feature = "repl")]
-        self.clear_tracking();
-    }
-
-    /// Restores memory from a set of deltas (for undo)
-    #[cfg(feature = "repl")]
-    pub fn restore_memory(&mut self, deltas: &[crate::history::MemoryDelta]) {
-        for delta in deltas {
-            if (delta.address as usize) < self.memory.len() {
-                self.memory[delta.address as usize] = delta.old_value;
-            }
-        }
-    }
-
-    /// Restores CSRs from a set of changes (for undo)
-    #[cfg(feature = "repl")]
-    pub fn restore_csrs(&mut self, changes: &[(u32, u32, u32)]) {
-        for &(addr, old_value, _new_value) in changes {
-            if (addr as usize) < 4096 && self.csr_exists[addr as usize] {
-                self.csrs[addr as usize] = old_value;
-            }
-        }
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_csr_initialization() {
+        let cpu = CPU::default();
+
+        // Verify user-level CSRs exist and are read-only
+        assert!(cpu.csr_exists[0xC00]); // cycle
+        assert!(cpu.csr_readonly[0xC00]);
+
+        assert!(cpu.csr_exists[0xC01]); // time
+        assert!(cpu.csr_readonly[0xC01]);
+
+        assert!(cpu.csr_exists[0xC02]); // instret
+        assert!(cpu.csr_readonly[0xC02]);
+
+        // Verify machine-level CSRs exist
+        assert!(cpu.csr_exists[0x300]); // mstatus
+        assert!(!cpu.csr_readonly[0x300]); // mstatus is writable
+
+        assert!(cpu.csr_exists[0x301]); // misa
+        assert!(cpu.csr_readonly[0x301]); // misa is read-only
+
+        // Verify mstatus initial value
+        assert_eq!(cpu.csrs[0x300], 0x00001800); // MPP = 11
+
+        // Verify misa initial value
+        assert_eq!(cpu.csrs[0x301], 0x40000100); // RV32I
+    }
+
+    #[test]
+    fn test_csr_read_basic() {
+        let cpu = CPU::default();
+
+        // Read existing CSR
+        let mstatus = cpu.read_csr(0x300).unwrap();
+        assert_eq!(mstatus, 0x00001800);
+
+        // Read MISA
+        let misa = cpu.read_csr(0x301).unwrap();
+        assert_eq!(misa, 0x40000100);
+
+        // Read dynamic CSRs (should return 0 for now)
+        assert_eq!(cpu.read_csr(0xC00).unwrap(), 0); // cycle
+        assert_eq!(cpu.read_csr(0xC01).unwrap(), 0); // time
+        assert_eq!(cpu.read_csr(0xC02).unwrap(), 0); // instret
+    }
+
+    #[test]
+    fn test_csr_read_nonexistent() {
+        let cpu = CPU::default();
+
+        // Try to read non-existent CSR
+        let result = cpu.read_csr(0x999);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::IllegalInstruction(_)));
+
+        // Try to read at boundary
+        let result = cpu.read_csr(0xFFF);
+        assert!(result.is_err());
+
+        // Try to read out of bounds
+        let result = cpu.read_csr(0x1000);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_csr_write_basic() {
+        let mut cpu = CPU::default();
+
+        // Write to writable CSR
+        cpu.write_csr(0x340, 0xDEADBEEF).unwrap(); // mscratch
+        assert_eq!(cpu.read_csr(0x340).unwrap(), 0xDEADBEEF);
+
+        // Write to another writable CSR
+        cpu.write_csr(0x305, 0x12345678).unwrap(); // mtvec
+        assert_eq!(cpu.read_csr(0x305).unwrap(), 0x12345678);
+    }
+
+    #[test]
+    fn test_csr_write_readonly() {
+        let mut cpu = CPU::default();
+
+        // Try to write to read-only CSRs
+        let result = cpu.write_csr(0xC00, 0x1234); // cycle is read-only
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::IllegalInstruction(_)));
+
+        let result = cpu.write_csr(0x301, 0x5678); // misa is read-only
+        assert!(result.is_err());
+
+        // Verify values didn't change
+        assert_eq!(cpu.read_csr(0xC00).unwrap(), 0);
+        assert_eq!(cpu.read_csr(0x301).unwrap(), 0x40000100);
+    }
+
+    #[test]
+    fn test_csr_write_nonexistent() {
+        let mut cpu = CPU::default();
+
+        // Try to write to non-existent CSR
+        let result = cpu.write_csr(0x999, 0x1234);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::IllegalInstruction(_)));
+    }
+
+    #[test]
+    fn test_csr_mstatus_warl() {
+        let mut cpu = CPU::default();
+
+        // mstatus has WARL behavior - only certain bits are writable
+        // Initial value: 0x00001800
+        // Writable mask: 0x00001888 (MIE bit 3, MPIE bit 7, MPP bits 11-12)
+
+        // Try to write all bits
+        cpu.write_csr(0x300, 0xFFFFFFFF).unwrap();
+
+        // Only writable bits should change
+        let mstatus = cpu.read_csr(0x300).unwrap();
+        println!("After writing 0xFFFFFFFF, mstatus = 0x{mstatus:08x}");
+        // Initial: 0x00001800 (MPP=11)
+        // Mask:    0x00001888 (allows changing MIE, MPIE, MPP)
+        // Result should be: 0x00001888 (all writable bits set)
+
+        // Write specific pattern (clear all writable bits)
+        cpu.write_csr(0x300, 0x00000000).unwrap();
+        let mstatus = cpu.read_csr(0x300).unwrap();
+        println!("After writing 0x00000000, mstatus = 0x{mstatus:08x}");
+        assert_eq!(mstatus, 0x00000000); // All writable bits cleared
+    }
+
+    #[test]
+    fn test_csr_set_bits() {
+        let mut cpu = CPU::default();
+
+        // Set bits in mscratch
+        cpu.write_csr(0x340, 0x00FF00FF).unwrap();
+
+        // Set additional bits
+        let old = cpu.set_csr_bits(0x340, 0x0F0F0F0F).unwrap();
+        assert_eq!(old, 0x00FF00FF); // Returns old value
+
+        // Verify new value has bits set
+        let new = cpu.read_csr(0x340).unwrap();
+        assert_eq!(new, 0x0FFF0FFF); // OR of old and mask
+
+        // Setting with mask 0 should not write
+        let old = cpu.set_csr_bits(0x340, 0).unwrap();
+        assert_eq!(old, 0x0FFF0FFF);
+        assert_eq!(cpu.read_csr(0x340).unwrap(), 0x0FFF0FFF); // Unchanged
+    }
+
+    #[test]
+    fn test_csr_clear_bits() {
+        let mut cpu = CPU::default();
+
+        // Set initial value in mscratch
+        cpu.write_csr(0x340, 0xFFFFFFFF).unwrap();
+
+        // Clear some bits
+        let old = cpu.clear_csr_bits(0x340, 0x0F0F0F0F).unwrap();
+        assert_eq!(old, 0xFFFFFFFF); // Returns old value
+
+        // Verify new value has bits cleared
+        let new = cpu.read_csr(0x340).unwrap();
+        assert_eq!(new, 0xF0F0F0F0); // AND with NOT mask
+
+        // Clearing with mask 0 should not write
+        let old = cpu.clear_csr_bits(0x340, 0).unwrap();
+        assert_eq!(old, 0xF0F0F0F0);
+        assert_eq!(cpu.read_csr(0x340).unwrap(), 0xF0F0F0F0); // Unchanged
+    }
+
+    #[test]
+    fn test_csr_set_clear_readonly() {
+        let mut cpu = CPU::default();
+
+        // Try to set bits in read-only CSR
+        let result = cpu.set_csr_bits(0x301, 0xFF); // misa is read-only
+        assert!(result.is_err());
+
+        // Try to clear bits in read-only CSR
+        let result = cpu.clear_csr_bits(0x301, 0xFF);
+        assert!(result.is_err());
+
+        // Verify value unchanged
+        assert_eq!(cpu.read_csr(0x301).unwrap(), 0x40000100);
+    }
+
+    #[test]
+    fn test_csr_all_machine_csrs() {
+        let cpu = CPU::default();
+
+        // Verify all machine CSRs we initialized exist
+        assert!(cpu.csr_exists[0x300]); // mstatus
+        assert!(cpu.csr_exists[0x301]); // misa
+        assert!(cpu.csr_exists[0x304]); // mie
+        assert!(cpu.csr_exists[0x305]); // mtvec
+        assert!(cpu.csr_exists[0x340]); // mscratch
+        assert!(cpu.csr_exists[0x341]); // mepc
+        assert!(cpu.csr_exists[0x342]); // mcause
+        assert!(cpu.csr_exists[0x343]); // mtval
+        assert!(cpu.csr_exists[0x344]); // mip
+    }
+
+    #[test]
+    fn test_csr_boundary_conditions() {
+        let mut cpu = CPU::default();
+
+        // Test CSR address 0
+        assert!(!cpu.csr_exists[0]);
+        assert!(cpu.read_csr(0).is_err());
+
+        // Test maximum valid CSR address (0xFFF = 4095)
+        assert!(!cpu.csr_exists[0xFFF]);
+        assert!(cpu.read_csr(0xFFF).is_err());
+
+        // Create a CSR at the boundary
+        cpu.csr_exists[0xFFF] = true;
+        cpu.csrs[0xFFF] = 0x12345678;
+
+        // Should now be readable
+        assert_eq!(cpu.read_csr(0xFFF).unwrap(), 0x12345678);
+
+        // And writable
+        cpu.write_csr(0xFFF, 0x87654321).unwrap();
+        assert_eq!(cpu.read_csr(0xFFF).unwrap(), 0x87654321);
+    }
+
+    #[test]
+    fn test_csr_bit_manipulation_edge_cases() {
+        let mut cpu = CPU::default();
+
+        // Test with all bits set
+        cpu.write_csr(0x340, 0xFFFFFFFF).unwrap();
+        cpu.set_csr_bits(0x340, 0xFFFFFFFF).unwrap();
+        assert_eq!(cpu.read_csr(0x340).unwrap(), 0xFFFFFFFF);
+
+        // Clear all bits
+        cpu.clear_csr_bits(0x340, 0xFFFFFFFF).unwrap();
+        assert_eq!(cpu.read_csr(0x340).unwrap(), 0);
+
+        // Set pattern
+        cpu.set_csr_bits(0x340, 0xAAAAAAAA).unwrap();
+        assert_eq!(cpu.read_csr(0x340).unwrap(), 0xAAAAAAAA);
+
+        // Clear alternating pattern
+        cpu.clear_csr_bits(0x340, 0x55555555).unwrap();
+        assert_eq!(cpu.read_csr(0x340).unwrap(), 0xAAAAAAAA); // No overlap
+
+        // Clear overlapping pattern
+        cpu.clear_csr_bits(0x340, 0xAAAAAAAA).unwrap();
+        assert_eq!(cpu.read_csr(0x340).unwrap(), 0);
+    }
+
+    // ===== CSR SPECIFICATION COMPLIANCE TESTS =====
+
+    // Test the key spec requirement from section 2.1:
+    // "If rd=x0, then the instruction shall not read the CSR and shall not
+    // cause any of the side effects that might occur on a CSR read."
+    #[test]
+    fn test_csrrw_rd_x0_no_read() {
+        let mut cpu = CPU::default();
+
+        // Create a custom CSR that tracks reads (simulating side effects)
+        let test_csr: u16 = 0x800;
+        cpu.csr_exists[test_csr as usize] = true;
+        cpu.csrs[test_csr as usize] = 0x12345678;
+
+        // CSRRW with rd=x0 should NOT read the CSR
+        // In a real implementation with side effects, this would be observable
+        // For now, we just verify the operation succeeds
+        cpu.write_csr(test_csr, 0xABCDEF00).unwrap();
+        assert_eq!(cpu.read_csr(test_csr).unwrap(), 0xABCDEF00);
+    }
+
+    // Test from spec: "For both CSRRS and CSRRC, if rs1=x0, then the instruction
+    // will not write to the CSR at all, and so shall not cause any of the side
+    // effects that might otherwise occur on a CSR write, nor raise illegal-instruction
+    // exceptions on accesses to read-only CSRs."
+    #[test]
+    fn test_csrrs_csrrc_rs1_x0_no_write() {
+        let mut cpu = CPU::default();
+
+        // Test with read-only CSR - should NOT raise exception when rs1=x0
+        let old_misa = cpu.set_csr_bits(0x301, 0).unwrap(); // misa is read-only
+        assert_eq!(old_misa, 0x40000100); // Should return old value
+        assert_eq!(cpu.read_csr(0x301).unwrap(), 0x40000100); // Unchanged
+
+        // Same for clear_bits
+        let old_misa = cpu.clear_csr_bits(0x301, 0).unwrap();
+        assert_eq!(old_misa, 0x40000100);
+        assert_eq!(cpu.read_csr(0x301).unwrap(), 0x40000100);
+
+        // But with non-zero mask, should fail on read-only
+        assert!(cpu.set_csr_bits(0x301, 1).is_err());
+        assert!(cpu.clear_csr_bits(0x301, 1).is_err());
+    }
+
+    // Test: "Note that if rs1 specifies a register other than x0, and that register
+    // holds a zero value, the instruction will not action any attendant per-field
+    // side effects, but will action any side effects caused by writing to the entire CSR."
+    #[test]
+    fn test_csrrs_csrrc_zero_value_behavior() {
+        let mut cpu = CPU::default();
+
+        // When rs1 != x0 but value is 0, write still happens
+        // This is different from rs1 = x0 case!
+        cpu.write_csr(0x340, 0xFFFFFFFF).unwrap();
+
+        // This simulates CSRRS with rs1 containing 0
+        // The write happens (triggering any CSR-write side effects)
+        // but no bits change
+        let old = cpu.set_csr_bits(0x340, 0).unwrap();
+        assert_eq!(old, 0xFFFFFFFF);
+        assert_eq!(cpu.read_csr(0x340).unwrap(), 0xFFFFFFFF);
+    }
+
+    // Test: "A CSRRW with rs1=x0 will attempt to write zero to the destination CSR."
+    #[test]
+    fn test_csrrw_rs1_x0_writes_zero() {
+        let mut cpu = CPU::default();
+
+        // Set a non-zero value
+        cpu.write_csr(0x340, 0xDEADBEEF).unwrap();
+
+        // CSRRW with rs1=x0 writes 0
+        cpu.write_csr(0x340, 0).unwrap();
+        assert_eq!(cpu.read_csr(0x340).unwrap(), 0);
+    }
+
+    // Test immediate instruction behavior
+    #[test]
+    fn test_immediate_variants_5bit() {
+        let mut cpu = CPU::default();
+
+        // Immediate values are 5-bit zero-extended
+        // Max immediate value is 31 (0b11111)
+        cpu.write_csr(0x340, 0).unwrap();
+
+        // Simulate CSRRSI with uimm=31
+        cpu.set_csr_bits(0x340, 31).unwrap();
+        assert_eq!(cpu.read_csr(0x340).unwrap(), 31);
+
+        // Clear lower 5 bits with immediate
+        cpu.clear_csr_bits(0x340, 31).unwrap();
+        assert_eq!(cpu.read_csr(0x340).unwrap(), 0);
+    }
+
+    // Test: "CSR reads the value prior to the execution of the instruction"
+    #[test]
+    fn test_read_before_write_semantics() {
+        let mut cpu = CPU::default();
+
+        cpu.write_csr(0x340, 0x1234).unwrap();
+
+        // All CSR instructions return the OLD value
+        let old = cpu.write_csr(0x340, 0x5678).unwrap();
+        assert_eq!(old, 0x1234); // Returns value before write
+
+        let old = cpu.set_csr_bits(0x340, 0xFF00).unwrap();
+        assert_eq!(old, 0x5678); // Returns value before set
+
+        let old = cpu.clear_csr_bits(0x340, 0x00FF).unwrap();
+        assert_eq!(old, 0xFF78); // Returns value before clear
+    }
+
+    // Test WARL behavior for specific fields
+    #[test]
+    fn test_warl_field_behavior() {
+        let mut cpu = CPU::default();
+
+        // Test mstatus WARL behavior more thoroughly
+        // Initial: 0x00001800 (MPP=11)
+
+        // Try to set all bits
+        cpu.write_csr(0x300, 0xFFFFFFFF).unwrap();
+        let mstatus = cpu.read_csr(0x300).unwrap();
+
+        // Only MIE(3), MPIE(7), MPP(11-12) should be set
+        assert_eq!(mstatus & 0x00000008, 0x00000008); // MIE set
+        assert_eq!(mstatus & 0x00000080, 0x00000080); // MPIE set
+        assert_eq!(mstatus & 0x00001800, 0x00001800); // MPP = 11
+
+        // All other bits should be 0
+        assert_eq!(mstatus & !0x00001888, 0);
+    }
+
+    // Test proper error handling for all error cases
+    #[test]
+    fn test_comprehensive_error_handling() {
+        let mut cpu = CPU::default();
+
+        // Non-existent CSR
+        assert!(matches!(
+            cpu.read_csr(0x999),
+            Err(Error::IllegalInstruction(_))
+        ));
+        assert!(matches!(
+            cpu.write_csr(0x999, 0),
+            Err(Error::IllegalInstruction(_))
+        ));
+        assert!(matches!(
+            cpu.set_csr_bits(0x999, 1),
+            Err(Error::IllegalInstruction(_))
+        ));
+        assert!(matches!(
+            cpu.clear_csr_bits(0x999, 1),
+            Err(Error::IllegalInstruction(_))
+        ));
+
+        // Out of bounds CSR address
+        assert!(matches!(
+            cpu.read_csr(0x1000),
+            Err(Error::IllegalInstruction(_))
+        ));
+
+        // Read-only CSR writes (with non-zero mask/value)
+        assert!(matches!(
+            cpu.write_csr(0x301, 0x12345678), // misa is read-only
+            Err(Error::IllegalInstruction(_))
+        ));
+        assert!(matches!(
+            cpu.set_csr_bits(0x301, 0xFF), // non-zero mask
+            Err(Error::IllegalInstruction(_))
+        ));
+        assert!(matches!(
+            cpu.clear_csr_bits(0x301, 0xFF), // non-zero mask
+            Err(Error::IllegalInstruction(_))
+        ));
+    }
+
+    // Test CSR address space boundaries thoroughly
+    #[test]
+    fn test_csr_address_validation() {
+        let mut cpu = CPU::default();
+
+        // Valid CSR addresses are 0x000 to 0xFFF (12 bits)
+        // Test boundary conditions
+
+        // Address 0x000 - valid but doesn't exist by default
+        assert!(cpu.read_csr(0x000).is_err());
+
+        // Address 0xFFF - valid but doesn't exist by default
+        assert!(cpu.read_csr(0xFFF).is_err());
+
+        // Address 0x1000 and above - invalid (> 12 bits)
+        assert!(cpu.read_csr(0x1000).is_err());
+        assert!(cpu.read_csr(0xFFFF).is_err());
+
+        // Create CSRs at boundaries
+        cpu.csr_exists[0x000] = true;
+        cpu.csr_exists[0xFFF] = true;
+
+        // Now they should be accessible
+        let _ = cpu.write_csr(0x000, 0x11111111).unwrap();
+        let _ = cpu.write_csr(0xFFF, 0x22222222).unwrap();
+        assert_eq!(cpu.read_csr(0x000).unwrap(), 0x11111111);
+        assert_eq!(cpu.read_csr(0xFFF).unwrap(), 0x22222222);
+    }
+
+    // Test that operations are atomic (read old value, write new value)
+    #[test]
+    fn test_atomic_operations() {
+        let mut cpu = CPU::default();
+
+        // Set initial value
+        cpu.write_csr(0x340, 0xAAAA5555).unwrap();
+
+        // Atomic set bits - should return old value and update
+        let old = cpu.set_csr_bits(0x340, 0x0F0F0F0F).unwrap();
+        assert_eq!(old, 0xAAAA5555); // Old value returned
+        assert_eq!(cpu.read_csr(0x340).unwrap(), 0xAFAF5F5F); // New value stored
+
+        // Atomic clear bits
+        let old = cpu.clear_csr_bits(0x340, 0xF0F0F0F0).unwrap();
+        assert_eq!(old, 0xAFAF5F5F); // Old value returned
+        assert_eq!(cpu.read_csr(0x340).unwrap(), 0x0F0F0F0F); // New value stored
+    }
+
+    // Test all initialized CSRs have correct properties
+    #[test]
+    fn test_all_standard_csrs_properties() {
+        let cpu = CPU::default();
+
+        // User-level CSRs
+        assert!(cpu.csr_exists[0xC00] && cpu.csr_readonly[0xC00]); // cycle
+        assert!(cpu.csr_exists[0xC01] && cpu.csr_readonly[0xC01]); // time
+        assert!(cpu.csr_exists[0xC02] && cpu.csr_readonly[0xC02]); // instret
+
+        // Machine-level CSRs
+        assert!(cpu.csr_exists[0x300] && !cpu.csr_readonly[0x300]); // mstatus (r/w)
+        assert!(cpu.csr_exists[0x301] && cpu.csr_readonly[0x301]); // misa (r/o)
+        assert!(cpu.csr_exists[0x304] && !cpu.csr_readonly[0x304]); // mie (r/w)
+        assert!(cpu.csr_exists[0x305] && !cpu.csr_readonly[0x305]); // mtvec (r/w)
+        assert!(cpu.csr_exists[0x340] && !cpu.csr_readonly[0x340]); // mscratch (r/w)
+        assert!(cpu.csr_exists[0x341] && !cpu.csr_readonly[0x341]); // mepc (r/w)
+        assert!(cpu.csr_exists[0x342] && !cpu.csr_readonly[0x342]); // mcause (r/w)
+        assert!(cpu.csr_exists[0x343] && !cpu.csr_readonly[0x343]); // mtval (r/w)
+        assert!(cpu.csr_exists[0x344] && !cpu.csr_readonly[0x344]); // mip (r/w)
+    }
+
+    // Test CSR read always returns 32-bit value (zero-extended for RV32)
+    #[test]
+    fn test_csr_read_zero_extension() {
+        let cpu = CPU::default();
+
+        // All CSR reads should return valid u32 values
+        // For RV32, CSRs are naturally 32-bit, but this documents the behavior
+        assert_eq!(cpu.read_csr(0x301).unwrap(), 0x40000100); // Full 32-bit value
+        assert_eq!(cpu.read_csr(0x300).unwrap(), 0x00001800); // Full 32-bit value
+    }
+
+    // Test specific MISA encoding
+    #[test]
+    fn test_misa_encoding() {
+        let cpu = CPU::default();
+
+        // MISA encodes the ISA
+        let misa = cpu.read_csr(0x301).unwrap();
+
+        // Bits 31-30: MXL (01 = 32-bit)
+        assert_eq!((misa >> 30) & 0b11, 0b01);
+
+        // Bit 8: I (base integer ISA)
+        assert_eq!((misa >> 8) & 1, 1);
+
+        // Our implementation: 0x40000100
+        // 0100_0000_0000_0000_0000_0001_0000_0000
+        // MXL=01 (32-bit), I bit set
+    }
+
+    #[test]
+    fn test_apply_modify_basic() {
+        let mut cpu = CPU::default();
+
+        // Create a modify command to set register x1 to 42
+        let modify = Modify {
+            register_changes: vec![(Register::X1, 42)],
+            memory_changes: vec![],
+            csr_changes: vec![],
+            pc_change: None,
+        };
+
+        // Apply the modification
+        let delta = cpu.apply(&modify).unwrap();
+
+        // Verify the register was changed
+        assert_eq!(cpu.get_register(Register::X1), 42);
+
+        // Verify the delta recorded the change
+        assert_eq!(delta.register_changes.len(), 1);
+        assert_eq!(delta.register_changes[0], (Register::X1, 0, 42));
+    }
+
+    #[test]
+    fn test_execute_with_delta() {
+        let mut cpu = CPU::default();
+
+        // Create an ADDI instruction: ADDI x1, x0, 42
+        let mut inst = super::formats::IType::new();
+        inst.rd = Register::X1;
+        inst.rs1 = Register::X0;
+        inst.imm.set_signed(42).unwrap();
+        let instruction = super::Instruction::ADDI(inst);
+
+        // Execute with delta tracking
+        let delta = cpu.execute(instruction).unwrap();
+
+        // Verify the register was changed
+        assert_eq!(cpu.get_register(Register::X1), 42);
+
+        // Verify the delta recorded the change
+        assert_eq!(delta.register_changes.len(), 1);
+        assert_eq!(delta.register_changes[0], (Register::X1, 0, 42));
+
+        // Verify PC was incremented
+        assert_eq!(delta.pc_change, (0, 4));
+    }
+
+    #[test]
+    fn test_delta_to_reverse_modify() {
+        let mut cpu = CPU::default();
+
+        // Execute an instruction
+        let mut inst = super::formats::IType::new();
+        inst.rd = Register::X1;
+        inst.rs1 = Register::X0;
+        inst.imm.set_signed(42).unwrap();
+        let instruction = super::Instruction::ADDI(inst);
+
+        let delta = cpu.execute(instruction).unwrap();
+
+        // Now reverse the delta
+        let reverse_modify = delta.to_reverse_modify();
+        let undo_delta = cpu.apply(&reverse_modify).unwrap();
+
+        // Verify we're back to the original state
+        assert_eq!(cpu.get_register(Register::X1), 0);
+        assert_eq!(cpu.pc, 0);
+
+        // Verify the undo delta
+        assert_eq!(undo_delta.register_changes.len(), 1);
+        assert_eq!(undo_delta.register_changes[0], (Register::X1, 42, 0));
+        assert_eq!(undo_delta.pc_change, (4, 0));
+    }
+
+    #[test]
+    fn test_documentation_example() {
+        let mut cpu = CPU::default();
+
+        // Create an ADDI instruction like in our documentation
+        let mut inst = super::formats::IType::new();
+        inst.rd = Register::X1;
+        inst.rs1 = Register::X0;
+        inst.imm.set_signed(42).unwrap();
+        let instruction = super::Instruction::ADDI(inst);
+
+        // This should work like the documentation example
+        let delta = cpu.execute(instruction).unwrap();
+
+        // See what changed
+        assert_eq!(delta.register_changes.len(), 1);
+        assert_eq!(delta.register_changes[0], (Register::X1, 0, 42));
+
+        // Perfect undo
+        let undo = delta.to_reverse_modify();
+        let _undo_delta = cpu.apply(&undo).unwrap();
+
+        // Verify we're back to original state
+        assert_eq!(cpu.get_register(Register::X1), 0);
+        assert_eq!(cpu.pc, 0);
+    }
+
+    #[test]
+    fn test_cpu_reset() {
+        let mut cpu = CPU::default();
+
+        // Modify CPU state
+        cpu.set_register(Register::X1, 0xDEADBEEF);
+        cpu.set_register(Register::X15, 0x12345678);
+        cpu.pc = 0x1000;
+        cpu.memory[0] = 0xFF;
+        cpu.memory[100] = 0xAB;
+        cpu.write_csr(0x340, 0xCAFEBABE).unwrap(); // mscratch
+
+        // Verify state was changed
+        assert_eq!(cpu.get_register(Register::X1), 0xDEADBEEF);
+        assert_eq!(cpu.pc, 0x1000);
+        assert_eq!(cpu.memory[0], 0xFF);
+        assert_eq!(cpu.read_csr(0x340).unwrap(), 0xCAFEBABE);
+
+        // Reset CPU
+        cpu.reset();
+
+        // Verify all state is cleared
+        for i in 0..32 {
+            assert_eq!(
+                cpu.get_register(Register::from_u32(i)),
+                0,
+                "Register X{i} should be 0"
+            );
+        }
+        assert_eq!(cpu.pc, 0);
+        assert_eq!(cpu.memory[0], 0);
+        assert_eq!(cpu.memory[100], 0);
+
+        // Verify CSRs are reset but standard ones still exist
+        assert_eq!(cpu.read_csr(0x340).unwrap(), 0); // mscratch cleared
+        assert_eq!(cpu.read_csr(0x300).unwrap(), 0x00001800); // mstatus has default value
+        assert_eq!(cpu.read_csr(0x301).unwrap(), 0x40000100); // misa has default value
+        assert!(cpu.csr_exists[0x300]); // mstatus exists
+        assert!(cpu.csr_exists[0x301]); // misa exists
+        assert!(cpu.csr_readonly[0x301]); // misa is read-only
+    }
+
+    #[test]
+    fn test_state_delta_memory_changes() {
+        let mut cpu = CPU::default();
+
+        // Store word instruction that modifies memory
+        let mut inst = super::formats::SType::new();
+        inst.rs1 = Register::X0; // base = 0
+        inst.rs2 = Register::X1; // value register
+        inst.imm.set_signed(100).unwrap(); // offset = 100
+
+        // Set x1 to a test value
+        cpu.set_register(Register::X1, 0xDEADBEEF);
+
+        let instruction = super::Instruction::SW(inst);
+        let delta = cpu.execute(instruction).unwrap();
+
+        // Verify memory was changed and delta recorded it
+        // SW instruction may record each byte separately
+        assert!(!delta.memory_changes.is_empty());
+
+        // Find the memory change that includes address 100
+        let mem_change = delta
+            .memory_changes
+            .iter()
+            .find(|mc| mc.addr == 100)
+            .unwrap();
+        assert_eq!(mem_change.old_data, vec![0]);
+        assert_eq!(mem_change.new_data, vec![0xEF]); // first byte of little endian
+    }
+
+    #[test]
+    fn test_state_delta_csr_changes() {
+        let mut cpu = CPU::default();
+
+        // Set up x2 with a non-zero value first
+        cpu.set_register(Register::X2, 0x12345678);
+
+        // CSR write instruction: CSRRW x1, mscratch, x2
+        // This should write x2 (0x12345678) to mscratch and read old value (0) to x1
+        let mut inst = super::formats::IType::new();
+        inst.rd = Register::X1;
+        inst.rs1 = Register::X2;
+        inst.imm.set_signed(0x340).unwrap(); // mscratch CSR
+
+        let instruction = super::Instruction::CSRRW(inst);
+        let delta = cpu.execute(instruction).unwrap();
+
+        // Verify CSR was changed and delta recorded it
+        assert_eq!(delta.csr_changes.len(), 1);
+        assert_eq!(delta.csr_changes[0], (0x340, 0, 0x12345678)); // old=0, new=0x12345678
+
+        // Register x1 should be changed only if old CSR value is different from x1's current value
+        // Since old CSR value was 0 and x1 starts at 0, no register change is recorded
+        // But let's verify the CPU state is correct
+        assert_eq!(cpu.get_register(Register::X1), 0); // Should have old CSR value
+        assert_eq!(cpu.read_csr(0x340).unwrap(), 0x12345678); // Should have new value
+    }
+
+    #[test]
+    fn test_complex_modify_multiple_changes() {
+        let mut cpu = CPU::default();
+
+        // Create a complex modification
+        let modify = Modify {
+            register_changes: vec![
+                (Register::X1, 0x1111),
+                (Register::X2, 0x2222),
+                (Register::X3, 0x3333),
+            ],
+            memory_changes: vec![
+                (0x100, vec![0xAA, 0xBB, 0xCC, 0xDD]),
+                (0x200, vec![0x11, 0x22]),
+            ],
+            csr_changes: vec![
+                (0x340, 0x12345678), // mscratch
+                (0x341, 0x87654321), // mepc
+            ],
+            pc_change: Some(0x1000),
+        };
+
+        // Apply the modification
+        let delta = cpu.apply(&modify).unwrap();
+
+        // Verify all changes were applied
+        assert_eq!(cpu.get_register(Register::X1), 0x1111);
+        assert_eq!(cpu.get_register(Register::X2), 0x2222);
+        assert_eq!(cpu.get_register(Register::X3), 0x3333);
+        assert_eq!(cpu.pc, 0x1000);
+        assert_eq!(cpu.read_csr(0x340).unwrap(), 0x12345678);
+        assert_eq!(cpu.read_csr(0x341).unwrap(), 0x87654321);
+        assert_eq!(&cpu.memory[0x100..0x104], &[0xAA, 0xBB, 0xCC, 0xDD]);
+        assert_eq!(&cpu.memory[0x200..0x202], &[0x11, 0x22]);
+
+        // Verify delta recorded all changes
+        assert_eq!(delta.register_changes.len(), 3);
+        assert_eq!(delta.memory_changes.len(), 2);
+        assert_eq!(delta.csr_changes.len(), 2);
+        assert_eq!(delta.pc_change, (0, 0x1000));
+    }
+
+    #[test]
+    fn test_forward_modify_conversion() {
+        let mut cpu = CPU::default();
+
+        // Execute an instruction to get a delta
+        let mut inst = super::formats::IType::new();
+        inst.rd = Register::X1;
+        inst.rs1 = Register::X0;
+        inst.imm.set_signed(42).unwrap();
+        let instruction = super::Instruction::ADDI(inst);
+
+        let delta = cpu.execute(instruction).unwrap();
+
+        // Reset CPU state
+        cpu.reset();
+
+        // Use to_forward_modify to reapply the change
+        let forward_modify = delta.to_forward_modify();
+        let redo_delta = cpu.apply(&forward_modify).unwrap();
+
+        // Verify state matches original execution
+        assert_eq!(cpu.get_register(Register::X1), 42);
+        assert_eq!(cpu.pc, 4);
+
+        // Verify redo delta
+        assert_eq!(redo_delta.register_changes.len(), 1);
+        assert_eq!(redo_delta.register_changes[0], (Register::X1, 0, 42));
+        assert_eq!(redo_delta.pc_change, (0, 4));
+    }
+
+    #[test]
+    fn test_modify_error_conditions() {
+        let mut cpu = CPU::default();
+
+        // Test invalid CSR address
+        let modify = Modify {
+            register_changes: vec![],
+            memory_changes: vec![],
+            csr_changes: vec![(0x999, 0x12345678)], // Invalid CSR
+            pc_change: None,
+        };
+
+        let result = cpu.apply(&modify);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("CSR address"));
+
+        // Test memory out of bounds
+        let modify = Modify {
+            register_changes: vec![],
+            memory_changes: vec![(cpu.memory.len() as u32, vec![0x42])], // Out of bounds
+            csr_changes: vec![],
+            pc_change: None,
+        };
+
+        let result = cpu.apply(&modify);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Memory modification out of bounds"));
+    }
+
+    #[test]
+    fn test_atomic_operations_with_modify() {
+        let mut cpu = CPU::default();
+
+        // Create a modify that should partially fail
+        let modify = Modify {
+            register_changes: vec![(Register::X1, 0x1111)],
+            memory_changes: vec![(0x100, vec![0xAA, 0xBB])],
+            csr_changes: vec![(0x999, 0x12345678)], // Invalid CSR - should fail
+            pc_change: Some(0x1000),
+        };
+
+        // Apply should fail atomically
+        let result = cpu.apply(&modify);
+        assert!(result.is_err());
+
+        // Verify NO changes were applied (atomic failure)
+        assert_eq!(cpu.get_register(Register::X1), 0); // unchanged
+        assert_eq!(cpu.pc, 0); // unchanged
+        assert_eq!(cpu.memory[0x100], 0); // unchanged
+    }
+
+    #[test]
+    fn test_state_delta_roundtrip() {
+        let mut cpu = CPU::default();
+
+        // Execute a complex instruction (store word)
+        cpu.set_register(Register::X1, 0x1000); // base address
+        cpu.set_register(Register::X2, 0xDEADBEEF); // value to store
+
+        let mut inst = super::formats::SType::new();
+        inst.rs1 = Register::X1;
+        inst.rs2 = Register::X2;
+        inst.imm.set_signed(4).unwrap();
+        let instruction = super::Instruction::SW(inst);
+
+        let original_state = (
+            cpu.get_register(Register::X1),
+            cpu.get_register(Register::X2),
+            cpu.pc,
+        );
+        let delta = cpu.execute(instruction).unwrap();
+
+        // Verify the instruction executed
+        assert_eq!(cpu.pc, 4);
+        assert_eq!(&cpu.memory[0x1004..0x1008], &[0xEF, 0xBE, 0xAD, 0xDE]);
+
+        // Use reverse modify to undo
+        let reverse_modify = delta.to_reverse_modify();
+        let undo_delta = cpu.apply(&reverse_modify).unwrap();
+
+        // Verify we're back to original state
+        assert_eq!(cpu.get_register(Register::X1), original_state.0);
+        assert_eq!(cpu.get_register(Register::X2), original_state.1);
+        assert_eq!(cpu.pc, original_state.2);
+        assert_eq!(&cpu.memory[0x1004..0x1008], &[0, 0, 0, 0]);
+
+        // Use forward modify to redo
+        let forward_modify = delta.to_forward_modify();
+        let redo_delta = cpu.apply(&forward_modify).unwrap();
+
+        // Verify we're back to executed state
+        assert_eq!(cpu.pc, 4);
+        assert_eq!(&cpu.memory[0x1004..0x1008], &[0xEF, 0xBE, 0xAD, 0xDE]);
+
+        // Verify delta symmetry
+        assert_eq!(
+            undo_delta.register_changes.len(),
+            delta.register_changes.len()
+        );
+        assert_eq!(undo_delta.memory_changes.len(), delta.memory_changes.len());
+        assert_eq!(
+            redo_delta.register_changes.len(),
+            delta.register_changes.len()
+        );
+        assert_eq!(redo_delta.memory_changes.len(), delta.memory_changes.len());
+    }
+}

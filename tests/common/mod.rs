@@ -7,3 +7,6 @@
 pub mod assertions;
 pub mod context;
 pub mod values;
+
+// Re-export commonly used types
+pub use context::{interpreter_context, TestContext};

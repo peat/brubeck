@@ -78,4 +78,79 @@ pub enum Error {
     OutOfRange(String),
 }
 
-// Tests have been moved to tests/unit/components/immediate.rs
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn always_sign_extend() {
+        let mut imm = Immediate::new(8);
+        let result = imm.set_signed(-128);
+        assert!(result.is_ok());
+        assert_eq!(imm.value, 0b1111_1111_1111_1111_1111_1111_1000_0000);
+
+        let result = imm.set_unsigned(255);
+        assert!(result.is_ok());
+        assert_eq!(imm.value, 0b1111_1111_1111_1111_1111_1111_1111_1111);
+    }
+
+    #[test]
+    fn min_max() {
+        let imm = Immediate::new(8);
+        assert_eq!(imm.unsigned_max(), u8::MAX as u32);
+        assert_eq!(imm.signed_max(), i8::MAX as i32);
+        assert_eq!(imm.signed_min(), i8::MIN as i32);
+    }
+
+    #[test]
+    fn set_signed() {
+        let mut imm = Immediate::new(8);
+        let result = imm.set_signed(128);
+        assert!(result.is_err());
+
+        let result = imm.set_signed(127);
+        assert!(result.is_ok());
+        assert_eq!(imm.value, 127u32);
+
+        let result = imm.set_signed(-128);
+        assert!(result.is_ok());
+        assert_eq!(imm.value, 0b1111_1111_1111_1111_1111_1111_1000_0000);
+    }
+
+    #[test]
+    fn get_signed() {
+        let mut imm = Immediate::new(8);
+
+        let result = imm.set_signed(-128);
+        assert!(result.is_ok());
+        assert_eq!(imm.as_i32(), -128);
+
+        let result = imm.set_unsigned(127);
+        assert!(result.is_ok());
+        assert_eq!(imm.as_u32(), 127);
+
+        let result = imm.set_unsigned(255);
+        assert!(result.is_ok());
+        assert_eq!(imm.as_u32(), u32::MAX);
+    }
+
+    #[test]
+    fn get_unsigned() {
+        let mut imm = Immediate::new(8);
+
+        let result = imm.set_unsigned(63);
+        assert!(result.is_ok());
+        // top bit is zero
+        assert_eq!(imm.as_u32(), 63);
+
+        let result = imm.set_unsigned(255);
+        assert!(result.is_ok());
+        // top bit is one, should be sign extended
+        assert_eq!(imm.as_u32(), u32::MAX);
+
+        let result = imm.set_signed(-128);
+        assert!(result.is_ok());
+        // top bit is one, should be sign extended
+        assert_eq!(imm.as_u32(), 0b1111_1111_1111_1111_1111_1111_1000_0000);
+    }
+}

@@ -230,18 +230,26 @@ fn test_bounds_checking() {
 fn test_8bit_sign_extension() {
     // Test from src/immediate.rs - 8-bit immediate sign extension
     let mut imm = Immediate::new(8);
-    
+
     // Test negative value sign extension
     let result = imm.set_signed(-128);
     assert!(result.is_ok());
     assert_eq!(imm.as_u32(), 0xFFFFFF80, "-128 sign-extends to 0xFFFFFF80");
     assert_eq!(imm.as_i32(), -128);
-    
+
     // Test unsigned max value sign extension
     let result = imm.set_unsigned(255);
     assert!(result.is_ok());
-    assert_eq!(imm.as_u32(), 0xFFFFFFFF, "255 (0xFF) sign-extends to 0xFFFFFFFF");
-    assert_eq!(imm.as_i32(), -1, "255 with bit 7 set = -1 when sign-extended");
+    assert_eq!(
+        imm.as_u32(),
+        0xFFFFFFFF,
+        "255 (0xFF) sign-extends to 0xFFFFFFFF"
+    );
+    assert_eq!(
+        imm.as_i32(),
+        -1,
+        "255 with bit 7 set = -1 when sign-extended"
+    );
 }
 
 #[test]
@@ -251,7 +259,7 @@ fn test_8bit_boundaries() {
     assert_eq!(imm.unsigned_max(), 255, "u8::MAX");
     assert_eq!(imm.signed_max(), 127, "i8::MAX");
     assert_eq!(imm.signed_min(), -128, "i8::MIN");
-    
+
     // Verify bounds checking
     let mut imm = Immediate::new(8);
     assert!(imm.set_signed(128).is_err(), "128 > i8::MAX");
@@ -264,17 +272,17 @@ fn test_8bit_boundaries() {
 fn test_value_preservation_and_retrieval() {
     // Test from src/immediate.rs - verifies correct value storage and retrieval
     let mut imm = Immediate::new(8);
-    
+
     // Test positive value storage
     imm.set_unsigned(63).unwrap();
     assert_eq!(imm.as_u32(), 63, "Positive values with bit 7=0 unchanged");
     assert_eq!(imm.as_i32(), 63);
-    
+
     // Test value with top bit set
     imm.set_unsigned(255).unwrap();
     assert_eq!(imm.as_u32(), 0xFFFFFFFF, "255 sign-extends due to bit 7=1");
     assert_eq!(imm.as_i32(), -1);
-    
+
     // Test negative value storage
     imm.set_signed(-128).unwrap();
     assert_eq!(imm.as_u32(), 0xFFFFFF80);

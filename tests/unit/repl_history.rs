@@ -109,12 +109,12 @@ fn test_cancel_navigation() {
 fn test_navigation_state_reset_on_add() {
     let mut history = CommandHistory::new(100);
     history.add("first".to_string());
-    
+
     // Start navigation
     history.start_navigation("working".to_string());
     history.previous();
     assert!(history.is_navigating());
-    
+
     // Adding a new command should reset navigation state
     history.add("new".to_string());
     assert!(!history.is_navigating());

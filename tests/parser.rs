@@ -461,7 +461,7 @@ fn test_parse_navigation_commands() {
         // Now we can navigate back
         let result = i.interpret(cmd);
         assert!(result.is_ok(), "Should recognize {cmd} command");
-        assert!(result.unwrap().contains("Navigated to previous state"));
+        assert!(result.unwrap().contains("Undid previous instruction"));
     }
 
     // Test /next aliases (should work after previous)
@@ -473,7 +473,7 @@ fn test_parse_navigation_commands() {
     for cmd in &commands {
         let result = i.interpret(cmd);
         assert!(result.is_ok(), "Should recognize {cmd} command");
-        assert!(result.unwrap().contains("Navigated to next state"));
+        assert!(result.unwrap().contains("Redid next instruction"));
 
         // Go back again for the next iteration
         if *cmd != "/n" {

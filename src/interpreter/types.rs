@@ -56,6 +56,8 @@ pub enum Token {
 /// Error types for the interpreter
 #[derive(Debug)]
 pub enum Error {
+    /// CPU execution error
+    CpuError(crate::rv32_i::Error),
     /// Generic error with a message
     Generic(String),
     /// Unrecognized token during parsing
@@ -81,9 +83,16 @@ pub enum Error {
     },
 }
 
+impl From<crate::rv32_i::Error> for Error {
+    fn from(err: crate::rv32_i::Error) -> Self {
+        Error::CpuError(err)
+    }
+}
+
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let err_string = match self {
+            Self::CpuError(err) => format!("CPU Error: {err:?}"),
             Self::Generic(s) => s.to_owned(),
 
             Self::UnrecognizedToken(s) => {

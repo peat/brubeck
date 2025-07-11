@@ -309,7 +309,7 @@ fn test_all_pseudo_instructions() {
 
     // Undo in reverse order
     ctx.undo_n(3) // RET, ADDI, J
-        .undo_expect("Navigated to previous state:"); // Generic check
+        .undo_expect("Undid previous instruction"); // Updated for new delta-based system
 }
 
 #[test]

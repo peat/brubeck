@@ -5,10 +5,78 @@
 
 use super::formatter;
 use super::types::{Command, Error};
-use crate::rv32_i::{Instruction, PseudoInstruction};
+use crate::rv32_i::{Instruction, PseudoInstruction, StateDelta};
 
 #[cfg(feature = "repl")]
-use crate::history::StateSnapshot;
+/// Simple history manager for collecting StateDelta records
+pub struct HistoryManager {
+    deltas: Vec<StateDelta>,
+    current_position: usize,
+    limit: usize,
+}
+
+#[cfg(feature = "repl")]
+impl HistoryManager {
+    pub fn new() -> Self {
+        Self {
+            deltas: Vec::new(),
+            current_position: 0,
+            limit: 1000, // Default limit
+        }
+    }
+
+    pub fn with_limit(limit: usize) -> Self {
+        Self {
+            deltas: Vec::new(),
+            current_position: 0,
+            limit,
+        }
+    }
+
+    pub fn record_delta(&mut self, delta: StateDelta) {
+        // Don't record anything if limit is 0
+        if self.limit == 0 {
+            return;
+        }
+
+        // If we're in the middle of history, truncate everything after current position
+        self.deltas.truncate(self.current_position);
+
+        // Add the new delta
+        self.deltas.push(delta);
+        self.current_position = self.deltas.len();
+
+        // Enforce the limit by removing oldest entries
+        while self.deltas.len() > self.limit {
+            self.deltas.remove(0);
+            self.current_position = self.current_position.saturating_sub(1);
+        }
+    }
+
+    pub fn get_previous_delta(&mut self) -> Option<&StateDelta> {
+        if self.current_position > 0 {
+            self.current_position -= 1;
+            self.deltas.get(self.current_position)
+        } else {
+            None
+        }
+    }
+
+    pub fn get_next_delta(&mut self) -> Option<&StateDelta> {
+        if self.current_position < self.deltas.len() {
+            let delta = self.deltas.get(self.current_position);
+            self.current_position += 1;
+            delta
+        } else {
+            None
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.deltas.clear();
+        self.current_position = 0;
+    }
+}
 
 /// Executes a command and returns the result as a string
 ///
@@ -47,15 +115,12 @@ pub fn run_command(
     }
 }
 
-/// Executes an instruction with state tracking for undo/redo
+/// Executes an instruction with delta tracking for undo/redo
 ///
 /// # State Tracking
 ///
-/// When the REPL feature is enabled, this function captures:
-/// - Register state before and after execution
-/// - Program counter changes
-/// - Memory modifications
-/// - CSR (Control and Status Register) changes
+/// When the REPL feature is enabled, this function captures the StateDelta
+/// returned by CPU execution, which includes all state changes.
 ///
 /// # Arguments
 ///
@@ -67,47 +132,21 @@ pub fn execute_with_tracking(
     display_name: Option<String>,
     interpreter: &mut crate::interpreter::Interpreter,
 ) -> Result<String, Error> {
-    // Capture state before execution (only if REPL feature is enabled)
+    // Execute the instruction and get the delta
+    let delta = interpreter.cpu_mut().execute(instruction)?;
+
+    // Record the delta in history if REPL is enabled
     #[cfg(feature = "repl")]
-    let (old_registers, old_pc, instruction_text) = {
-        interpreter.cpu_mut().clear_tracking();
-        let regs = interpreter.cpu().get_all_registers();
-        let pc = interpreter.cpu().pc;
-        // Use provided display name or generate one
-        let text = display_name.unwrap_or_else(|| {
-            // Use the mnemonic for the instruction
-            instruction.mnemonic().to_string()
-        });
-        (regs, pc, text)
-    };
-
-    // Execute the instruction
-    match interpreter.cpu_mut().execute(instruction) {
-        Ok(()) => {
-            // Capture state after successful execution
-            #[cfg(feature = "repl")]
-            {
-                let new_registers = interpreter.cpu().get_all_registers();
-                let new_pc = interpreter.cpu().pc;
-                let snapshot = StateSnapshot {
-                    instruction: instruction_text,
-                    registers: old_registers,
-                    pc: old_pc,
-                    registers_after: new_registers,
-                    pc_after: new_pc,
-                    csr_changes: interpreter.cpu().csr_changes.clone(),
-                    memory_changes: interpreter.cpu().memory_changes.clone(),
-                };
-                interpreter.history_mut().push(snapshot);
-            }
-
-            Ok(formatter::format_instruction_result(
-                &instruction,
-                interpreter.cpu(),
-            ))
-        }
-        e => Err(Error::Generic(format!("{e:?}"))),
+    if let Some(history) = interpreter.history_mut() {
+        history.record_delta(delta.clone());
     }
+
+    // Format the result
+    let instruction_text = display_name.unwrap_or_else(|| instruction.mnemonic().to_string());
+    Ok(formatter::format_instruction_result(
+        &instruction_text,
+        &delta,
+    ))
 }
 
 /// Executes a pseudo-instruction by expanding it and running the real instructions
@@ -135,7 +174,9 @@ pub fn execute_pseudo(
         .map_err(|e| Error::Generic(format!("Failed to expand pseudo-instruction: {e}")))?;
 
     let mut results = Vec::new();
+    let mut instruction_names = Vec::new();
     for inst in instructions {
+        instruction_names.push(inst.mnemonic().to_string());
         // Execute with the pseudo-instruction name for history
         match execute_with_tracking(inst, Some(pseudo_name.clone()), interpreter) {
             Ok(result) => results.push(result),
@@ -144,10 +185,13 @@ pub fn execute_pseudo(
     }
 
     if results.len() == 1 {
-        Ok(format!("Pseudo-instruction: {}", results[0]))
+        Ok(format!("Pseudo-instruction {} expanded to {}: {}", 
+                   pseudo_name, instruction_names[0], results[0]))
     } else {
         Ok(format!(
-            "Pseudo-instruction expanded to: {}",
+            "Pseudo-instruction {} expanded to [{}]: {}",
+            pseudo_name,
+            instruction_names.join(", "),
             results.join("; ")
         ))
     }
@@ -164,70 +208,42 @@ pub fn execute_pseudo(
 /// - Reverts CSR changes
 #[cfg(feature = "repl")]
 fn handle_previous(interpreter: &mut crate::interpreter::Interpreter) -> Result<String, Error> {
-    // Clone the snapshot to avoid borrowing conflicts
-    let snapshot = match interpreter.history_mut().go_previous() {
-        Some(s) => s.clone(),
-        None => return Err(Error::Generic("No previous state in history".to_string())),
-    };
+    if let Some(history) = interpreter.history_mut() {
+        if let Some(delta) = history.get_previous_delta() {
+            // Create a reverse modify to undo the delta
+            let undo_modify = delta.to_reverse_modify();
 
-    // Now we can mutably borrow the CPU without conflicts
-    let cpu = interpreter.cpu_mut();
+            // Apply the undo
+            let _undo_delta = interpreter.cpu_mut().apply(&undo_modify)?;
 
-    // Restore CPU state
-    cpu.set_all_registers(&snapshot.registers);
-    cpu.pc = snapshot.pc;
+            return Ok("Undid previous instruction".to_string());
+        }
+    }
 
-    // Restore memory changes
-    cpu.restore_memory(&snapshot.memory_changes);
-
-    // Restore CSR changes
-    cpu.restore_csrs(&snapshot.csr_changes);
-
-    Ok(format!(
-        "Navigated to previous state: {}",
-        snapshot.instruction
-    ))
+    Err(Error::Generic("No previous state in history".to_string()))
 }
 
 /// Handles the /next command
 ///
 /// # Next Operation
 ///
-/// Navigates to the next state in the execution history:
-/// - Restores registers to the state after the instruction
-/// - Updates program counter
-/// - Re-applies memory modifications
-/// - Re-applies CSR changes
+/// Navigates to the next state in the execution history by re-applying
+/// a previously undone delta.
 #[cfg(feature = "repl")]
 fn handle_next(interpreter: &mut crate::interpreter::Interpreter) -> Result<String, Error> {
-    // Clone the snapshot to avoid borrowing conflicts
-    let snapshot = match interpreter.history_mut().go_next() {
-        Some(s) => s.clone(),
-        None => return Err(Error::Generic("No next state in history".to_string())),
-    };
+    if let Some(history) = interpreter.history_mut() {
+        if let Some(delta) = history.get_next_delta() {
+            // Create a forward modify to redo the delta
+            let redo_modify = delta.to_forward_modify();
 
-    // Now we can mutably borrow the CPU without conflicts
-    let cpu = interpreter.cpu_mut();
+            // Apply the redo
+            let _redo_delta = interpreter.cpu_mut().apply(&redo_modify)?;
 
-    // Restore to the state AFTER the instruction
-    cpu.set_all_registers(&snapshot.registers_after);
-    cpu.pc = snapshot.pc_after;
-
-    // Apply the memory changes
-    for delta in &snapshot.memory_changes {
-        if (delta.address as usize) < cpu.memory.len() {
-            cpu.memory[delta.address as usize] = delta.new_value;
+            return Ok("Redid next instruction".to_string());
         }
     }
 
-    // Apply the CSR changes
-    for &(addr, _old_val, new_val) in &snapshot.csr_changes {
-        if cpu.csr_exists[addr as usize] && !cpu.csr_readonly[addr as usize] {
-            cpu.csrs[addr as usize] = new_val;
-        }
-    }
-
-    Ok(format!("Navigated to next state: {}", snapshot.instruction))
+    Err(Error::Generic("No next state in history".to_string()))
 }
 
 /// Handles the /reset command
@@ -263,7 +279,9 @@ fn handle_reset(interpreter: &mut crate::interpreter::Interpreter) -> Result<Str
         interpreter.cpu_mut().reset();
 
         // Clear history
-        interpreter.history_mut().clear();
+        if let Some(history) = interpreter.history_mut() {
+            history.clear();
+        }
 
         Ok("CPU state reset".to_string())
     } else {

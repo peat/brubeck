@@ -244,7 +244,7 @@ fn test_system_instructions() {
 
     // Test ECALL/EBREAK - these will trap
     let ecall_err = ctx.exec_fail("ECALL");
-    assert!(ecall_err.contains("EnvironmentCall"));
+    assert!(ecall_err.contains("Environment call"));
 
     let ebreak_err = ctx.exec_fail("EBREAK");
     assert!(ebreak_err.contains("Breakpoint"));

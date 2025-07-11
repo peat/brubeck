@@ -52,6 +52,10 @@ pub struct Cli {
     /// Disable color output
     #[arg(long = "no-color")]
     pub no_color: bool,
+
+    /// Enable educational tips in error messages
+    #[arg(long = "tips")]
+    pub tips: bool,
 }
 
 /// Configuration derived from CLI arguments

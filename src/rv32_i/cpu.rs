@@ -1594,13 +1594,50 @@ pub enum CPUError {
 impl std::fmt::Display for CPUError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CPUError::MisalignedJump(addr) => write!(f, "Misaligned jump to address 0x{addr:08x}"),
-            CPUError::AccessViolation(addr) => {
-                write!(f, "Memory address out of bounds: 0x{addr:08x}")
+            CPUError::MisalignedJump(addr) => {
+                write!(f, "Misaligned jump to address 0x{addr:08x}\n\
+                    💡 Tip: RISC-V requires instruction addresses to be 4-byte aligned (divisible by 4).\n\
+                    The address 0x{addr:08x} has a remainder of {} when divided by 4.\n\
+                    Check your jump offset calculation or ensure JALR's target address has bit 0 cleared.", 
+                    addr % 4)
             }
-            CPUError::EnvironmentCall => write!(f, "Environment call"),
-            CPUError::Breakpoint => write!(f, "Breakpoint"),
-            CPUError::IllegalInstruction(desc) => write!(f, "Illegal instruction: {desc}"),
+            CPUError::AccessViolation(addr) => {
+                write!(f, "Memory address out of bounds: 0x{addr:08x}\n\
+                    💡 Tip: The default CPU has 1MB of memory (addresses 0x00000000 to 0x000FFFFF).\n\
+                    Common causes:\n\
+                    - Uninitialized register used as base address\n\
+                    - Incorrect offset calculation\n\
+                    - Stack pointer not properly initialized\n\
+                    Use --memory flag to increase memory size if needed.")
+            }
+            CPUError::EnvironmentCall => {
+                write!(
+                    f,
+                    "Environment call (ECALL)\n\
+                    💡 Tip: ECALL is used to request services from the execution environment.\n\
+                    In a real system, this would trigger a trap to the operating system.\n\
+                    The service requested is typically specified in register a7 (x17)."
+                )
+            }
+            CPUError::Breakpoint => {
+                write!(
+                    f,
+                    "Breakpoint (EBREAK)\n\
+                    💡 Tip: EBREAK is used to transfer control to a debugger.\n\
+                    In a real system, this would pause execution for debugging.\n\
+                    This instruction is often inserted by debuggers at breakpoint locations."
+                )
+            }
+            CPUError::IllegalInstruction(desc) => {
+                write!(
+                    f,
+                    "Illegal instruction: {desc}\n\
+                    💡 Tip: This error typically indicates:\n\
+                    - An invalid CSR address (check the RISC-V privileged spec)\n\
+                    - Attempting to write to a read-only CSR\n\
+                    - An unimplemented instruction encoding"
+                )
+            }
         }
     }
 }

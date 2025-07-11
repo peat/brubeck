@@ -21,7 +21,9 @@ fn test_custom_memory_size() {
     assert!(result.is_ok());
     let result = interpreter.interpret("SW x1, 0(x1)");
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("AccessViolation"));
+    let err_msg = result.unwrap_err().to_string();
+    // The new error format includes more detail
+    assert!(err_msg.contains("Memory address out of bounds"));
 }
 
 #[test]

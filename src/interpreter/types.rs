@@ -69,25 +69,43 @@ impl From<crate::rv32_i::CPUError> for Error {
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let err_string = match self {
-            Self::CpuError(err) => format!("CPU Error: {err:?}"),
+            Self::CpuError(err) => err.to_string(),
             Self::Generic(s) => s.to_owned(),
 
             Self::UnrecognizedToken(s) => {
                 format!("Unrecognized token: '{s}'\n💡 Tip: Check for typos in instruction names, register names, or number formats")
-            },
+            }
 
-            Self::UnknownInstruction { instruction, suggestion } => {
+            Self::UnknownInstruction {
+                instruction,
+                suggestion,
+            } => {
                 match suggestion {
-                    Some(s) => format!("Unknown instruction '{instruction}'. Did you mean '{s}'?\n💡 Tip: RISC-V instructions are case-insensitive. Use 'help' for a list of supported instructions"),
+                    Some(s) if s.contains("or ") => {
+                        // Multiple suggestions mean it's ambiguous
+                        format!("Unknown instruction '{instruction}'. Did you mean '{s}'?")
+                    },
+                    Some(s) if s.contains("No ") || s.contains("Use:") => {
+                        // This is an architecture mismatch explanation, not a typo
+                        format!("Unknown instruction '{instruction}'. {s}")
+                    },
+                    Some(s) => {
+                        // Single suggestion means it's likely a typo
+                        format!("Unknown instruction '{instruction}'. Did you mean '{s}'?\n💡 Tip: Double-check the spelling. Common typos: ADI→ADDI, MOVE→MV, JMP→JAL")
+                    },
                     None => format!("Unknown instruction '{instruction}'\n💡 Tip: Check the RISC-V ISA manual or use 'help' for supported instructions"),
                 }
-            },
+            }
 
             Self::InvalidRegister { register, help } => {
                 format!("Invalid register '{register}'. {help}\n💡 Tip: Valid registers are x0-x31, or ABI names like zero, ra, sp, gp, tp, t0-t6, s0-s11, a0-a7")
-            },
+            }
 
-            Self::WrongArgumentCount { instruction, expected, found } => {
+            Self::WrongArgumentCount {
+                instruction,
+                expected,
+                found,
+            } => {
                 let tip = match instruction.as_str() {
                     "ADD" | "SUB" | "AND" | "OR" | "XOR" | "SLL" | "SLT" | "SLTU" | "SRA" | "SRL" => 
                         "💡 Tip: R-type instructions need 3 registers: rd, rs1, rs2 (e.g., ADD x1, x2, x3)",
@@ -107,11 +125,17 @@ impl Display for Error {
                         "💡 Tip: JALR needs link register, base register + offset: rd, rs1, offset",
                     _ => "💡 Tip: Check the RISC-V ISA manual for the correct instruction format",
                 };
-                format!("{instruction} expects {expected}, but {found} {} provided\n{tip}",
-                    if *found == 1 { "was" } else { "were" })
-            },
+                format!(
+                    "{instruction} expects {expected}, but {found} {} provided\n{tip}",
+                    if *found == 1 { "was" } else { "were" }
+                )
+            }
 
-            Self::ImmediateOutOfRange { instruction, value, range } => {
+            Self::ImmediateOutOfRange {
+                instruction,
+                value,
+                range,
+            } => {
                 let tip = match instruction.as_str() {
                     "ADDI" | "ANDI" | "ORI" | "XORI" | "SLTI" | "SLTIU" => 
                         "💡 Tip: I-type immediates are 12-bit signed values. For larger values, use LUI + ADDI pattern",
@@ -126,7 +150,7 @@ impl Display for Error {
                     _ => "💡 Tip: Different instruction types have different immediate ranges - check the RISC-V ISA manual",
                 };
                 format!("Immediate value {value} out of range for {instruction} (valid range: {range})\n{tip}")
-            },
+            }
         };
 
         write!(f, "{err_string}")

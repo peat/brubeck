@@ -96,6 +96,8 @@ mod builder;
 mod executor;
 #[path = "interpreter/formatter.rs"]
 mod formatter;
+#[path = "interpreter/fuzzy.rs"]
+mod fuzzy;
 #[path = "interpreter/parser.rs"]
 mod parser;
 #[path = "interpreter/types.rs"]
@@ -144,7 +146,12 @@ impl Interpreter {
         // This functionality has been moved to the binary
         if input.contains(';') {
             return Err(Error::Generic(
-                "Semicolon-separated commands are not supported in the library. Use the binary for batch execution.".to_string()
+                "Semicolon-separated commands are not supported in the library\n\
+                💡 Tip: The library processes one instruction at a time.\n\
+                To execute multiple commands, call interpret() multiple times:\n\
+                  interpreter.interpret(\"ADDI x1, x0, 10\")?;\n\
+                  interpreter.interpret(\"ADDI x2, x1, 20\")?;"
+                    .to_string(),
             ));
         }
         self.interpret_single(input)
@@ -192,7 +199,13 @@ impl Interpreter {
 
             Ok("Undid previous instruction".to_string())
         } else {
-            Err(Error::Generic("No previous state in history".to_string()))
+            Err(Error::Generic(
+                "No previous state in history\n\
+                💡 Tip: You've reached the beginning of the undo history.\n\
+                The history is limited to preserve memory. Default limit: 1000 instructions.\n\
+                Use --undo-limit flag to change this when starting the REPL."
+                    .to_string(),
+            ))
         }
     }
 
@@ -207,7 +220,13 @@ impl Interpreter {
 
             Ok("Redid next instruction".to_string())
         } else {
-            Err(Error::Generic("No next state in history".to_string()))
+            Err(Error::Generic(
+                "No next state in history\n\
+                💡 Tip: You're at the most recent state.\n\
+                Use /previous (or /p) to go back, then /next (or /n) to move forward.\n\
+                Execute new instructions to create more history."
+                    .to_string(),
+            ))
         }
     }
 

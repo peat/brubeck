@@ -41,11 +41,17 @@ fn main() -> io::Result<()> {
     match cli.execution_mode() {
         ExecutionMode::Execute => {
             let commands = cli.execute.unwrap();
-            run_execute_mode(&mut interpreter, &commands, cli.verbose, cli.no_color)
+            run_execute_mode(
+                &mut interpreter,
+                &commands,
+                cli.verbose,
+                cli.no_color,
+                cli.tips,
+            )
         }
         ExecutionMode::Script => {
             let path = cli.script.unwrap();
-            run_script_mode(&mut interpreter, &path, cli.verbose, cli.no_color)
+            run_script_mode(&mut interpreter, &path, cli.verbose, cli.no_color, cli.tips)
         }
         ExecutionMode::Interactive => {
             // Check if stdin is a terminal (interactive mode) or pipe
@@ -53,9 +59,9 @@ fn main() -> io::Result<()> {
 
             if is_interactive {
                 let history_size = if cli.no_history { 0 } else { cli.history_size };
-                run_interactive(&mut interpreter, cli.quiet, history_size)
+                run_interactive(&mut interpreter, cli.quiet, history_size, cli.tips)
             } else {
-                run_batch(&mut interpreter, cli.no_color)
+                run_batch(&mut interpreter, cli.no_color, cli.tips)
             }
         }
     }
@@ -65,10 +71,12 @@ fn run_interactive(
     interpreter: &mut Interpreter,
     quiet: bool,
     history_size: usize,
+    tips: bool,
 ) -> io::Result<()> {
     // Only show banner if not in quiet mode
     if !quiet && should_show_banner(ExecutionMode::Interactive) && io::stdin().is_tty() {
         println!("Brubeck: A RISC-V REPL");
+        println!("Type /help for help, or start with --tips for richer assistance");
         println!("Ctrl-C to quit\n");
     }
 
@@ -96,14 +104,14 @@ fn run_interactive(
 
         // Execute the command
         let input = buffer.trim();
-        execute_and_print(interpreter, input, true, quiet, false)?;
+        execute_and_print(interpreter, input, true, quiet, false, tips)?;
 
         // Add to history (all commands, even if they fail - this is what shells do)
         history.add(input.to_string());
     }
 }
 
-fn run_batch(interpreter: &mut Interpreter, _no_color: bool) -> io::Result<()> {
+fn run_batch(interpreter: &mut Interpreter, _no_color: bool, tips: bool) -> io::Result<()> {
     let stdin = io::stdin();
     let reader = stdin.lock();
 
@@ -118,10 +126,25 @@ fn run_batch(interpreter: &mut Interpreter, _no_color: bool) -> io::Result<()> {
             continue;
         }
 
-        execute_and_print(interpreter, &line, use_color, false, false)?;
+        execute_and_print(interpreter, &line, use_color, false, false, tips)?;
     }
 
     Ok(())
+}
+
+/// Format error message with or without educational tips
+fn format_error(error: &str, with_tips: bool) -> String {
+    if with_tips {
+        // Return the full error message with tips
+        error.to_string()
+    } else {
+        // Strip out the educational content (💡 Tips)
+        let lines: Vec<&str> = error
+            .lines()
+            .filter(|line| !line.starts_with("💡 Tip:"))
+            .collect();
+        lines.join("\n")
+    }
 }
 
 fn execute_and_print(
@@ -130,6 +153,7 @@ fn execute_and_print(
     use_color: bool,
     quiet: bool,
     verbose: bool,
+    tips: bool,
 ) -> io::Result<()> {
     let trimmed = input.trim();
     let is_slash_command = trimmed.starts_with('/');
@@ -151,7 +175,7 @@ fn execute_and_print(
     let result = if is_slash_command {
         repl_commands::handle_repl_command(input, interpreter).map_err(|e| e.to_string())
     } else {
-        interpreter.interpret(input).map_err(|e| format!("{e:?}"))
+        interpreter.interpret(input).map_err(|e| e.to_string())
     };
 
     match result {
@@ -191,14 +215,15 @@ fn execute_and_print(
             }
         }
         Err(s) => {
+            let formatted_error = format_error(&s, tips);
             if use_color {
                 let mut stdout = io::stdout();
                 stdout.execute(SetForegroundColor(Color::Red))?;
                 stdout.execute(Print("● "))?;
                 stdout.execute(ResetColor)?;
-                println!("{s}");
+                println!("{formatted_error}");
             } else {
-                eprintln!("ERROR: {s}");
+                eprintln!("ERROR: {formatted_error}");
             }
         }
     }
@@ -211,6 +236,7 @@ fn run_execute_mode(
     commands: &str,
     verbose: bool,
     no_color: bool,
+    tips: bool,
 ) -> io::Result<()> {
     use crate::cli::split_commands;
 
@@ -219,7 +245,7 @@ fn run_execute_mode(
 
     // Split by semicolons and execute each command
     for command in split_commands(commands) {
-        execute_and_print(interpreter, command, use_color, false, verbose)?;
+        execute_and_print(interpreter, command, use_color, false, verbose, tips)?;
     }
 
     Ok(())
@@ -230,6 +256,7 @@ fn run_script_mode(
     path: &str,
     verbose: bool,
     no_color: bool,
+    tips: bool,
 ) -> io::Result<()> {
     // Read the script file
     let contents = fs::read_to_string(path)?;
@@ -246,7 +273,7 @@ fn run_script_mode(
             continue;
         }
 
-        execute_and_print(interpreter, line, use_color, false, verbose)?;
+        execute_and_print(interpreter, line, use_color, false, verbose, tips)?;
     }
 
     Ok(())

@@ -11,6 +11,9 @@ use crate::rv32_i::{
     BType, IType, Instruction, JType, PseudoInstruction, RType, Register, SType, UType,
 };
 
+// Import fuzzy matching functions
+use super::fuzzy::{find_closest_instruction, get_all_instructions};
+
 /// Parses a single line of RISC-V assembly into an executable command.
 ///
 /// # The Four-Phase Parsing Process
@@ -181,19 +184,30 @@ pub fn tokenize(input: Vec<String>) -> Result<Vec<Token>, Error> {
 /// - Guiding users to the correct RISC-V syntax
 /// - Teaching RISC-V conventions through suggestions
 pub fn suggest_instruction(unknown: &str) -> Option<String> {
-    match unknown {
-        "JUMP" | "JMP" => Some("JAL (Jump And Link) or J (pseudo-instruction)".to_string()),
-        "MOVE" | "MOV" => Some("MV (pseudo-instruction: ADDI rd, rs, 0)".to_string()),
-        "LOAD" | "LD" => Some("LW (Load Word), LH (Load Half), or LB (Load Byte)".to_string()),
-        "STORE" | "ST" => Some("SW (Store Word), SH (Store Half), or SB (Store Byte)".to_string()),
-        "BRANCH" | "BR" => Some("BEQ, BNE, BLT, BGE, BLTU, or BGEU".to_string()),
-        "RETURN" => Some("RET (pseudo-instruction: JALR x0, x1, 0)".to_string()),
-        "PUSH" => Some("No PUSH in RISC-V. Use: ADDI sp, sp, -4; SW reg, 0(sp)".to_string()),
-        "POP" => Some("No POP in RISC-V. Use: LW reg, 0(sp); ADDI sp, sp, 4".to_string()),
-        "CALL" => Some("JAL or JALR for function calls".to_string()),
-        "CMP" => Some("No CMP in RISC-V. Use SLT/SLTU for comparison".to_string()),
-        _ => None,
+    // First check common architecture-specific mistakes
+    match unknown.to_uppercase().as_str() {
+        "JUMP" | "JMP" => return Some("JAL (Jump And Link) or J (pseudo-instruction)".to_string()),
+        "MOVE" | "MOV" => return Some("MV (pseudo-instruction: ADDI rd, rs, 0)".to_string()),
+        "LOAD" | "LD" => {
+            return Some("LW (Load Word), LH (Load Half), or LB (Load Byte)".to_string())
+        }
+        "STORE" | "ST" => {
+            return Some("SW (Store Word), SH (Store Half), or SB (Store Byte)".to_string())
+        }
+        "BRANCH" | "BR" => return Some("BEQ, BNE, BLT, BGE, BLTU, or BGEU".to_string()),
+        "RETURN" => return Some("RET (pseudo-instruction: JALR x0, x1, 0)".to_string()),
+        "PUSH" => {
+            return Some("No PUSH in RISC-V. Use: ADDI sp, sp, -4; SW reg, 0(sp)".to_string())
+        }
+        "POP" => return Some("No POP in RISC-V. Use: LW reg, 0(sp); ADDI sp, sp, 4".to_string()),
+        "CALL" => return Some("JAL or JALR for function calls".to_string()),
+        "CMP" => return Some("No CMP in RISC-V. Use SLT/SLTU for comparison".to_string()),
+        _ => {}
     }
+
+    // Use fuzzy matching for typos
+    let all_instructions = get_all_instructions();
+    find_closest_instruction(unknown, &all_instructions)
 }
 
 /// Parses a single normalized string into a typed token.

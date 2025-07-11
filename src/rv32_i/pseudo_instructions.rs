@@ -129,7 +129,13 @@ impl PseudoInstruction {
 
                 // JAL offset is in multiples of 2
                 if offset % 2 != 0 {
-                    return Err("Jump offset must be even".to_string());
+                    return Err(format!(
+                        "Jump offset must be even (got {})\n\
+                        💡 Tip: RISC-V instructions are 4 bytes and must be aligned.\n\
+                        Jump offsets must be multiples of 2. Use {} instead.",
+                        offset,
+                        if *offset > 0 { offset - 1 } else { offset + 1 }
+                    ));
                 }
                 let encoded_offset = offset / 2;
 
@@ -175,7 +181,11 @@ impl PseudoInstruction {
 
             PseudoInstruction::LA { .. } => {
                 // LA (Load Address) requires a full assembler with symbol table support
-                Err("LA pseudo-instruction requires symbol resolution".to_string())
+                Err("LA pseudo-instruction requires symbol resolution\n\
+                    💡 Tip: LA (Load Address) is used to load the address of a label or symbol.\n\
+                    This REPL doesn't support symbols. Use LI to load immediate values instead.\n\
+                    Example: LI x1, 0x1000  # Load address 0x1000 into x1"
+                    .to_string())
             }
         }
     }
@@ -248,16 +258,31 @@ impl PseudoInstruction {
         match self {
             PseudoInstruction::MV { rd, rs } => {
                 if rd == rs {
-                    Err("MV with same source and destination is redundant".to_string())
+                    Err("MV with same source and destination is redundant\n\
+                        💡 Tip: MV x1, x1 doesn't do anything - the register already contains that value.\n\
+                        If you want to test the MV instruction, use different registers.\n\
+                        Example: MV x2, x1  # Copy value from x1 to x2".to_string())
                 } else {
                     Ok(())
                 }
             }
             PseudoInstruction::J { offset } => {
                 if offset % 2 != 0 {
-                    Err("Jump offset must be even".to_string())
+                    Err(format!(
+                        "Jump offset must be even (got {})\n\
+                        💡 Tip: RISC-V instructions are 4 bytes and must be aligned.\n\
+                        Jump offsets must be multiples of 2. Use {} instead.",
+                        offset,
+                        if *offset > 0 { offset - 1 } else { offset + 1 }
+                    ))
                 } else if *offset < -1048576 || *offset > 1048575 {
-                    Err("Jump offset out of range for JAL".to_string())
+                    Err(format!(
+                        "Jump offset {offset} out of range for JAL (±1MB)\n\
+                        💡 Tip: JAL can jump ±1MB from the current PC (range: -1048576 to 1048575).\n\
+                        For longer jumps, use AUIPC + JALR:\n\
+                        AUIPC x1, <high_20_bits>\n\
+                        JALR x0, x1, <low_12_bits>"
+                    ))
                 } else {
                     Ok(())
                 }

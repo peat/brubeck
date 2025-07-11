@@ -81,22 +81,3 @@ pub fn format_memory_range(cpu: &CPU, start: Option<u32>, end: Option<u32>) -> S
     output
 }
 
-/// Formats a single memory word (4 bytes) at the given address
-pub fn format_memory_word(cpu: &CPU, address: u32) -> String {
-    if (address as usize + 3) >= cpu.memory.len() {
-        return format!("Error: Address 0x{address:08x} out of bounds");
-    }
-
-    if address % 4 != 0 {
-        return format!("Error: Address 0x{address:08x} not word-aligned");
-    }
-
-    let word = u32::from_le_bytes([
-        cpu.memory[address as usize],
-        cpu.memory[(address + 1) as usize],
-        cpu.memory[(address + 2) as usize],
-        cpu.memory[(address + 3) as usize],
-    ]);
-
-    format!("[0x{address:08x}]: 0x{word:08x} ({})", word as i32)
-}

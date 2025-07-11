@@ -65,16 +65,6 @@ pub fn format_specific_registers(cpu: &CPU, registers: &[Register]) -> String {
     output
 }
 
-/// Formats a single register value
-pub fn format_register_value(reg: Register, value: u32) -> String {
-    let abi_name = get_abi_name(reg);
-    
-    if abi_name != "----" {
-        format!("{:?} ({}): 0x{:08x} ({})", reg, abi_name, value, value as i32)
-    } else {
-        format!("{:?}: 0x{:08x} ({})", reg, value, value as i32)
-    }
-}
 
 /// Get register from index
 fn register_from_index(i: u32) -> Register {

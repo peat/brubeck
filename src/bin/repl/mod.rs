@@ -3,7 +3,6 @@
 //! This module contains features that enhance the interactive REPL experience
 //! but are not part of the core emulation library.
 
-pub mod colors;
 mod history;
 mod input;
 

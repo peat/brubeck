@@ -3,7 +3,7 @@
 //! This module contains functions that format CPU state, instructions, and
 //! help information for display to the user.
 
-use crate::rv32_i::{Instruction, Register, StateDelta, CPU};
+use crate::rv32_i::{Register, StateDelta, CPU};
 
 /// Formats the result of executing an instruction using StateDelta information
 pub fn format_instruction_result(instruction_name: &str, delta: &StateDelta) -> String {
@@ -41,190 +41,6 @@ pub fn format_instruction_result(instruction_name: &str, delta: &StateDelta) -> 
     }
 
     result.trim_end().to_string()
-}
-
-/// Formats the result of executing an instruction with a human-readable description (legacy)
-#[allow(dead_code)]
-pub fn format_instruction_result_legacy(instruction: &Instruction, cpu: &CPU) -> String {
-    match instruction {
-        Instruction::ADD(i) => {
-            format!(
-                "{}: Added {:?} ({}) and {:?} ({}) and stored result in {:?} ({})",
-                instruction.mnemonic(),
-                i.rs1,
-                cpu.get_register(i.rs1),
-                i.rs2,
-                cpu.get_register(i.rs2),
-                i.rd,
-                cpu.get_register(i.rd)
-            )
-        }
-        Instruction::ADDI(i) => {
-            format!(
-                "{}: Added {} to {:?} ({}) and stored result in {:?} ({})",
-                instruction.mnemonic(),
-                i.imm.as_i32(),
-                i.rs1,
-                cpu.get_register(i.rs1),
-                i.rd,
-                cpu.get_register(i.rd)
-            )
-        }
-        Instruction::SUB(i) => {
-            format!(
-                "{}: Subtracted {:?} ({}) from {:?} ({}) and stored result in {:?} ({})",
-                instruction.mnemonic(),
-                i.rs2,
-                cpu.get_register(i.rs2),
-                i.rs1,
-                cpu.get_register(i.rs1),
-                i.rd,
-                cpu.get_register(i.rd)
-            )
-        }
-        Instruction::LW(i) => {
-            format!(
-                "{}: Loaded word from memory address 0x{:x} ({}+{}) into {:?} ({})",
-                instruction.mnemonic(),
-                (cpu.get_register(i.rs1) as i32 + i.imm.as_i32()) as u32,
-                cpu.get_register(i.rs1),
-                i.imm.as_i32(),
-                i.rd,
-                cpu.get_register(i.rd)
-            )
-        }
-        Instruction::SW(i) => {
-            format!(
-                "{}: Stored word from {:?} ({}) to memory address 0x{:x} ({}+{})",
-                instruction.mnemonic(),
-                i.rs2,
-                cpu.get_register(i.rs2),
-                (cpu.get_register(i.rs1) as i32 + i.imm.as_i32()) as u32,
-                cpu.get_register(i.rs1),
-                i.imm.as_i32()
-            )
-        }
-        Instruction::BEQ(i) => {
-            if cpu.get_register(i.rs1) == cpu.get_register(i.rs2) {
-                format!(
-                    "{}: Branch taken: {:?} ({}) equals {:?} ({})",
-                    instruction.mnemonic(),
-                    i.rs1,
-                    cpu.get_register(i.rs1),
-                    i.rs2,
-                    cpu.get_register(i.rs2)
-                )
-            } else {
-                format!(
-                    "{}: Branch not taken: {:?} ({}) does not equal {:?} ({})",
-                    instruction.mnemonic(),
-                    i.rs1,
-                    cpu.get_register(i.rs1),
-                    i.rs2,
-                    cpu.get_register(i.rs2)
-                )
-            }
-        }
-        Instruction::BNE(i) => {
-            if cpu.get_register(i.rs1) != cpu.get_register(i.rs2) {
-                format!(
-                    "{}: Branch taken: {:?} ({}) does not equal {:?} ({})",
-                    instruction.mnemonic(),
-                    i.rs1,
-                    cpu.get_register(i.rs1),
-                    i.rs2,
-                    cpu.get_register(i.rs2)
-                )
-            } else {
-                format!(
-                    "{}: Branch not taken: {:?} ({}) equals {:?} ({})",
-                    instruction.mnemonic(),
-                    i.rs1,
-                    cpu.get_register(i.rs1),
-                    i.rs2,
-                    cpu.get_register(i.rs2)
-                )
-            }
-        }
-        Instruction::JAL(i) => {
-            format!(
-                "{}: Jumped to PC+{} and stored return address in {:?} ({})",
-                instruction.mnemonic(),
-                i.imm.as_i32(),
-                i.rd,
-                cpu.get_register(i.rd)
-            )
-        }
-        Instruction::JALR(i) => {
-            format!(
-                "{}: Jumped to {:?} ({}) + {} and stored return address in {:?} ({})",
-                instruction.mnemonic(),
-                i.rs1,
-                cpu.get_register(i.rs1),
-                i.imm.as_i32(),
-                i.rd,
-                cpu.get_register(i.rd)
-            )
-        }
-        Instruction::LUI(i) => {
-            format!(
-                "{}: Loaded upper immediate {} into {:?} ({})",
-                instruction.mnemonic(),
-                i.imm.as_i32(),
-                i.rd,
-                cpu.get_register(i.rd)
-            )
-        }
-        Instruction::AUIPC(i) => {
-            format!(
-                "{}: Added upper immediate {} to PC and stored in {:?} ({})",
-                instruction.mnemonic(),
-                i.imm.as_i32(),
-                i.rd,
-                cpu.get_register(i.rd)
-            )
-        }
-        Instruction::AND(i) => {
-            format!(
-                "{}: Bitwise AND of {:?} ({}) and {:?} ({}) stored in {:?} ({})",
-                instruction.mnemonic(),
-                i.rs1,
-                cpu.get_register(i.rs1),
-                i.rs2,
-                cpu.get_register(i.rs2),
-                i.rd,
-                cpu.get_register(i.rd)
-            )
-        }
-        Instruction::OR(i) => {
-            format!(
-                "{}: Bitwise OR of {:?} ({}) and {:?} ({}) stored in {:?} ({})",
-                instruction.mnemonic(),
-                i.rs1,
-                cpu.get_register(i.rs1),
-                i.rs2,
-                cpu.get_register(i.rs2),
-                i.rd,
-                cpu.get_register(i.rd)
-            )
-        }
-        Instruction::XOR(i) => {
-            format!(
-                "{}: Bitwise XOR of {:?} ({}) and {:?} ({}) stored in {:?} ({})",
-                instruction.mnemonic(),
-                i.rs1,
-                cpu.get_register(i.rs1),
-                i.rs2,
-                cpu.get_register(i.rs2),
-                i.rd,
-                cpu.get_register(i.rd)
-            )
-        }
-        Instruction::NOP => format!("{}: No operation", instruction.mnemonic()),
-        _ => {
-            format!("{}: Executed instruction", instruction.mnemonic())
-        }
-    }
 }
 
 /// Shows all register values in a formatted table
@@ -381,6 +197,7 @@ Examples:
 /// ```text
 /// 0x00001000: 48 65 6c 6c 6f 20 57 6f | 72 6c 64 21 00 00 00 00  Hello World!....
 /// ```
+#[cfg(feature = "repl")]
 pub fn format_memory(cpu: &CPU, start: Option<u32>, end: Option<u32>) -> String {
     let mut output = String::new();
 

@@ -8,5 +8,6 @@ pub mod assertions;
 pub mod context;
 pub mod values;
 
-// Re-export commonly used types
-pub use context::{interpreter_context, TestContext};
+// Re-export commonly used types for active tests
+// TODO: Enable when needed
+// pub use context::{interpreter_context, TestContext};

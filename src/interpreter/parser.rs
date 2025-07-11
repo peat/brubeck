@@ -468,6 +468,7 @@ pub fn parse_number(input: &str) -> Result<i32, String> {
 /// Parses a memory address (unsigned 32-bit value)
 ///
 /// Supports decimal, hexadecimal (0x), and binary (0b) formats
+#[cfg(feature = "repl")]
 fn parse_address(input: &str) -> Result<u32, Error> {
     let input = input.trim();
 

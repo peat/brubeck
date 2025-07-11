@@ -81,6 +81,10 @@
 //!
 //! // ... Any execution errors will be caught.
 //! assert!(result.is_ok());
+//! 
+//! // The result is a StateDelta showing what changed
+//! let delta = result.unwrap();
+//! assert_eq!(delta.register_changes.len(), 1);
 //!
 //! // Verify the register was updated
 //! assert_eq!(cpu.x1, 0b0000_0000_0000_0000_0000_0000_0000_0001);
@@ -107,6 +111,10 @@
 //!
 //! // ... Any execution errors will be caught.
 //! assert!(result.is_ok());
+//! 
+//! // The delta shows memory was changed
+//! let delta = result.unwrap();
+//! assert!(!delta.memory_changes.is_empty());
 //!
 //! // Let's check the address
 //! assert_eq!(cpu.memory[255], 1);
@@ -119,9 +127,6 @@ mod immediate;
 
 pub mod interpreter;
 pub mod rv32_i;
-
-#[cfg(feature = "repl")]
-pub mod history;
 
 #[cfg(feature = "repl")]
 pub mod cli;

@@ -5,7 +5,9 @@
 
 use super::formatter;
 use super::types::{Command, Error};
-use crate::rv32_i::{Instruction, PseudoInstruction, StateDelta};
+use crate::rv32_i::{Instruction, PseudoInstruction};
+#[cfg(feature = "repl")]
+use crate::rv32_i::StateDelta;
 
 #[cfg(feature = "repl")]
 /// Simple history manager for collecting StateDelta records

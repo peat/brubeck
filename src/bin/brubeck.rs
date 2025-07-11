@@ -2,7 +2,9 @@ use brubeck::interpreter::Interpreter;
 
 #[cfg(not(feature = "repl"))]
 use std::io::Write;
-use std::io::{self, BufRead};
+use std::io;
+#[cfg(feature = "repl")]
+use std::io::BufRead;
 
 #[cfg(feature = "repl")]
 use brubeck::cli::{should_show_banner, Cli, ExecutionMode};
@@ -131,15 +133,13 @@ fn run_interactive(
     }
 }
 
-fn run_batch(interpreter: &mut Interpreter, no_color: bool) -> io::Result<()> {
+#[cfg(feature = "repl")]
+fn run_batch(interpreter: &mut Interpreter, _no_color: bool) -> io::Result<()> {
     let stdin = io::stdin();
     let reader = stdin.lock();
 
     // Check if stdout is a terminal to determine if we can use colors
-    #[cfg(feature = "repl")]
-    let use_color = io::stdout().is_tty() && !no_color;
-    #[cfg(not(feature = "repl"))]
-    let use_color = false;
+    let use_color = io::stdout().is_tty() && !_no_color;
 
     for line in reader.lines() {
         let line = line?;

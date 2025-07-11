@@ -54,7 +54,7 @@ fn test_parse_complete_instruction() {
     assert!(result.is_ok());
 
     // Verify result - check register directly
-    assert_eq!(i.cpu().get_register(brubeck::rv32_i::Register::X1), 8);
+    assert_eq!(i.cpu.get_register(brubeck::rv32_i::Register::X1), 8);
 }
 
 #[test]
@@ -66,14 +66,14 @@ fn test_trivial_add() {
     i.interpret("ADDI x3, zero, 5").unwrap();
 
     // Verify initial state - check register directly
-    assert_eq!(i.cpu().get_register(brubeck::rv32_i::Register::X1), 0);
+    assert_eq!(i.cpu.get_register(brubeck::rv32_i::Register::X1), 0);
 
     // Execute ADD
     let result = i.interpret("ADD x1, x2, x3");
     assert!(result.is_ok());
 
     // Verify result - check register directly
-    assert_eq!(i.cpu().get_register(brubeck::rv32_i::Register::X1), 8);
+    assert_eq!(i.cpu.get_register(brubeck::rv32_i::Register::X1), 8);
 }
 
 #[test]
@@ -86,7 +86,7 @@ fn test_parse_negative_immediates() {
 
     // Verify result - check register directly
     assert_eq!(
-        i.cpu().get_register(brubeck::rv32_i::Register::X1),
+        i.cpu.get_register(brubeck::rv32_i::Register::X1),
         0xffffffff
     ); // -1 sign-extends to 32 bits
 
@@ -106,7 +106,7 @@ fn test_parse_hex_immediates() {
     assert!(result.is_ok());
 
     // Verify result - check register directly
-    assert_eq!(i.cpu().get_register(brubeck::rv32_i::Register::X1), 0xff);
+    assert_eq!(i.cpu.get_register(brubeck::rv32_i::Register::X1), 0xff);
 }
 
 #[test]
@@ -247,19 +247,19 @@ fn test_pc_advancement() {
     let mut i = Interpreter::new();
 
     // Check initial PC
-    assert_eq!(i.get_pc(), 0);
+    assert_eq!(i.cpu.pc, 0);
 
     // Execute an instruction
     i.interpret("NOP").unwrap();
 
     // PC should advance by 4
-    assert_eq!(i.get_pc(), 4);
+    assert_eq!(i.cpu.pc, 4);
 
     // Execute another instruction
     i.interpret("NOP").unwrap();
 
     // PC should advance to 8
-    assert_eq!(i.get_pc(), 8);
+    assert_eq!(i.cpu.pc, 8);
 }
 
 #[test]

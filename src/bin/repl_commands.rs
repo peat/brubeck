@@ -94,9 +94,9 @@ fn parse_repl_command(parts: &[&str]) -> Result<ReplCommand, String> {
 /// Execute the REPL command
 fn execute_repl_command(cmd: ReplCommand, interpreter: &mut Interpreter) -> Result<String, String> {
     match cmd {
-        ReplCommand::ShowRegs => Ok(repl_formatter::format_all_registers(interpreter.cpu())),
+        ReplCommand::ShowRegs => Ok(repl_formatter::format_all_registers(&interpreter.cpu)),
         ReplCommand::ShowSpecificRegs(regs) => Ok(repl_formatter::format_specific_registers(
-            interpreter.cpu(),
+            &interpreter.cpu,
             regs,
         )),
         ReplCommand::ShowHelp => Ok(repl_formatter::format_help()),
@@ -104,7 +104,7 @@ fn execute_repl_command(cmd: ReplCommand, interpreter: &mut Interpreter) -> Resu
         ReplCommand::Next => handle_next(interpreter),
         ReplCommand::Reset => handle_reset(interpreter),
         ReplCommand::ShowMemory { start, end } => {
-            Ok(repl_formatter::format_memory(interpreter.cpu(), start, end))
+            Ok(repl_formatter::format_memory(&interpreter.cpu, start, end))
         }
         ReplCommand::Quit => {
             // Return a special error that signals the main loop to exit
@@ -115,12 +115,26 @@ fn execute_repl_command(cmd: ReplCommand, interpreter: &mut Interpreter) -> Resu
 
 /// Handle the /previous command
 fn handle_previous(interpreter: &mut Interpreter) -> Result<String, String> {
-    interpreter.previous_state().map_err(|e| format!("{e:?}"))
+    // Use the new API and format the delta
+    match interpreter.previous_state() {
+        Ok(delta) => Ok(format!(
+            "Navigated back: {} changes",
+            delta.register_changes.len() + delta.memory_changes.len()
+        )),
+        Err(e) => Err(format!("{e:?}")),
+    }
 }
 
 /// Handle the /next command
 fn handle_next(interpreter: &mut Interpreter) -> Result<String, String> {
-    interpreter.next_state().map_err(|e| format!("{e:?}"))
+    // Use the new API and format the delta
+    match interpreter.next_state() {
+        Ok(delta) => Ok(format!(
+            "Navigated forward: {} changes",
+            delta.register_changes.len() + delta.memory_changes.len()
+        )),
+        Err(e) => Err(format!("{e:?}")),
+    }
 }
 
 /// Handle the /reset command
@@ -143,11 +157,8 @@ fn handle_reset(interpreter: &mut Interpreter) -> Result<String, String> {
     let confirmed = input.trim().eq_ignore_ascii_case("y");
 
     if confirmed {
-        // Reset CPU state
-        interpreter.cpu_mut().reset();
-
-        // Clear history
-        interpreter.clear_history();
+        // Reset interpreter (CPU and history)
+        interpreter.reset();
 
         Ok("CPU state reset".to_string())
     } else {

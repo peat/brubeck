@@ -3,22 +3,24 @@
 //! This module handles the execution of parsed commands, including
 //! hardware instructions and pseudo-instructions.
 
-use super::formatter;
 use super::types::{Command, Error};
-use crate::rv32_i::{Instruction, PseudoInstruction};
+use crate::rv32_i::{Instruction, PseudoInstruction, StateDelta};
 
-/// Executes a command and returns the result as a string
+/// Executes a command and returns the state delta
 ///
 /// # Command Types
 ///
 /// - **Exec**: Execute a hardware instruction
 /// - **ExecPseudo**: Execute a pseudo-instruction
+///
+/// Note: This is a temporary function that will be removed once we
+/// separate parse and execute in the public API
 pub fn run_command(
     input: Command,
     interpreter: &mut crate::interpreter::Interpreter,
-) -> Result<String, Error> {
+) -> Result<StateDelta, Error> {
     match input {
-        Command::Exec(instruction) => execute_with_tracking(instruction, None, interpreter),
+        Command::Exec(instruction) => execute_with_tracking(instruction, interpreter),
         Command::ExecPseudo(pseudo) => execute_pseudo(pseudo, interpreter),
     }
 }
@@ -33,25 +35,13 @@ pub fn run_command(
 /// # Arguments
 ///
 /// - `instruction`: The instruction to execute
-/// - `display_name`: Optional name for history display (used for pseudo-instructions)
 /// - `interpreter`: The interpreter context
 pub fn execute_with_tracking(
     instruction: Instruction,
-    display_name: Option<String>,
     interpreter: &mut crate::interpreter::Interpreter,
-) -> Result<String, Error> {
-    // Execute the instruction and get the delta
-    let delta = interpreter.cpu_mut().execute(instruction)?;
-
-    // Record the delta in history
-    interpreter.history_mut().record_delta(delta.clone());
-
-    // Format the result
-    let instruction_text = display_name.unwrap_or_else(|| instruction.mnemonic().to_string());
-    Ok(formatter::format_instruction_result(
-        &instruction_text,
-        &delta,
-    ))
+) -> Result<StateDelta, Error> {
+    // Use the interpreter's execute method which handles history recording
+    Ok(interpreter.execute(instruction)?)
 }
 
 /// Executes a pseudo-instruction by expanding it and running the real instructions
@@ -65,41 +55,34 @@ pub fn execute_with_tracking(
 ///
 /// # State Tracking
 ///
-/// Each expanded instruction is executed with the pseudo-instruction's name
-/// for better history display in the REPL.
+/// For pseudo-instructions that expand to multiple instructions, this returns
+/// the combined delta of all executed instructions.
 pub fn execute_pseudo(
     pseudo: PseudoInstruction,
     interpreter: &mut crate::interpreter::Interpreter,
-) -> Result<String, Error> {
-    // Get a nice display name for the pseudo-instruction
-    let pseudo_name = format!("{pseudo:?}"); // We'll improve this later
-
+) -> Result<StateDelta, Error> {
     let instructions = pseudo
         .expand()
         .map_err(|e| Error::Generic(format!("Failed to expand pseudo-instruction: {e}")))?;
 
-    let mut results = Vec::new();
-    let mut instruction_names = Vec::new();
+    // For single instruction expansions, just return that delta
+    if instructions.len() == 1 {
+        return execute_with_tracking(instructions[0], interpreter);
+    }
+
+    // For multiple instructions, we need to merge the deltas
+    // We'll execute all instructions and return the last delta
+    // (which represents the cumulative change from the initial state)
+    let mut last_delta = None;
     for inst in instructions {
-        instruction_names.push(inst.mnemonic().to_string());
-        // Execute with the pseudo-instruction name for history
-        match execute_with_tracking(inst, Some(pseudo_name.clone()), interpreter) {
-            Ok(result) => results.push(result),
+        match execute_with_tracking(inst, interpreter) {
+            Ok(delta) => last_delta = Some(delta),
             Err(e) => return Err(e),
         }
     }
 
-    if results.len() == 1 {
-        Ok(format!(
-            "Pseudo-instruction {} expanded to {}: {}",
-            pseudo_name, instruction_names[0], results[0]
-        ))
-    } else {
-        Ok(format!(
-            "Pseudo-instruction {} expanded to [{}]: {}",
-            pseudo_name,
-            instruction_names.join(", "),
-            results.join("; ")
-        ))
-    }
+    // This should never happen since we checked len > 0
+    last_delta.ok_or_else(|| {
+        Error::Generic("No instructions in pseudo-instruction expansion".to_string())
+    })
 }

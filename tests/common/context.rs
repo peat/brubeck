@@ -117,7 +117,7 @@ impl TestContext<Interpreter> {
         };
 
         // Get the actual value
-        let value = self.inner.cpu().get_register(register);
+        let value = self.inner.cpu.get_register(register);
 
         // Parse expected value
         let expected_val = if expected.starts_with("0x") || expected.starts_with("0X") {
@@ -146,7 +146,7 @@ impl TestContext<Interpreter> {
 
     /// Get the current PC value
     pub fn get_pc(&self) -> u32 {
-        self.inner.get_pc()
+        self.inner.cpu.pc
     }
 
     /// Undo last operation
@@ -161,16 +161,12 @@ impl TestContext<Interpreter> {
     /// Undo with expected content
     pub fn undo_expect(&mut self, _expected: &str) -> &mut Self {
         let ctx = self.context("Undo");
-        let result = self
+        let _delta = self
             .inner
             .previous_state()
             .unwrap_or_else(|e| panic!("{ctx}: {e:?}"));
-        // For now, just check that undo succeeded
-        // The library no longer returns instruction names
-        assert!(
-            result.contains("Undid"),
-            "{ctx}: Expected undo message, got: {result}"
-        );
+        // The new API returns StateDelta, not strings
+        // Success is indicated by not panicking above
         self
     }
 

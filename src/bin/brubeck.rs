@@ -85,7 +85,7 @@ fn run_interactive(
 
     loop {
         // Show PC address prompt
-        let prompt = format!("[0x{:08x}]> ", interpreter.get_pc());
+        let prompt = format!("[0x{:08x}]> ", interpreter.cpu.pc);
 
         let buffer = match repl::read_line_with_history(&prompt, &mut history) {
             Ok(line) => line,
@@ -176,7 +176,7 @@ fn execute_and_print(
 
     // Store PC before execution for verbose mode
     let pc_before = if verbose {
-        Some(interpreter.get_pc())
+        Some(interpreter.cpu.pc)
     } else {
         None
     };

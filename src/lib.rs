@@ -125,5 +125,5 @@
 pub mod interpreter;
 pub mod rv32_i;
 
-pub use interpreter::Interpreter;
-pub use rv32_i::{Immediate, PseudoInstruction};
+pub use interpreter::{parse, ExecutionError, HistoryError, Interpreter, ParseError};
+pub use rv32_i::{CPUError, Immediate, PseudoInstruction};

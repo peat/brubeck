@@ -57,10 +57,9 @@ pub mod helpers {
                 .unwrap_or_else(|e| panic!("{ctx}: {e:?}"));
             // For now, just check that redo succeeded
             // The library no longer returns instruction names
-            assert!(
-                result.contains("Redid"),
-                "{ctx}: Expected redo message, got: {result}"
-            );
+            // The new API returns StateDelta, not strings
+            // Success is indicated by not panicking above
+            let _ = result;
             self
         }
 

@@ -216,15 +216,19 @@ impl Interpreter {
 ### 🚧 In Progress
 
 #### Interpreter Public API Refactoring ⏱️ ~16 hours
-**Status**: Planning  
+**Status**: Phases 1-5 Complete! (Tests and binary updates remaining)  
 **Specification**: See `INTERPRETER_REFACTOR_SPEC.md`  
+**Progress**: See `REFACTORING_PROGRESS.md`  
 **Why**: Current API returns strings instead of data, mixes concerns  
-**Key Changes**:
-- Separate `parse()` and `execute()` methods
-- Return `StateDelta` instead of strings
-- Structured error types (`ParseError`, `HistoryError`)
-- Remove string formatting from library
-- Static parse method for validation without execution
+**Completed**:
+- ✅ New error types (`ParseError`, `HistoryError`, `ExecutionError`)
+- ✅ Removed string formatting from library
+- ✅ Static `parse()` method returns `Vec<Instruction>`
+- ✅ Methods return `StateDelta` instead of strings
+- ✅ Public `cpu` field, added `reset()` method
+**TODO**:
+- Update tests to use new API
+- Update binary to handle formatting
 
 #### Register Output Colorization ⏱️ ~4 hours  
 **Status**: PAUSED - Basic implementation done, needs refinement  
@@ -245,6 +249,7 @@ impl Interpreter {
 - `INSTRUCTION_IMPLEMENTATION.md` - Guide for adding new instructions
 - `CLAUDE.md` - AI assistant context (keep updated!)
 - `INTERPRETER_REFACTOR_SPEC.md` - Detailed spec for API refactoring
+- `REFACTORING_PROGRESS.md` - Progress on interpreter API refactoring
 - `COLORIZATION_STATUS.md` - Status of register colorization work
 
 ## 🎯 Success Metrics

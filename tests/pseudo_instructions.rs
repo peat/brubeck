@@ -4,6 +4,7 @@
 //! expanded, and executed through the interpreter interface.
 
 use brubeck::interpreter::Interpreter;
+use brubeck::rv32_i::Register;
 
 #[test]
 fn test_mv_pseudo_instruction() {
@@ -18,9 +19,7 @@ fn test_mv_pseudo_instruction() {
 
     // Verify the value was moved
     assert_eq!(
-        interpreter
-            .cpu()
-            .get_register(brubeck::rv32_i::Register::X1),
+        interpreter.cpu.get_register(brubeck::rv32_i::Register::X1),
         42,
         "x1 should contain 42"
     );
@@ -40,9 +39,7 @@ fn test_not_pseudo_instruction() {
     // Verify the result (NOT 5 = -6 in two's complement)
     // NOT 0x00000005 = 0xFFFFFFFA = -6 in signed interpretation = 4294967290 unsigned
     assert_eq!(
-        interpreter
-            .cpu()
-            .get_register(brubeck::rv32_i::Register::X2),
+        interpreter.cpu.get_register(brubeck::rv32_i::Register::X2),
         0xfffffffa,
         "x2 should contain 0xfffffffa"
     );
@@ -58,9 +55,7 @@ fn test_seqz_pseudo_instruction() {
     assert!(result.is_ok(), "SEQZ should execute successfully");
 
     assert_eq!(
-        interpreter
-            .cpu()
-            .get_register(brubeck::rv32_i::Register::X2),
+        interpreter.cpu.get_register(brubeck::rv32_i::Register::X2),
         0x00000001,
         "SEQZ of 0 should be 1"
     );
@@ -70,9 +65,7 @@ fn test_seqz_pseudo_instruction() {
     interpreter.interpret("SEQZ x4, x3").unwrap();
 
     assert_eq!(
-        interpreter
-            .cpu()
-            .get_register(brubeck::rv32_i::Register::X4),
+        interpreter.cpu.get_register(brubeck::rv32_i::Register::X4),
         0x00000000,
         "SEQZ of 5 should be 0"
     );
@@ -88,9 +81,7 @@ fn test_snez_pseudo_instruction() {
     assert!(result.is_ok(), "SNEZ should execute successfully");
 
     assert_eq!(
-        interpreter
-            .cpu()
-            .get_register(brubeck::rv32_i::Register::X2),
+        interpreter.cpu.get_register(brubeck::rv32_i::Register::X2),
         0x00000000,
         "SNEZ of 0 should be 0"
     );
@@ -100,9 +91,7 @@ fn test_snez_pseudo_instruction() {
     interpreter.interpret("SNEZ x4, x3").unwrap();
 
     assert_eq!(
-        interpreter
-            .cpu()
-            .get_register(brubeck::rv32_i::Register::X4),
+        interpreter.cpu.get_register(brubeck::rv32_i::Register::X4),
         0x00000001,
         "SNEZ of 5 should be 1"
     );
@@ -117,7 +106,7 @@ fn test_j_pseudo_instruction() {
     assert!(result.is_ok(), "J should execute successfully");
 
     // Check PC has jumped
-    assert_eq!(interpreter.get_pc(), 8, "PC should be 8 after J 8");
+    assert_eq!(interpreter.cpu.pc, 8, "PC should be 8 after J 8");
 }
 
 #[test]
@@ -133,8 +122,7 @@ fn test_jr_pseudo_instruction() {
 
     // Check PC has jumped to register value
     assert_eq!(
-        interpreter.get_pc(),
-        100,
+        interpreter.cpu.pc, 100,
         "PC should be 100 (0x64) after JR x1"
     );
 }
@@ -151,11 +139,7 @@ fn test_ret_pseudo_instruction() {
     assert!(result.is_ok(), "RET should execute successfully");
 
     // Check PC has jumped to return address
-    assert_eq!(
-        interpreter.get_pc(),
-        200,
-        "PC should be 200 (0xc8) after RET"
-    );
+    assert_eq!(interpreter.cpu.pc, 200, "PC should be 200 (0xc8) after RET");
 }
 
 #[test]
@@ -167,9 +151,7 @@ fn test_li_small_immediate() {
     assert!(result.is_ok(), "LI with small immediate should work");
 
     assert_eq!(
-        interpreter
-            .cpu()
-            .get_register(brubeck::rv32_i::Register::X1),
+        interpreter.cpu.get_register(brubeck::rv32_i::Register::X1),
         0x0000002a,
         "x1 should contain 42 (0x2a)"
     );
@@ -184,9 +166,7 @@ fn test_li_large_immediate() {
     assert!(result.is_ok(), "LI with large immediate should work");
 
     assert_eq!(
-        interpreter
-            .cpu()
-            .get_register(brubeck::rv32_i::Register::X1),
+        interpreter.cpu.get_register(brubeck::rv32_i::Register::X1),
         0x00012345,
         "x1 should contain 0x12345 (74565)"
     );
@@ -201,9 +181,7 @@ fn test_li_negative_immediate() {
     assert!(result.is_ok(), "LI with -1 should work");
 
     assert_eq!(
-        interpreter
-            .cpu()
-            .get_register(brubeck::rv32_i::Register::X1),
+        interpreter.cpu.get_register(brubeck::rv32_i::Register::X1),
         0xffffffff,
         "x1 should contain 0xffffffff (-1)"
     );
@@ -218,9 +196,7 @@ fn test_pseudo_instruction_with_abi_names() {
     interpreter.interpret("MV fp, sp").unwrap();
 
     assert_eq!(
-        interpreter
-            .cpu()
-            .get_register(brubeck::rv32_i::Register::X8),
+        interpreter.cpu.get_register(brubeck::rv32_i::Register::X8),
         0x000003e8,
         "fp (x8) should contain 1000 (0x3e8)"
     );
@@ -230,8 +206,7 @@ fn test_pseudo_instruction_with_abi_names() {
     interpreter.interpret("RET").unwrap();
 
     assert_eq!(
-        interpreter.get_pc(),
-        8192,
+        interpreter.cpu.pc, 8192,
         "PC should be 0x2000 (8192) after RET"
     );
 }
@@ -259,13 +234,23 @@ fn test_pseudo_instruction_errors() {
 fn test_pseudo_instruction_expansion_visibility() {
     let mut interpreter = Interpreter::new();
 
-    // The execute_pseudo method shows what instructions were expanded to
+    // The new API doesn't return instruction names, just state changes
+    // We can verify the pseudo-instructions work by checking their effects
+
+    // MV x1, x2 should copy x2 to x1
+    interpreter.interpret("ADDI x2, x0, 42").unwrap(); // Set x2 = 42
     let result = interpreter.interpret("MV x1, x2").unwrap();
-    assert!(result.contains("ADDI"), "MV expansion should mention ADDI");
+    assert!(result.contains("PC:"), "MV should execute and change PC");
+    assert_eq!(interpreter.cpu.get_register(Register::X1), 42);
 
+    // NOT x3, x4 should invert x4 into x3
+    interpreter.interpret("ADDI x4, x0, 0xFF").unwrap(); // Set x4 = 255
     let result = interpreter.interpret("NOT x3, x4").unwrap();
-    assert!(result.contains("XORI"), "NOT expansion should mention XORI");
+    assert!(result.contains("PC:"), "NOT should execute and change PC");
+    assert_eq!(interpreter.cpu.get_register(Register::X3) as i32, -256);
 
+    // RET should jump to ra and increment PC
+    interpreter.interpret("ADDI ra, x0, 0x100").unwrap(); // Set return address
     let result = interpreter.interpret("RET").unwrap();
-    assert!(result.contains("JALR"), "RET expansion should mention JALR");
+    assert!(result.contains("PC:"), "RET should change PC");
 }

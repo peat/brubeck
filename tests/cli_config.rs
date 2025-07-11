@@ -40,20 +40,20 @@ fn test_custom_history_limit() {
 
     // Should be able to undo 3 times (history limit)
     assert!(interpreter.previous_state().is_ok());
-    assert_eq!(interpreter.cpu().get_register(Register::X5), 0);
+    assert_eq!(interpreter.cpu.get_register(Register::X5), 0);
 
     assert!(interpreter.previous_state().is_ok());
-    assert_eq!(interpreter.cpu().get_register(Register::X4), 0);
+    assert_eq!(interpreter.cpu.get_register(Register::X4), 0);
 
     assert!(interpreter.previous_state().is_ok());
-    assert_eq!(interpreter.cpu().get_register(Register::X3), 0);
+    assert_eq!(interpreter.cpu.get_register(Register::X3), 0);
 
     // Fourth undo should fail (exceeded history limit)
     assert!(interpreter.previous_state().is_err());
 
     // x1 and x2 should still have their values (not in history)
-    assert_eq!(interpreter.cpu().get_register(Register::X1), 1);
-    assert_eq!(interpreter.cpu().get_register(Register::X2), 2);
+    assert_eq!(interpreter.cpu.get_register(Register::X1), 1);
+    assert_eq!(interpreter.cpu.get_register(Register::X2), 2);
 }
 
 #[test]
@@ -63,15 +63,16 @@ fn test_zero_history_limit() {
 
     // Execute an instruction
     interpreter.interpret("ADDI x1, x0, 42").unwrap();
-    assert_eq!(interpreter.cpu().get_register(Register::X1), 42);
+    assert_eq!(interpreter.cpu.get_register(Register::X1), 42);
 
     // Undo should fail immediately
     let result = interpreter.previous_state();
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("No previous state"));
+    // With history_limit=0, we get AtBeginning error
+    assert!(matches!(
+        result.unwrap_err(),
+        brubeck::HistoryError::AtBeginning
+    ));
 }
 
 #[test]

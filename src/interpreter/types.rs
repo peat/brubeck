@@ -34,7 +34,7 @@ pub enum Token {
 #[derive(Debug)]
 pub enum Error {
     /// CPU execution error
-    CpuError(crate::rv32_i::CPUError),
+    Cpu(crate::rv32_i::CPUError),
     /// Generic error with a message
     Generic(String),
     /// Unrecognized token during parsing
@@ -62,14 +62,14 @@ pub enum Error {
 
 impl From<crate::rv32_i::CPUError> for Error {
     fn from(err: crate::rv32_i::CPUError) -> Self {
-        Error::CpuError(err)
+        Error::Cpu(err)
     }
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let err_string = match self {
-            Self::CpuError(err) => err.to_string(),
+            Self::Cpu(err) => err.to_string(),
             Self::Generic(s) => s.to_owned(),
 
             Self::UnrecognizedToken(s) => {

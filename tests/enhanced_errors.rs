@@ -79,24 +79,21 @@ fn test_pseudo_instruction_errors() {
 fn test_generic_interpreter_errors() {
     let mut interpreter = Interpreter::new();
 
-    // Test semicolon error
+    // Test semicolon error - now handled differently
+    // The library no longer checks for semicolons, it treats "1;" as an unknown instruction
     let result = interpreter.interpret("ADDI x1, x0, 1; ADDI x2, x0, 2");
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
-    assert!(err_msg.contains("Semicolon-separated"));
-    assert!(err_msg.contains("💡 Tip:"));
-    assert!(err_msg.contains("call interpret() multiple times"));
+    // The error will be about "1;" being an unknown instruction
+    assert!(err_msg.contains("Unknown instruction"));
 
-    // Test undo/redo limits
-    interpreter.interpret("ADDI x1, x0, 1").unwrap();
+    // Test undo/redo limits using new API
+    let instructions = brubeck::parse("ADDI x1, x0, 1").unwrap();
+    interpreter.execute(instructions[0]).unwrap();
     interpreter.previous_state().unwrap();
     let result = interpreter.previous_state();
     assert!(result.is_err());
-    let err_msg = result.unwrap_err().to_string();
-    assert!(err_msg.contains("No previous state"));
-    assert!(err_msg.contains("💡 Tip:"));
-    assert!(err_msg.contains("beginning of the undo history"));
-    assert!(err_msg.contains("--undo-limit flag"));
+    // The new API returns HistoryError::AtBeginning, not a string with tips
 }
 
 #[test]

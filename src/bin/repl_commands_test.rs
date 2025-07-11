@@ -60,17 +60,17 @@ mod tests {
         // Test undo - use /previous which is what's implemented
         let result = handle_repl_command("/previous", &mut i);
         assert!(result.is_ok());
-        assert!(result.unwrap().contains("Undid"));
+        assert!(result.unwrap().contains("Navigated back"));
 
         // Test next instead of redo
         let result = handle_repl_command("/next", &mut i);
         assert!(result.is_ok());
-        assert!(result.unwrap().contains("Redid"));
+        assert!(result.unwrap().contains("Navigated forward"));
 
         // Test /p alias for previous
         let result = handle_repl_command("/p", &mut i);
         assert!(result.is_ok());
-        assert!(result.unwrap().contains("Undid"));
+        assert!(result.unwrap().contains("Navigated back"));
     }
 
     #[test]

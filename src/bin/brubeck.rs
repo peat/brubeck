@@ -18,9 +18,8 @@ mod cli;
 mod formatting;
 mod repl;
 
-// REPL module with commands and formatting
+// REPL module with commands
 mod repl_commands;
-mod repl_formatter;
 
 #[cfg(test)]
 mod repl_commands_test;

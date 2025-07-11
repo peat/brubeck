@@ -4,7 +4,6 @@
 //! that are not part of the core library.
 
 use crate::formatting;
-use crate::repl_formatter;
 use brubeck::interpreter::Interpreter;
 use brubeck::rv32_i::Register;
 
@@ -95,17 +94,17 @@ fn parse_repl_command(parts: &[&str]) -> Result<ReplCommand, String> {
 /// Execute the REPL command
 fn execute_repl_command(cmd: ReplCommand, interpreter: &mut Interpreter) -> Result<String, String> {
     match cmd {
-        ReplCommand::ShowRegs => Ok(repl_formatter::format_all_registers(&interpreter.cpu)),
-        ReplCommand::ShowSpecificRegs(regs) => Ok(repl_formatter::format_specific_registers(
+        ReplCommand::ShowRegs => Ok(formatting::registers::format_registers(&interpreter.cpu, true)),
+        ReplCommand::ShowSpecificRegs(regs) => Ok(formatting::registers::format_specific_registers(
             &interpreter.cpu,
-            regs,
+            &regs,
         )),
-        ReplCommand::ShowHelp => Ok(repl_formatter::format_help()),
+        ReplCommand::ShowHelp => Ok(formatting::help::format_help()),
         ReplCommand::Previous => handle_previous(interpreter),
         ReplCommand::Next => handle_next(interpreter),
         ReplCommand::Reset => handle_reset(interpreter),
         ReplCommand::ShowMemory { start, end } => {
-            Ok(repl_formatter::format_memory(&interpreter.cpu, start, end))
+            Ok(formatting::memory::format_memory_range(&interpreter.cpu, start, end))
         }
         ReplCommand::Quit => {
             // Return a special error that signals the main loop to exit

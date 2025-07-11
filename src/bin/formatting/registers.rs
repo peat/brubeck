@@ -44,9 +44,9 @@ pub fn format_specific_registers(cpu: &CPU, registers: &[Register]) -> String {
         let abi_name = get_abi_name(*reg);
 
         let reg_str = if abi_name != "----" {
-            format!("{:?} ({})", reg, abi_name)
+            format!("{} ({})", format_register_name(*reg), abi_name)
         } else {
-            format!("{:?}", reg)
+            format_register_name(*reg)
         };
 
         output.push_str(&format!(
@@ -112,6 +112,45 @@ fn register_from_index(i: u32) -> Register {
         30 => Register::X30,
         31 => Register::X31,
         _ => panic!("Invalid register index: {}", i),
+    }
+}
+
+/// Format register name consistently
+fn format_register_name(reg: Register) -> String {
+    match reg {
+        Register::X0 => "x 0".to_string(),
+        Register::X1 => "x 1".to_string(),
+        Register::X2 => "x 2".to_string(),
+        Register::X3 => "x 3".to_string(),
+        Register::X4 => "x 4".to_string(),
+        Register::X5 => "x 5".to_string(),
+        Register::X6 => "x 6".to_string(),
+        Register::X7 => "x 7".to_string(),
+        Register::X8 => "x 8".to_string(),
+        Register::X9 => "x 9".to_string(),
+        Register::X10 => "x10".to_string(),
+        Register::X11 => "x11".to_string(),
+        Register::X12 => "x12".to_string(),
+        Register::X13 => "x13".to_string(),
+        Register::X14 => "x14".to_string(),
+        Register::X15 => "x15".to_string(),
+        Register::X16 => "x16".to_string(),
+        Register::X17 => "x17".to_string(),
+        Register::X18 => "x18".to_string(),
+        Register::X19 => "x19".to_string(),
+        Register::X20 => "x20".to_string(),
+        Register::X21 => "x21".to_string(),
+        Register::X22 => "x22".to_string(),
+        Register::X23 => "x23".to_string(),
+        Register::X24 => "x24".to_string(),
+        Register::X25 => "x25".to_string(),
+        Register::X26 => "x26".to_string(),
+        Register::X27 => "x27".to_string(),
+        Register::X28 => "x28".to_string(),
+        Register::X29 => "x29".to_string(),
+        Register::X30 => "x30".to_string(),
+        Register::X31 => "x31".to_string(),
+        Register::PC => "pc".to_string(),
     }
 }
 

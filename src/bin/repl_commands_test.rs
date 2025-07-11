@@ -18,7 +18,7 @@ mod tests {
         assert!(result.is_ok());
         let output = result.unwrap();
         // PC is always shown as a single register on its own line
-        assert!(output.contains("pc      :") || output.contains("pc:"));
+        assert!(output.contains("pc:") || output.contains("PC:"));
 
         let result = handle_repl_command("/regs X1", &mut i);
         assert!(result.is_ok());
@@ -80,20 +80,20 @@ mod tests {
         // Test memory command without arguments (shows memory around PC)
         let result = handle_repl_command("/memory", &mut i);
         assert!(result.is_ok());
-        assert!(result.unwrap().contains("0x00000000:"));
+        assert!(result.unwrap().contains("0x00000000 "));
 
         // Test memory command with valid address
         let result = handle_repl_command("/memory 0x0", &mut i);
         assert!(result.is_ok());
-        assert!(result.unwrap().contains("0x00000000:"));
+        assert!(result.unwrap().contains("0x00000000 "));
 
         // Test memory command with range (0x100 to 0x120 = 32 bytes)
         let result = handle_repl_command("/memory 0x100 0x120", &mut i);
         assert!(result.is_ok());
         let output = result.unwrap();
-        assert!(output.contains("0x00000100:"));
+        assert!(output.contains("0x00000100 "));
         // Should show 32 bytes (2 lines of 16 bytes each)
-        assert!(output.contains("0x00000110:"));
+        assert!(output.contains("0x00000110 "));
     }
 
     #[test]
@@ -176,7 +176,7 @@ mod tests {
         let output = result.unwrap();
         assert!(output.contains("x 0"));
         assert!(output.contains("x31"));
-        assert!(output.contains("pc      :"));
+        assert!(output.contains("pc       :"));
 
         // Test with /r alias
         let result = handle_repl_command("/r x1", &mut i);

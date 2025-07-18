@@ -242,13 +242,9 @@ impl Interpreter {
 - Simplify color functions
 
 ### 📚 Documentation Status
-- `REPL_USABILITY_FEEDBACK.md` - Original user feedback and analysis
-- `REFACTORING_SUMMARY.md` - Details of interpreter modularization
 - `INSTRUCTION_IMPLEMENTATION.md` - Guide for adding new instructions
 - `CLAUDE.md` - AI assistant context (keep updated!)
-- `INTERPRETER_REFACTOR_SPEC.md` - Detailed spec for API refactoring
-- `REFACTORING_PROGRESS.md` - Progress on interpreter API refactoring
-- `COLORIZATION_STATUS.md` - Status of register colorization work
+- `docs/archive/` - Completed specs and progress tracking from past refactoring work
 
 ## 🎯 Success Metrics
 

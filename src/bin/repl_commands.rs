@@ -100,7 +100,6 @@ fn parse_repl_command(parts: &[&str]) -> Result<ReplCommand, String> {
     }
 }
 
-
 /// Execute the REPL command with optional delta for coloring
 fn execute_repl_command_with_delta(
     cmd: ReplCommand,
@@ -120,11 +119,14 @@ fn execute_repl_command_with_delta(
         ReplCommand::Previous => handle_previous(interpreter),
         ReplCommand::Next => handle_next(interpreter),
         ReplCommand::Reset => handle_reset(interpreter),
-        ReplCommand::ShowMemory { start, end } => Ok(formatting::memory::format_memory_range(
-            &interpreter.cpu,
-            start,
-            end,
-        )),
+        ReplCommand::ShowMemory { start, end } => {
+            Ok(formatting::memory::format_memory_range_with_colors(
+                &interpreter.cpu,
+                start,
+                end,
+                last_delta,
+            ))
+        }
         ReplCommand::Quit => {
             // Return a special error that signals the main loop to exit
             Err("QUIT".to_string())

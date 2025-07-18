@@ -1,9 +1,9 @@
 //! Comprehensive tests covering ALL RV32I instructions
 //!
-//! These tests ensure every instruction type can be properly undone and redone.
+//! These tests ensure every instruction type can be properly navigated with history.
 
 use crate::common::TestContext;
-use crate::helpers::UndoRedoExt;
+use crate::helpers::HistoryNavigationExt;
 use brubeck::interpreter::Interpreter;
 
 // Helper function to create test context
@@ -25,15 +25,15 @@ fn test_arithmetic_complete() {
         .check_reg("x4", "0x00000014");
 
     // Undo SUB and ADD
-    ctx.undo()
+    ctx.previous()
         .check_reg("x4", "0x00000000")
-        .undo()
+        .previous()
         .check_reg("x3", "0x00000000");
 
     // Redo both
-    ctx.redo()
+    ctx.next()
         .check_reg("x3", "0x00000050")
-        .redo()
+        .next()
         .check_reg("x4", "0x00000014");
 }
 
@@ -49,7 +49,7 @@ fn test_arithmetic_edge_cases() {
         .exec("SUB x4, x0, x0"); // x4 = 0
 
     // Undo and verify
-    ctx.undo_n(2).check_reg("x3", "0x00000000");
+    ctx.previous_n(2).check_reg("x3", "0x00000000");
 }
 
 // ==================== LOGICAL INSTRUCTIONS ====================
@@ -75,7 +75,7 @@ fn test_logical_operations() {
         .exec("XORI x8, x1, -1"); // NOT operation
 
     // Undo all logical operations
-    ctx.undo_n(6).check_regs_zero(3, 8);
+    ctx.previous_n(6).check_regs_zero(3, 8);
 }
 
 // ==================== SHIFT INSTRUCTIONS ====================
@@ -99,7 +99,7 @@ fn test_shift_operations() {
         .exec("SRA x9, x4, x6");
 
     // Undo one and verify
-    ctx.undo().check_reg("x9", "0x00000000");
+    ctx.previous().check_reg("x9", "0x00000000");
 }
 
 // ==================== COMPARISON INSTRUCTIONS ====================
@@ -124,7 +124,7 @@ fn test_comparison_operations() {
         .check_reg("x6", "0x00000000");
 
     // Undo all comparisons
-    ctx.undo_n(5);
+    ctx.previous_n(5);
 }
 
 // ==================== MEMORY OPERATIONS ====================
@@ -155,7 +155,7 @@ fn test_memory_all_sizes() {
         .exec("LW x9, 8(x1)"); // Load word
 
     // Undo stores (loads don't change state)
-    ctx.undo_n(2); // Undo LW and SW
+    ctx.previous_n(2); // Undo LW and SW
 
     // Verify memory was restored
     ctx.exec("LW x10, 8(x1)").check_reg("x10", "0x00000000");
@@ -172,7 +172,7 @@ fn test_memory_negative_offsets() {
         .check_reg("x3", "0x0000002a");
 
     // Undo and verify
-    ctx.undo_n(2);
+    ctx.previous_n(2);
     ctx.exec("LW x4, -4(x1)").check_reg("x4", "0x00000000");
 }
 
@@ -188,9 +188,9 @@ fn test_upper_immediate() {
     ctx.exec("AUIPC x2, 0x1000"); // PC + (0x1000 << 12)
 
     // Undo both
-    ctx.undo()
+    ctx.previous()
         .check_reg("x2", "0x00000000")
-        .undo()
+        .previous()
         .check_reg("x1", "0x00000000");
 }
 
@@ -215,7 +215,7 @@ fn test_all_branch_types() {
 
     // Undo all branches
     for _ in 0..6 {
-        ctx.undo_expect("B"); // All branch instructions start with B
+        ctx.previous_expect("B"); // All branch instructions start with B
     }
 }
 
@@ -225,12 +225,12 @@ fn test_all_branch_types() {
 fn test_jump_instructions() {
     let mut ctx = test_ctx("test_jump_instructions");
     // Test JAL (Jump and Link)
-    ctx.exec("JAL x1, 0x100").undo_expect("JAL");
+    ctx.exec("JAL x1, 0x100").previous_expect("JAL");
 
     // Test JALR (Jump and Link Register)
     ctx.exec("ADDI x2, x0, 0x200")
         .exec("JALR x3, x2, 8")
-        .undo()
+        .previous()
         .check_reg("x3", "0x00000000");
 }
 
@@ -250,7 +250,7 @@ fn test_system_instructions() {
     assert!(ebreak_err.contains("Breakpoint"));
 
     // Only FENCE should be undoable
-    ctx.undo_expect("FENCE").undo_should_fail();
+    ctx.previous_expect("FENCE").previous_should_fail();
 }
 
 // ==================== CSR INSTRUCTIONS ====================
@@ -271,7 +271,7 @@ fn test_csr_all_variants() {
         .exec("CSRRCI x8, 0x340, 3"); // Clear immediate bits
 
     // Undo all CSR operations
-    ctx.undo_n(6);
+    ctx.previous_n(6);
 
     // Verify CSR is back to original state
     ctx.exec("CSRRS x9, 0x340, x0")
@@ -286,7 +286,7 @@ fn test_csr_read_only() {
     assert!(err.contains("read-only"));
 
     // Failed instruction should not be in history
-    ctx.undo_should_fail();
+    ctx.previous_should_fail();
 }
 
 // ==================== PSEUDO-INSTRUCTIONS ====================
@@ -308,8 +308,8 @@ fn test_all_pseudo_instructions() {
         .exec("RET"); // Return to x1
 
     // Undo in reverse order
-    ctx.undo_n(3) // RET, ADDI, J
-        .undo_expect("Undid previous instruction"); // Updated for new delta-based system
+    ctx.previous_n(3) // RET, ADDI, J
+        .previous_expect("Undid previous instruction"); // Updated for new delta-based system
 }
 
 #[test]
@@ -317,8 +317,8 @@ fn test_li_large_values() {
     let mut ctx = test_ctx("test_li_large_values");
     // Test LI with values requiring LUI + ADDI
     ctx.exec("LI x1, 0x12345678")
-        .undo_expect("LI") // This undoes the ADDI part
-        .undo() // This undoes the LUI part
+        .previous_expect("LI") // This undoes the ADDI part
+        .previous() // This undoes the LUI part
         .check_reg("x1", "0x00000000");
 }
 
@@ -337,8 +337,8 @@ fn test_memory_aliasing() {
     // Load and check
     ctx.exec("LW x4, 0(x1)");
 
-    // Undo the byte store
-    ctx.undo_n(2); // LW and SB
+    // Navigate back from the byte store
+    ctx.previous_n(2); // LW and SB
 
     // Load again - should have original word
     ctx.exec("LW x5, 0(x1)").check_reg("x5", "0x12345678"); // 0x12345678
@@ -353,11 +353,11 @@ fn test_maximum_undo_redo_cycles() {
     }
 
     // Undo all
-    ctx.undo_n(5);
+    ctx.previous_n(5);
 
     // Redo all
     for _ in 0..5 {
-        ctx.redo();
+        ctx.next();
     }
 
     // Verify final state
@@ -366,5 +366,5 @@ fn test_maximum_undo_redo_cycles() {
     }
 
     // Undo some, execute new instruction, verify redo is cleared
-    ctx.undo_n(2).exec("ADDI x6, x0, 99").redo_should_fail();
+    ctx.previous_n(2).exec("ADDI x6, x0, 99").next_should_fail();
 }

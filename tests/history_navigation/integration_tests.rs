@@ -1,12 +1,12 @@
-//! Basic integration tests for undo/redo functionality
+//! Basic integration tests for history navigation functionality
 //!
 //! These tests cover common use cases and basic functionality.
 
 use crate::common::TestContext;
-use crate::helpers::UndoRedoExt;
+use crate::helpers::HistoryNavigationExt;
 
 #[test]
-fn test_undo_redo_basic_arithmetic() {
+fn test_history_navigation_basic_arithmetic() {
     let mut ctx = TestContext::new();
 
     // Execute a sequence of arithmetic instructions
@@ -17,21 +17,21 @@ fn test_undo_redo_basic_arithmetic() {
     // Verify current state
     ctx.check_reg("x3", "0x0000001e");
 
-    // Undo the ADD
-    ctx.undo_expect("ADD").check_reg("x3", "0x00000000");
+    // Navigate back from the ADD
+    ctx.previous_expect("ADD").check_reg("x3", "0x00000000");
 
-    // Undo the second ADDI
-    ctx.undo().check_reg("x2", "0x00000000");
+    // Navigate back from the second ADDI
+    ctx.previous().check_reg("x2", "0x00000000");
 
-    // Redo the second ADDI
-    ctx.redo_expect("ADDI").check_reg("x2", "0x00000014");
+    // Navigate forward to the second ADDI
+    ctx.next_expect("ADDI").check_reg("x2", "0x00000014");
 
-    // Redo the ADD
-    ctx.redo().check_reg("x3", "0x0000001e");
+    // Navigate forward to the ADD
+    ctx.next().check_reg("x3", "0x0000001e");
 }
 
 #[test]
-fn test_undo_memory_operations() {
+fn test_previous_memory_operations() {
     let mut ctx = TestContext::new();
 
     // Set up base address and value
@@ -44,18 +44,18 @@ fn test_undo_memory_operations() {
     // Load it back to verify
     ctx.exec("LW x3, 0(x1)").check_reg("x3", "0x0000abcd"); // 0xABCD
 
-    // Undo the load (shouldn't affect memory)
-    ctx.undo().check_reg("x3", "0x00000000");
+    // Navigate back from the load (shouldn't affect memory)
+    ctx.previous().check_reg("x3", "0x00000000");
 
-    // Undo the store (should restore memory)
-    ctx.undo();
+    // Navigate back from the store (should restore memory)
+    ctx.previous();
 
     // Try to load again - should get 0 since memory was restored
     ctx.exec("LW x4, 0(x1)").check_reg("x4", "0x00000000");
 }
 
 #[test]
-fn test_undo_csr_operations() {
+fn test_previous_csr_operations() {
     let mut ctx = TestContext::new();
 
     // Write to MSCRATCH CSR
@@ -65,11 +65,11 @@ fn test_undo_csr_operations() {
     ctx.exec("CSRRS x3, 0x340, x0") // Read mscratch
         .check_reg("x3", "0x000004d2");
 
-    // Undo the read
-    ctx.undo().check_reg("x3", "0x00000000");
+    // Navigate back from the read
+    ctx.previous().check_reg("x3", "0x00000000");
 
-    // Undo the write
-    ctx.undo();
+    // Navigate back from the write
+    ctx.previous();
 
     // Read again - should get original value (0)
     ctx.exec("CSRRS x4, 0x340, x0")
@@ -77,7 +77,7 @@ fn test_undo_csr_operations() {
 }
 
 #[test]
-fn test_undo_limit() {
+fn test_previous_limit() {
     let mut ctx = TestContext::new();
 
     // Execute many instructions
@@ -95,24 +95,24 @@ fn test_undo_limit() {
     assert!(undo_count > 0);
 
     // Further undo should fail
-    ctx.undo_should_fail();
+    ctx.previous_should_fail();
 }
 
 #[test]
-fn test_redo_cleared_after_new_instruction() {
+fn test_next_cleared_after_new_instruction() {
     let mut ctx = TestContext::new();
 
     // Execute some instructions
     ctx.exec("ADDI x1, x0, 10").exec("ADDI x2, x0, 20");
 
     // Undo one
-    ctx.undo().check_reg("x2", "0x00000000");
+    ctx.previous().check_reg("x2", "0x00000000");
 
     // Execute a new instruction
     ctx.exec("ADDI x3, x0, 30");
 
     // Redo should now fail
-    ctx.redo_should_fail();
+    ctx.next_should_fail();
 }
 
 #[test]
@@ -126,7 +126,7 @@ fn test_pseudo_instruction_undo() {
     ctx.check_reg("x2", "0x00012345"); // 0x12345
 
     // Undo MV
-    ctx.undo_expect("MV").check_reg("x2", "0x00000000");
+    ctx.previous_expect("MV").check_reg("x2", "0x00000000");
 
     // x1 should still have the value
     ctx.check_reg("x1", "0x00012345");
@@ -149,8 +149,8 @@ fn test_branch_instruction_undo() {
     let pc_after = ctx.get_pc();
     assert_ne!(pc_before, pc_after);
 
-    // Undo the branch
-    ctx.undo();
+    // Navigate back from the branch
+    ctx.previous();
 
     // PC should be restored
     let pc_restored = ctx.get_pc();
@@ -169,8 +169,8 @@ fn test_invalid_instruction_not_in_history() {
     assert!(err.contains("Invalid token") || err.contains("Unknown"));
 
     // Undo should undo the ADDI, not fail on the invalid instruction
-    ctx.undo_expect("ADDI").check_reg("x1", "0x00000000");
+    ctx.previous_expect("ADDI").check_reg("x1", "0x00000000");
 
     // Another undo should fail (no more history)
-    ctx.undo_should_fail();
+    ctx.previous_should_fail();
 }

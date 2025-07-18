@@ -24,6 +24,9 @@ mod repl_commands;
 #[cfg(test)]
 mod repl_commands_test;
 
+#[cfg(test)]
+mod formatting_tests;
+
 fn main() -> io::Result<()> {
     // Parse command-line arguments
     let cli = Cli::parse();
@@ -32,7 +35,9 @@ fn main() -> io::Result<()> {
     let mut interpreter = match cli.to_config() {
         Ok(config) => Interpreter::with_config(config.memory_size, config.undo_limit),
         Err(e) => {
-            eprintln!("Error parsing configuration: {e}");
+            let formatted =
+                formatting::errors::format_parse_error(&e.to_string(), "memory_size", cli.tips);
+            eprintln!("● {formatted}");
             return Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string()));
         }
     };
@@ -112,7 +117,7 @@ fn run_interactive(
         // Handle the command
         let result = if is_slash_command {
             repl_commands::handle_repl_command_with_delta(input, interpreter, last_delta.as_ref())
-                .map_err(|e| e.to_string())
+                .map_err(|e| formatting::errors::format_repl_command_error(&e, tips))
         } else {
             // Execute instruction and capture delta
             interpreter
@@ -236,7 +241,8 @@ fn execute_and_print(
 
     // Handle slash commands separately
     let result = if is_slash_command {
-        repl_commands::handle_repl_command(input, interpreter).map_err(|e| e.to_string())
+        repl_commands::handle_repl_command(input, interpreter)
+            .map_err(|e| formatting::errors::format_repl_command_error(&e, tips))
     } else {
         // Call interpreter and format the result
         interpreter
@@ -331,7 +337,18 @@ fn run_script_mode(
     tips: bool,
 ) -> io::Result<()> {
     // Read the script file
-    let contents = fs::read_to_string(path)?;
+    let contents = match fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(e) => {
+            let formatted = formatting::errors::format_io_error(
+                &e,
+                &format!("Failed to read script '{path}'"),
+                tips,
+            );
+            eprintln!("● {formatted}");
+            return Err(e);
+        }
+    };
 
     // Check if stdout is a terminal to determine if we can use colors
     let use_color = io::stdout().is_tty() && !no_color;

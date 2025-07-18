@@ -43,13 +43,19 @@ The implementation follows the official RISC-V ISA specification, available in `
    - `cli.rs` - Command-line argument parsing with clap
    - `history.rs` - History navigation with delta compression
    - `bin/brubeck.rs` - Binary entry point with terminal features
+   - `bin/formatting/` - Output formatters with color support:
+     - `registers.rs` - Register display with change highlighting
+     - `memory.rs` - Memory display with PC and change highlighting
+     - `state_delta.rs` - Instruction execution result formatting
+     - `errors.rs` - Error message formatting
+     - `help.rs` - Help text formatting
 
 ### Current Features
 
 - **Complete RV32I instruction set** (47 instructions) + CSR support
 - **Command system**: 
-  - `/regs` (`/r`) - Show registers
-  - `/memory` (`/m`) - Inspect memory
+  - `/regs` (`/r`) - Show registers with color highlighting
+  - `/memory` (`/m`) - Inspect memory with color highlighting
   - `/previous` (`/prev`, `/p`) - Navigate to previous state
   - `/next` (`/n`) - Navigate to next state
   - `/reset` - Reset CPU state (with confirmation)
@@ -59,6 +65,9 @@ The implementation follows the official RISC-V ISA specification, available in `
 - **History navigation**: Navigate through execution history
 - **Memory inspection**: View memory in hex/ASCII format
 - **Educational error messages**: Context-aware help for common mistakes
+- **Color-coded output**:
+  - Registers: Changed values in green, zeros in dark gray
+  - Memory: Changed bytes in green, zeros in dark gray, PC location highlighted
 
 ## Development Workflow
 

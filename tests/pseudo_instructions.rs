@@ -252,5 +252,8 @@ fn test_pseudo_instruction_expansion_visibility() {
     // RET should jump to ra and increment PC
     interpreter.interpret("ADDI ra, x0, 0x100").unwrap(); // Set return address
     let delta = interpreter.interpret("RET").unwrap();
-    assert_eq!(delta.pc_change.1, 0x100, "RET should jump to return address");
+    assert_eq!(
+        delta.pc_change.1, 0x100,
+        "RET should jump to return address"
+    );
 }

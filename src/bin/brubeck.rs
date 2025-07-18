@@ -82,7 +82,7 @@ fn run_interactive(
 
     // Initialize command history
     let mut history = repl::CommandHistory::new(history_size);
-    
+
     // Track last instruction delta for register coloring
     let mut last_delta: Option<brubeck::rv32_i::StateDelta> = None;
 
@@ -115,7 +115,8 @@ fn run_interactive(
                 .map_err(|e| e.to_string())
         } else {
             // Execute instruction and capture delta
-            interpreter.interpret(input)
+            interpreter
+                .interpret(input)
                 .map(|delta| {
                     let output = formatting::state_delta::format_instruction_result(&delta);
                     last_delta = Some(delta);
@@ -125,7 +126,13 @@ fn run_interactive(
         };
 
         // Clear last delta on reset
-        if is_slash_command && input.eq_ignore_ascii_case("/reset") && result.as_ref().map(|s| s.contains("CPU state reset")).unwrap_or(false) {
+        if is_slash_command
+            && input.eq_ignore_ascii_case("/reset")
+            && result
+                .as_ref()
+                .map(|s| s.contains("CPU state reset"))
+                .unwrap_or(false)
+        {
             last_delta = None;
         }
 
@@ -202,7 +209,6 @@ fn format_error(error: &str, with_tips: bool) -> String {
         lines.join("\n")
     }
 }
-
 
 fn execute_and_print(
     interpreter: &mut Interpreter,

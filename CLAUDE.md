@@ -49,7 +49,8 @@ The implementation follows the official RISC-V ISA specification, available in `
      - `help.rs` - Help text formatting
    - `bin/repl_commands.rs` - REPL command handling
    - `cli.rs` - Command-line argument parsing with clap
-   - `history.rs` - History navigation with delta compression
+   - `repl/history.rs` - Command history with arrow key navigation
+   - `state_history.rs` - State history navigation with delta compression
 
 ### Current Features
 
@@ -131,9 +132,22 @@ cargo check                # Quick compilation check
 
 ### Test Organization
 
-- **Unit tests**: In `tests/unit/` for focused component testing
-- **Integration tests**: In `tests/` for cross-module functionality
-- **Manual testing**: Document any features requiring user interaction
+#### Rust Testing Best Practices
+
+- **Unit tests** (`#[cfg(test)]` modules): Place in the same file as the code being tested
+  - Can test private functions and internal implementation
+  - Binary tests now use this pattern (e.g., formatting tests in `src/bin/formatting/*.rs`)
+  - Provides better locality and easier maintenance
+
+- **Integration tests** (`tests/` directory): Test the public API
+  - Each file in `tests/` is compiled as a separate crate
+  - Cannot access private implementation details
+  - Good for end-to-end testing and ensuring the library works as users expect
+  - Example: `tests/history_navigation.rs` tests the complete history system
+
+- **Test helpers** (`tests/common/`): Shared test infrastructure
+  - Use `mod common;` to import in test files
+  - Provides consistent test context and assertion helpers
 
 ### Writing Effective Tests
 
@@ -152,6 +166,12 @@ let result = i.interpret("/memory 0x100");
 assert!(result.unwrap().contains("48"));     // Hex for 'H'
 assert!(result.unwrap().contains("H"));       // ASCII display
 ```
+
+### Test Naming Conventions
+
+- Use descriptive test names that explain what is being tested
+- Avoid outdated terminology (e.g., use "history_navigation" not "undo_redo")
+- Keep test names aligned with actual implementation terminology
 
 ## Implementation Patterns
 
@@ -292,9 +312,18 @@ println!("{}", formatted);
 
 Example:
 ```rust
+let history_limit = if cli.no_history_nav { 0 } else { cli.history_limit };
 let history_size = if cli.no_history { 0 } else { cli.history_size };
 run_interactive(&mut interpreter, cli.quiet, history_size)
 ```
+
+### Terminology Consistency
+
+- **History Navigation**: Use "previous/next" terminology, not "undo/redo"
+  - Commands: `/previous` (`/p`) and `/next` (`/n`)
+  - CLI: `--history-limit` and `--no-history-nav`
+  - Methods: `previous_state()` and `next_state()`
+  - This reflects that we're navigating through a history of states, not undoing actions
 
 ## Common Pitfalls
 
@@ -304,6 +333,8 @@ run_interactive(&mut interpreter, cli.quiet, history_size)
 4. **Feature flag scope**: Remember what's gated by `#[cfg(feature = "repl")]`
 5. **Terminal state**: Always restore on all exit paths (success, error, panic)
 6. **Event loops**: Handle Ctrl+C gracefully with proper cleanup
+7. **Test file organization**: Don't mix test files with source files in `src/bin/`
+8. **Naming consistency**: Keep terminology consistent between code, tests, and documentation
 
 ## References
 

@@ -94,8 +94,8 @@ x3 (gp): 0x000001f4 (        500)
 # Custom memory size
 $ brubeck -m 64k
 
-# Disable history tracking for minimal overhead
-$ brubeck --no-undo
+# Disable history navigation for minimal overhead
+$ brubeck --no-history-nav
 ```
 
 ### Error Messages
@@ -139,8 +139,8 @@ Usage: brubeck [OPTIONS]
 
 Options:
   -m, --memory <SIZE>      Memory size (e.g., 1M, 256k, 1024) [default: 1M]
-      --undo-limit <N>     Maximum history depth [default: 1000]
-      --no-undo            Disable history navigation
+      --history-limit <N>  Maximum history navigation depth [default: 1000]
+      --no-history-nav     Disable history navigation
   -e, --execute <CMDS>     Execute commands and exit (semicolon-separated)
   -s, --script <FILE>      Execute script file and exit
   -q, --quiet              Suppress banner and descriptions (REPL only)

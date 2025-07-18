@@ -34,7 +34,10 @@ pub fn format_registers_with_colors(
         .unwrap_or_default();
 
     // Format general purpose registers in two columns
-    for i in 0..32 {
+    // Left column: x0-x15, Right column: x16-x31
+    for row in 0..16 {
+        // Left column (x0-x15)
+        let i = row;
         let reg = register_from_index(i);
         let val = cpu.get_register(reg);
         let abi_name = get_abi_name(reg);
@@ -61,13 +64,37 @@ pub fn format_registers_with_colors(
             format!("0x{val:08x} ({val:11})", val = val as i32)
         };
 
-        if i % 2 == 0 && i < 31 {
-            // Left column
-            output.push_str(&format!("{reg_str}: {val_str}  "));
+        output.push_str(&format!("{reg_str}: {val_str}  "));
+
+        // Right column (x16-x31)
+        let i = row + 16;
+        let reg = register_from_index(i);
+        let val = cpu.get_register(reg);
+        let abi_name = get_abi_name(reg);
+
+        let reg_str = if use_abi_names && abi_name != "----" {
+            format!("x{i:2} ({abi_name:4})")
         } else {
-            // Right column or last register
-            output.push_str(&format!("{reg_str}: {val_str}\n"));
-        }
+            format!("x{i:2}      ")
+        };
+
+        // Format the value with color
+        let val_str = if val == 0 {
+            // Gray for zero values
+            format!("0x{val:08x} ({val:11})", val = val as i32)
+                .dark_grey()
+                .to_string()
+        } else if changed_regs.contains(&reg) {
+            // Green for changed values
+            format!("0x{val:08x} ({val:11})", val = val as i32)
+                .green()
+                .to_string()
+        } else {
+            // Normal color for others
+            format!("0x{val:08x} ({val:11})", val = val as i32)
+        };
+
+        output.push_str(&format!("{reg_str}: {val_str}\n"));
     }
 
     // Add PC with coloring if it changed

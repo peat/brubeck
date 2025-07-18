@@ -25,6 +25,15 @@ pub enum ReplCommand {
 
 /// Parse and execute a REPL command
 pub fn handle_repl_command(input: &str, interpreter: &mut Interpreter) -> Result<String, String> {
+    handle_repl_command_with_delta(input, interpreter, None)
+}
+
+/// Parse and execute a REPL command with access to last delta for coloring
+pub fn handle_repl_command_with_delta(
+    input: &str,
+    interpreter: &mut Interpreter,
+    last_delta: Option<&brubeck::rv32_i::StateDelta>,
+) -> Result<String, String> {
     let normalized = input.trim().to_uppercase();
     let parts: Vec<&str> = normalized.split_whitespace().collect();
 
@@ -33,7 +42,7 @@ pub fn handle_repl_command(input: &str, interpreter: &mut Interpreter) -> Result
     }
 
     let cmd = parse_repl_command(&parts)?;
-    execute_repl_command(cmd, interpreter)
+    execute_repl_command_with_delta(cmd, interpreter, last_delta)
 }
 
 /// Parse the command and arguments
@@ -91,12 +100,18 @@ fn parse_repl_command(parts: &[&str]) -> Result<ReplCommand, String> {
     }
 }
 
-/// Execute the REPL command
-fn execute_repl_command(cmd: ReplCommand, interpreter: &mut Interpreter) -> Result<String, String> {
+
+/// Execute the REPL command with optional delta for coloring
+fn execute_repl_command_with_delta(
+    cmd: ReplCommand,
+    interpreter: &mut Interpreter,
+    last_delta: Option<&brubeck::rv32_i::StateDelta>,
+) -> Result<String, String> {
     match cmd {
-        ReplCommand::ShowRegs => Ok(formatting::registers::format_registers(
+        ReplCommand::ShowRegs => Ok(formatting::registers::format_registers_with_colors(
             &interpreter.cpu,
             true,
+            last_delta,
         )),
         ReplCommand::ShowSpecificRegs(regs) => Ok(
             formatting::registers::format_specific_registers(&interpreter.cpu, &regs),

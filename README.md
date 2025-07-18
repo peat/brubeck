@@ -16,10 +16,14 @@ Feedback and suggestions for this RISC-V assembly playground are welcome.
 * Parser with helpful error messages
 * Standard RISC-V syntax: `LW x1, 4(x2)` with backward compatibility
 * Documentation explaining implementation concepts
-* Error messages with contextual tips
 * **Multiple formats**: Hex (0x), binary (0b), and decimal immediates
-* **History navigation** (`/previous`, `/next`): Step back and forward through execution history
-* **Color-coded output**: Changed registers/memory in green, zeros in gray, PC location highlighted
+* **History navigation** (`/previous`, `/next`): Step back and forward with detailed change info
+* **Enhanced output formatting**:
+  - Color-coded registers: Changed values in green, zeros in gray
+  - Color-coded memory: Changed bytes in green, PC location highlighted
+  - Detailed history navigation shows exact changes (e.g., "x2: 100 → 0")
+  - Consistent columnar alignment for easy reading
+* **Context-aware error messages**: Helpful tips for common mistakes
 * CLI support: Script files, one-liners, and execution traces
 
 ### 🧪 **Testing**
@@ -36,8 +40,8 @@ Implementation strictly follows the RISC-V ISA specification (see `riscv-isa-man
 * `/memory` or `/m` - Show memory around PC (changed bytes in green, PC highlighted)
 * `/memory 0x100` - Show memory starting at address
 * `/memory 0x100 0x200` - Show memory range
-* `/previous` or `/p` - Navigate to previous state
-* `/next` or `/n` - Navigate to next state  
+* `/previous` or `/p` - Navigate to previous state (shows what changed)
+* `/next` or `/n` - Navigate to next state (shows what changed)  
 * `/reset` - Reset CPU state (with confirmation)
 * `/help` or `/h` - Show help
 * `/quit` - Exit REPL
@@ -61,20 +65,20 @@ Ctrl-C to quit
 ● X3: 0 → 150, PC: 0x00000008 → 0x0000000c
 
 [0x0000000c]> /regs x3
-● x 3 (gp  ): 0x00000096
+● x3 (gp): 0x00000096 (        150)
 
 [0x0000000c]> /p
-● Navigated back: Changed: 1 register
+● Navigated back: x3: 150 → 0, PC: 0x0000000c → 0x00000008
 
 [0x00000008]> /regs x3
-● x 3 (gp  ): 0x00000000
+● x3 (gp): 0x00000000 (          0)
 ```
 
 ### Command-Line Usage
 ```bash
 # Quick calculations
 $ brubeck -e "ADDI x1, x0, 42; SLLI x2, x1, 2; /r x2"
-x 2 (sp  ): 0x000000a8
+x2 (sp): 0x000000a8 (        168)
 
 # Run a script file
 $ brubeck -s program.bru
@@ -83,9 +87,9 @@ X3: 500 (0x1f4)
 # Verbose mode for learning
 $ brubeck -s program.bru --verbose
 ADDI x1, x0, 100     # 0x00000000 ADDI: Added 100 to X0 (0) and stored result in X1 (100)
-SLLI x2, x1, 2       # 0x00000004 SLLI: Executed instruction
-ADD x3, x1, x2       # 0x00000008 ADD: Added X1 (100) and X2 (400) and stored result in X3 (500)
-x 3 (gp  ): 0x000001f4
+SLLI x2, x1, 2       # 0x00000004 SLLI: x2 ← x1 << 2 = 400
+ADD x3, x1, x2       # 0x00000008 ADD: x3 ← x1 + x2 = 100 + 400 = 500
+x3 (gp): 0x000001f4 (        500)
 
 # Custom memory size
 $ brubeck -m 64k

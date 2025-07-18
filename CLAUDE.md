@@ -35,20 +35,21 @@ The implementation follows the official RISC-V ISA specification, available in `
    - `parser.rs` - Four-phase parsing pipeline with validation
    - `builder.rs` - Instruction building and validation logic
    - `executor.rs` - Command execution and state management
-   - `formatter.rs` - Human-readable output formatting
    - `validator.rs` - Reusable validation functions
    - `types.rs` - Shared types (Command, Token, Error)
+   - Returns `StateDelta` for state changes (library/binary separation)
 
-3. **REPL Infrastructure**
-   - `cli.rs` - Command-line argument parsing with clap
-   - `history.rs` - History navigation with delta compression
+3. **REPL Infrastructure (Binary-only)**
    - `bin/brubeck.rs` - Binary entry point with terminal features
    - `bin/formatting/` - Output formatters with color support:
      - `registers.rs` - Register display with change highlighting
      - `memory.rs` - Memory display with PC and change highlighting
      - `state_delta.rs` - Instruction execution result formatting
-     - `errors.rs` - Error message formatting
+     - `errors.rs` - Context-aware error formatting with tips
      - `help.rs` - Help text formatting
+   - `bin/repl_commands.rs` - REPL command handling
+   - `cli.rs` - Command-line argument parsing with clap
+   - `history.rs` - History navigation with delta compression
 
 ### Current Features
 
@@ -56,8 +57,8 @@ The implementation follows the official RISC-V ISA specification, available in `
 - **Command system**: 
   - `/regs` (`/r`) - Show registers with color highlighting
   - `/memory` (`/m`) - Inspect memory with color highlighting
-  - `/previous` (`/prev`, `/p`) - Navigate to previous state
-  - `/next` (`/n`) - Navigate to next state
+  - `/previous` (`/prev`, `/p`) - Navigate to previous state with detailed changes
+  - `/next` (`/n`) - Navigate to next state with detailed changes
   - `/reset` - Reset CPU state (with confirmation)
   - `/help` (`/h`) - Show help
 - **Multiple number formats**: Hex (0x), binary (0b), decimal
@@ -68,6 +69,7 @@ The implementation follows the official RISC-V ISA specification, available in `
 - **Color-coded output**:
   - Registers: Changed values in green, zeros in dark gray
   - Memory: Changed bytes in green, zeros in dark gray, PC location highlighted
+  - History navigation: Shows exact changes (e.g., "x2: 100 → 0")
 
 ## Development Workflow
 
@@ -184,15 +186,17 @@ match normalized.len() {
 1. **Align output**: Use consistent alignment for readability
 2. **Provide dual representations**: Show both raw and interpreted data
 3. **Add visual separators**: Help users parse dense information
+4. **Use color judiciously**: Highlight changes and important information
 
-Example from memory formatter:
+Example from register formatter:
 ```rust
-// 16-byte aligned display with separator at byte 8
-output.push_str(&format!("0x{addr:08x}: "));
-for i in 0..16 {
-    if i == 7 { output.push_str("| "); }
-    // ... hex and ASCII display ...
-}
+// Consistent column alignment
+let reg_str = if use_abi_names && abi_name != "----" {
+    format!("x{i} ({abi_name})")
+} else {
+    format!("x{i}")
+};
+output.push_str(&format!("{reg_str:<10}: {val_str}"));
 ```
 
 ### State Management
@@ -200,17 +204,20 @@ for i in 0..16 {
 1. **Components own their state**: Each module manages its own lifecycle
 2. **Clear reset semantics**: Provide explicit reset methods
 3. **Avoid external state manipulation**: Use encapsulation
+4. **Return state changes**: Library returns `StateDelta`, binary handles formatting
 
 Good example:
 ```rust
-impl CPU {
-    pub fn reset(&mut self) {
-        self.registers.fill(0);
-        self.pc = 0;
-        self.memory.fill(0);
-        self.init_csrs();
-    }
+// Library returns data
+pub fn interpret(&mut self, input: &str) -> Result<StateDelta, Error> {
+    let command = parser::parse(input)?;
+    let delta = executor::run_command(command, self)?;
+    Ok(delta)
 }
+
+// Binary formats for display
+let formatted = formatting::state_delta::format_instruction_result(&delta);
+println!("{}", formatted);
 ```
 
 ## Code Style Guidelines

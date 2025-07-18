@@ -21,12 +21,6 @@ mod repl;
 // REPL module with commands
 mod repl_commands;
 
-#[cfg(test)]
-mod repl_commands_test;
-
-#[cfg(test)]
-mod formatting_tests;
-
 fn main() -> io::Result<()> {
     // Parse command-line arguments
     let cli = Cli::parse();

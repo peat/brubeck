@@ -140,7 +140,7 @@ fn handle_previous(interpreter: &mut Interpreter) -> Result<String, String> {
     match interpreter.previous_state() {
         Ok(delta) => Ok(format!(
             "Navigated back: {}",
-            formatting::state_delta::format_state_delta_compact(&delta)
+            formatting::state_delta::format_instruction_result(&delta)
         )),
         Err(e) => Err(formatting::errors::format_history_error(&e, true)),
     }
@@ -152,7 +152,7 @@ fn handle_next(interpreter: &mut Interpreter) -> Result<String, String> {
     match interpreter.next_state() {
         Ok(delta) => Ok(format!(
             "Navigated forward: {}",
-            formatting::state_delta::format_state_delta_compact(&delta)
+            formatting::state_delta::format_instruction_result(&delta)
         )),
         Err(e) => Err(formatting::errors::format_history_error(&e, true)),
     }

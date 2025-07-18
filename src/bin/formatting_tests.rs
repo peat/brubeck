@@ -14,7 +14,7 @@ mod tests {
         delta.register_changes.push((Register::X1, 0, 42));
 
         let result = formatting::state_delta::format_instruction_result(&delta);
-        assert!(result.contains("X1: 0 → 42"));
+        assert!(result.contains("x1: 0 → 42"));
         assert!(result.contains("PC: 0x00000000 → 0x00000004"));
     }
 

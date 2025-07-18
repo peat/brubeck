@@ -239,18 +239,18 @@ fn test_pseudo_instruction_expansion_visibility() {
 
     // MV x1, x2 should copy x2 to x1
     interpreter.interpret("ADDI x2, x0, 42").unwrap(); // Set x2 = 42
-    let result = interpreter.interpret("MV x1, x2").unwrap();
-    assert!(result.contains("PC:"), "MV should execute and change PC");
+    let delta = interpreter.interpret("MV x1, x2").unwrap();
+    assert_ne!(delta.pc_change.0, delta.pc_change.1, "MV should change PC");
     assert_eq!(interpreter.cpu.get_register(Register::X1), 42);
 
     // NOT x3, x4 should invert x4 into x3
     interpreter.interpret("ADDI x4, x0, 0xFF").unwrap(); // Set x4 = 255
-    let result = interpreter.interpret("NOT x3, x4").unwrap();
-    assert!(result.contains("PC:"), "NOT should execute and change PC");
+    let delta = interpreter.interpret("NOT x3, x4").unwrap();
+    assert_ne!(delta.pc_change.0, delta.pc_change.1, "NOT should change PC");
     assert_eq!(interpreter.cpu.get_register(Register::X3) as i32, -256);
 
     // RET should jump to ra and increment PC
     interpreter.interpret("ADDI ra, x0, 0x100").unwrap(); // Set return address
-    let result = interpreter.interpret("RET").unwrap();
-    assert!(result.contains("PC:"), "RET should change PC");
+    let delta = interpreter.interpret("RET").unwrap();
+    assert_eq!(delta.pc_change.1, 0x100, "RET should jump to return address");
 }

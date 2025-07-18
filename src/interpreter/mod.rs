@@ -175,51 +175,11 @@ impl Interpreter {
         }
     }
 
-    /// Interprets a single command (no semicolons)
-    pub fn interpret(&mut self, input: &str) -> Result<String, Error> {
+    /// Interprets a single command (no semicolons) and returns the state changes
+    pub fn interpret(&mut self, input: &str) -> Result<StateDelta, Error> {
         let command = parser::parse(input)?;
         let delta = executor::run_command(command, self)?;
-
-        // Format the state delta for display
-        let mut changes = Vec::new();
-
-        // Format register changes (show the most important ones)
-        let mut has_pc_change = false;
-        for (reg, old, new) in &delta.register_changes {
-            if *reg == crate::rv32_i::Register::PC {
-                changes.push(format!("PC: 0x{old:08x} → 0x{new:08x}"));
-                has_pc_change = true;
-            } else {
-                changes.push(format!("{:?}: {} → {}", reg, *old as i32, *new as i32));
-            }
-        }
-
-        // Always show PC change from delta
-        if !has_pc_change && delta.pc_change.0 != delta.pc_change.1 {
-            changes.push(format!(
-                "PC: 0x{:08x} → 0x{:08x}",
-                delta.pc_change.0, delta.pc_change.1
-            ));
-        }
-
-        // Show memory changes summary
-        if !delta.memory_changes.is_empty() {
-            changes.push(format!(
-                "{} memory bytes changed",
-                delta.memory_changes.len()
-            ));
-        }
-
-        // Show CSR changes
-        for (csr, old, new) in &delta.csr_changes {
-            changes.push(format!("CSR[0x{csr:03x}]: 0x{old:08x} → 0x{new:08x}"));
-        }
-
-        if changes.is_empty() {
-            Ok("No state changes".to_string())
-        } else {
-            Ok(changes.join(", "))
-        }
+        Ok(delta)
     }
 
     /// Executes an [Instruction] directly, returning the state changes

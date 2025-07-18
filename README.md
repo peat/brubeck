@@ -19,6 +19,7 @@ Feedback and suggestions for this RISC-V assembly playground are welcome.
 * Error messages with contextual tips
 * **Multiple formats**: Hex (0x), binary (0b), and decimal immediates
 * **History navigation** (`/previous`, `/next`): Step back and forward through execution history
+* **Color-coded output**: Changed registers/memory in green, zeros in gray, PC location highlighted
 * CLI support: Script files, one-liners, and execution traces
 
 ### 🧪 **Testing**
@@ -27,6 +28,19 @@ Feedback and suggestions for this RISC-V assembly playground are welcome.
 * Structured test organization
 
 Implementation strictly follows the RISC-V ISA specification (see `riscv-isa-manual/src/rv32.adoc`).
+
+## REPL Commands
+
+* `/regs` or `/r` - Show all registers (changed values in green, zeros in gray)
+* `/regs x1 x2` - Show specific registers
+* `/memory` or `/m` - Show memory around PC (changed bytes in green, PC highlighted)
+* `/memory 0x100` - Show memory starting at address
+* `/memory 0x100 0x200` - Show memory range
+* `/previous` or `/p` - Navigate to previous state
+* `/next` or `/n` - Navigate to next state  
+* `/reset` - Reset CPU state (with confirmation)
+* `/help` or `/h` - Show help
+* `/quit` - Exit REPL
 
 ## Examples
 
@@ -38,19 +52,19 @@ Brubeck: A RISC-V REPL
 Ctrl-C to quit
 
 [0x00000000]> ADDI x1, zero, 100
-● ADDI: Added 100 to X0 (0) and stored result in X1 (100)
+● X1: 0 → 100, PC: 0x00000000 → 0x00000004
 
 [0x00000004]> ADDI x2, zero, 50
-● ADDI: Added 50 to X0 (0) and stored result in X2 (50)
+● X2: 0 → 50, PC: 0x00000004 → 0x00000008
 
 [0x00000008]> ADD x3, x1, x2
-● ADD: Added X1 (100) and X2 (50) and stored result in X3 (150)
+● X3: 0 → 150, PC: 0x00000008 → 0x0000000c
 
 [0x0000000c]> /regs x3
 ● x 3 (gp  ): 0x00000096
 
 [0x0000000c]> /p
-● Navigated to previous state: ADD
+● Navigated back: Changed: 1 register
 
 [0x00000008]> /regs x3
 ● x 3 (gp  ): 0x00000000
@@ -134,8 +148,7 @@ Options:
 ## Future Enhancements
 
 * **RISC-V Extensions**: Add M (multiplication/division), A (atomic), F/D (floating-point) extensions
-* **REPL Commands**: `/memory` for memory inspection, `/reset` to clear state
-* **Advanced REPL**: Command history, tab completion, syntax highlighting
+* **Advanced REPL**: Tab completion, syntax highlighting
 * **Debugging Features**: Breakpoints, step execution, execution tracing
 * **Educational Tools**: Instruction encoding display, pipeline visualization
 * **Assembly Features**: Labels, expressions, assembler directives (.text, .data, etc.)

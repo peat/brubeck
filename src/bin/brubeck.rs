@@ -24,6 +24,9 @@ mod repl_commands;
 #[cfg(test)]
 mod repl_commands_test;
 
+#[cfg(test)]
+mod formatting_tests;
+
 fn main() -> io::Result<()> {
     // Parse command-line arguments
     let cli = Cli::parse();
@@ -32,7 +35,9 @@ fn main() -> io::Result<()> {
     let mut interpreter = match cli.to_config() {
         Ok(config) => Interpreter::with_config(config.memory_size, config.undo_limit),
         Err(e) => {
-            eprintln!("Error parsing configuration: {e}");
+            let formatted =
+                formatting::errors::format_parse_error(&e.to_string(), "memory_size", cli.tips);
+            eprintln!("● {formatted}");
             return Err(io::Error::new(io::ErrorKind::InvalidInput, e.to_string()));
         }
     };
@@ -83,6 +88,9 @@ fn run_interactive(
     // Initialize command history
     let mut history = repl::CommandHistory::new(history_size);
 
+    // Track last instruction delta for register coloring
+    let mut last_delta: Option<brubeck::rv32_i::StateDelta> = None;
+
     loop {
         // Show PC address prompt
         let prompt = format!("[0x{:08x}]> ", interpreter.cpu.pc);
@@ -104,16 +112,66 @@ fn run_interactive(
 
         // Execute the command
         let input = buffer.trim();
+        let is_slash_command = input.starts_with('/');
 
-        // Check if it's a quit command before adding to history
-        if let Err(e) = execute_and_print(interpreter, input, true, quiet, false, tips) {
-            // Check if this is our special quit signal
-            if e.to_string() == "QUIT" {
-                println!(); // Add newline for clean exit
-                return Ok(());
+        // Handle the command
+        let result = if is_slash_command {
+            repl_commands::handle_repl_command_with_delta(input, interpreter, last_delta.as_ref())
+                .map_err(|e| formatting::errors::format_repl_command_error(&e, tips))
+        } else {
+            // Execute instruction and capture delta
+            interpreter
+                .interpret(input)
+                .map(|delta| {
+                    let output = formatting::state_delta::format_instruction_result(&delta);
+                    last_delta = Some(delta);
+                    output
+                })
+                .map_err(|e| e.to_string())
+        };
+
+        // Clear last delta on reset
+        if is_slash_command
+            && input.eq_ignore_ascii_case("/reset")
+            && result
+                .as_ref()
+                .map(|s| s.contains("CPU state reset"))
+                .unwrap_or(false)
+        {
+            last_delta = None;
+        }
+
+        // Display the result
+        match result {
+            Ok(s) => {
+                if quiet && is_slash_command && !matches!(input, "/help" | "/h") {
+                    continue;
+                }
+
+                if !is_slash_command {
+                    let mut stdout = io::stdout();
+                    stdout.execute(SetForegroundColor(Color::Green))?;
+                    stdout.execute(Print("● "))?;
+                    stdout.execute(ResetColor)?;
+                } else {
+                    println!();
+                }
+
+                println!("{s}");
             }
-            // Otherwise propagate the error
-            return Err(e);
+            Err(s) => {
+                if s == "QUIT" {
+                    println!(); // Add newline for clean exit
+                    return Ok(());
+                }
+
+                let formatted_error = format_error(&s, tips);
+                let mut stdout = io::stdout();
+                stdout.execute(SetForegroundColor(Color::Red))?;
+                stdout.execute(Print("● "))?;
+                stdout.execute(ResetColor)?;
+                println!("{formatted_error}");
+            }
         }
 
         // Add to history (all commands, even if they fail - this is what shells do)
@@ -183,9 +241,14 @@ fn execute_and_print(
 
     // Handle slash commands separately
     let result = if is_slash_command {
-        repl_commands::handle_repl_command(input, interpreter).map_err(|e| e.to_string())
+        repl_commands::handle_repl_command(input, interpreter)
+            .map_err(|e| formatting::errors::format_repl_command_error(&e, tips))
     } else {
-        interpreter.interpret(input).map_err(|e| e.to_string())
+        // Call interpreter and format the result
+        interpreter
+            .interpret(input)
+            .map(|delta| formatting::state_delta::format_instruction_result(&delta))
+            .map_err(|e| e.to_string())
     };
 
     match result {
@@ -274,7 +337,18 @@ fn run_script_mode(
     tips: bool,
 ) -> io::Result<()> {
     // Read the script file
-    let contents = fs::read_to_string(path)?;
+    let contents = match fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(e) => {
+            let formatted = formatting::errors::format_io_error(
+                &e,
+                &format!("Failed to read script '{path}'"),
+                tips,
+            );
+            eprintln!("● {formatted}");
+            return Err(e);
+        }
+    };
 
     // Check if stdout is a terminal to determine if we can use colors
     let use_color = io::stdout().is_tty() && !no_color;

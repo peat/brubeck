@@ -1,10 +1,37 @@
 //! Register display formatter
 
-use brubeck::rv32_i::{Register, CPU};
+use brubeck::rv32_i::{Register, StateDelta, CPU};
+use crossterm::style::Stylize;
 
-/// Formats all registers in a table format
-pub fn format_registers(cpu: &CPU, use_abi_names: bool) -> String {
+/// Formats all registers in a table format with optional coloring based on changes
+///
+/// This function displays all 32 general-purpose registers and the PC in a two-column
+/// layout. When a StateDelta is provided, it will color-code the output:
+/// - **Green**: Registers that changed in the last instruction
+/// - **Dark gray**: Registers with zero values
+/// - **Normal**: All other registers
+///
+/// # Arguments
+/// * `cpu` - The CPU state to display
+/// * `use_abi_names` - Whether to show ABI names (ra, sp, etc.) alongside register numbers
+/// * `last_delta` - Optional state changes from the last instruction for highlighting
+pub fn format_registers_with_colors(
+    cpu: &CPU,
+    use_abi_names: bool,
+    last_delta: Option<&StateDelta>,
+) -> String {
     let mut output = String::new();
+
+    // Build a set of changed registers for quick lookup
+    let changed_regs: std::collections::HashSet<Register> = last_delta
+        .map(|delta| {
+            delta
+                .register_changes
+                .iter()
+                .map(|(reg, _, _)| *reg)
+                .collect()
+        })
+        .unwrap_or_default();
 
     // Format general purpose registers in two columns
     for i in 0..32 {
@@ -18,7 +45,21 @@ pub fn format_registers(cpu: &CPU, use_abi_names: bool) -> String {
             format!("x{i:2}      ")
         };
 
-        let val_str = format!("0x{val:08x} ({val:11})", val = val as i32);
+        // Format the value with color
+        let val_str = if val == 0 {
+            // Gray for zero values
+            format!("0x{val:08x} ({val:11})", val = val as i32)
+                .dark_grey()
+                .to_string()
+        } else if changed_regs.contains(&reg) {
+            // Green for changed values
+            format!("0x{val:08x} ({val:11})", val = val as i32)
+                .green()
+                .to_string()
+        } else {
+            // Normal color for others
+            format!("0x{val:08x} ({val:11})", val = val as i32)
+        };
 
         if i % 2 == 0 && i < 31 {
             // Left column
@@ -29,8 +70,18 @@ pub fn format_registers(cpu: &CPU, use_abi_names: bool) -> String {
         }
     }
 
-    // Add PC
-    output.push_str(&format!("pc       : 0x{:08x}\n", cpu.pc));
+    // Add PC with coloring if it changed
+    let pc_changed = last_delta
+        .map(|delta| delta.pc_change.0 != delta.pc_change.1)
+        .unwrap_or(false);
+
+    let pc_str = if pc_changed {
+        format!("0x{:08x}", cpu.pc).green().to_string()
+    } else {
+        format!("0x{:08x}", cpu.pc)
+    };
+
+    output.push_str(&format!("pc       : {pc_str}\n"));
 
     output
 }

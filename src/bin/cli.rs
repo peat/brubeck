@@ -21,9 +21,9 @@ pub struct Cli {
     #[arg(long = "history-limit", default_value_t = 1000)]
     pub history_limit: usize,
 
-    /// Disable history navigation functionality
-    #[arg(long = "no-history-nav", conflicts_with = "history_limit")]
-    pub no_history_nav: bool,
+    /// Disable state history navigation functionality
+    #[arg(long = "no-state-history", conflicts_with = "history_limit")]
+    pub no_state_history: bool,
 
     /// Maximum command history size
     #[arg(long = "history-size", default_value_t = 1000)]
@@ -199,7 +199,7 @@ impl Cli {
     pub fn to_config(&self) -> Result<Config, ParseMemoryError> {
         let memory_size = parse_memory_size(&self.memory)?;
 
-        let history_limit = if self.no_history_nav {
+        let history_limit = if self.no_state_history {
             0
         } else {
             self.history_limit

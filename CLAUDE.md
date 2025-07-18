@@ -312,7 +312,7 @@ println!("{}", formatted);
 
 Example:
 ```rust
-let history_limit = if cli.no_history_nav { 0 } else { cli.history_limit };
+let history_limit = if cli.no_state_history { 0 } else { cli.history_limit };
 let history_size = if cli.no_history { 0 } else { cli.history_size };
 run_interactive(&mut interpreter, cli.quiet, history_size)
 ```
@@ -321,7 +321,7 @@ run_interactive(&mut interpreter, cli.quiet, history_size)
 
 - **History Navigation**: Use "previous/next" terminology, not "undo/redo"
   - Commands: `/previous` (`/p`) and `/next` (`/n`)
-  - CLI: `--history-limit` and `--no-history-nav`
+  - CLI: `--history-limit` and `--no-state-history`
   - Methods: `previous_state()` and `next_state()`
   - This reflects that we're navigating through a history of states, not undoing actions
 

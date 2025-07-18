@@ -43,9 +43,9 @@ pub fn format_registers_with_colors(
         let abi_name = get_abi_name(reg);
 
         let reg_str = if use_abi_names && abi_name != "----" {
-            format!("x{i:2} ({abi_name:4})")
+            format!("x{i:<2} ({abi_name:4})")
         } else {
-            format!("x{i:2}      ")
+            format!("x{i:<2}      ")
         };
 
         // Format the value with color
@@ -73,9 +73,9 @@ pub fn format_registers_with_colors(
         let abi_name = get_abi_name(reg);
 
         let reg_str = if use_abi_names && abi_name != "----" {
-            format!("x{i:2} ({abi_name:4})")
+            format!("x{i:<2} ({abi_name:4})")
         } else {
-            format!("x{i:2}      ")
+            format!("x{i:<2}      ")
         };
 
         // Format the value with color
@@ -180,16 +180,16 @@ fn register_from_index(i: u32) -> Register {
 /// Format register name consistently
 fn format_register_name(reg: Register) -> String {
     match reg {
-        Register::X0 => "x 0".to_string(),
-        Register::X1 => "x 1".to_string(),
-        Register::X2 => "x 2".to_string(),
-        Register::X3 => "x 3".to_string(),
-        Register::X4 => "x 4".to_string(),
-        Register::X5 => "x 5".to_string(),
-        Register::X6 => "x 6".to_string(),
-        Register::X7 => "x 7".to_string(),
-        Register::X8 => "x 8".to_string(),
-        Register::X9 => "x 9".to_string(),
+        Register::X0 => "x0".to_string(),
+        Register::X1 => "x1".to_string(),
+        Register::X2 => "x2".to_string(),
+        Register::X3 => "x3".to_string(),
+        Register::X4 => "x4".to_string(),
+        Register::X5 => "x5".to_string(),
+        Register::X6 => "x6".to_string(),
+        Register::X7 => "x7".to_string(),
+        Register::X8 => "x8".to_string(),
+        Register::X9 => "x9".to_string(),
         Register::X10 => "x10".to_string(),
         Register::X11 => "x11".to_string(),
         Register::X12 => "x12".to_string(),

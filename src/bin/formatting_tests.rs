@@ -41,8 +41,8 @@ mod tests {
 
         let result =
             formatting::registers::format_registers_with_colors(&interpreter.cpu, false, None);
-        assert!(result.contains("x 0"));
-        assert!(result.contains("x 1"));
+        assert!(result.contains("x0 "));
+        assert!(result.contains("x1 "));
         assert!(result.contains("0x0000002a"));
         assert!(result.contains("42"));
     }
@@ -52,9 +52,9 @@ mod tests {
         let interpreter = Interpreter::new();
         let result =
             formatting::registers::format_registers_with_colors(&interpreter.cpu, true, None);
-        assert!(result.contains("x 0 (zero)"));
-        assert!(result.contains("x 1 (ra  )"));
-        assert!(result.contains("x 2 (sp  )"));
+        assert!(result.contains("x0  (zero)"));
+        assert!(result.contains("x1  (ra  )"));
+        assert!(result.contains("x2  (sp  )"));
     }
 
     #[test]
@@ -169,8 +169,8 @@ mod tests {
 
         let regs = vec![Register::X1, Register::X2];
         let result = formatting::registers::format_specific_registers(&interpreter.cpu, &regs);
-        assert!(result.contains("x 1"));
-        assert!(result.contains("x 2"));
+        assert!(result.contains("x1"));
+        assert!(result.contains("x2"));
         assert!(result.contains("100"));
         assert!(result.contains("200"));
     }

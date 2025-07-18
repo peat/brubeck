@@ -27,7 +27,7 @@ fn main() -> io::Result<()> {
 
     // Create interpreter with configuration from CLI
     let mut interpreter = match cli.to_config() {
-        Ok(config) => Interpreter::with_config(config.memory_size, config.undo_limit),
+        Ok(config) => Interpreter::with_config(config.memory_size, config.history_limit),
         Err(e) => {
             let formatted =
                 formatting::errors::format_parse_error(&e.to_string(), "memory_size", cli.tips);

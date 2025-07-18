@@ -17,13 +17,13 @@ pub struct Cli {
     #[arg(short = 'm', long = "memory", default_value = "1M")]
     pub memory: String,
 
-    /// Maximum undo/redo depth
-    #[arg(long = "undo-limit", default_value_t = 1000)]
-    pub undo_limit: usize,
+    /// Maximum history navigation depth
+    #[arg(long = "history-limit", default_value_t = 1000)]
+    pub history_limit: usize,
 
-    /// Disable undo/redo functionality
-    #[arg(long = "no-undo", conflicts_with = "undo_limit")]
-    pub no_undo: bool,
+    /// Disable history navigation functionality
+    #[arg(long = "no-history-nav", conflicts_with = "history_limit")]
+    pub no_history_nav: bool,
 
     /// Maximum command history size
     #[arg(long = "history-size", default_value_t = 1000)]
@@ -62,17 +62,17 @@ pub struct Cli {
 #[derive(Debug, Clone)]
 pub struct Config {
     pub memory_size: usize,
-    pub undo_limit: usize,
+    pub history_limit: usize,
 }
 
 impl Config {
     /// Creates a new configuration with validation
-    pub fn new(memory_size: usize, undo_limit: usize) -> Result<Self, String> {
+    pub fn new(memory_size: usize, history_limit: usize) -> Result<Self, String> {
         // For now, we accept any memory size that fits in usize
         // Could add validation here if needed
         Ok(Self {
             memory_size,
-            undo_limit,
+            history_limit,
         })
     }
 }
@@ -199,9 +199,13 @@ impl Cli {
     pub fn to_config(&self) -> Result<Config, ParseMemoryError> {
         let memory_size = parse_memory_size(&self.memory)?;
 
-        let undo_limit = if self.no_undo { 0 } else { self.undo_limit };
+        let history_limit = if self.no_history_nav {
+            0
+        } else {
+            self.history_limit
+        };
 
-        Config::new(memory_size, undo_limit).map_err(|e| ParseMemoryError { message: e })
+        Config::new(memory_size, history_limit).map_err(|e| ParseMemoryError { message: e })
     }
 
     /// Determines the execution mode from CLI arguments

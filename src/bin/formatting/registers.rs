@@ -49,12 +49,7 @@ pub fn format_specific_registers(cpu: &CPU, registers: &[Register]) -> String {
             format_register_name(*reg)
         };
 
-        output.push_str(&format!(
-            "{}: 0x{:08x} ({})\n",
-            reg_str,
-            val,
-            val as i32
-        ));
+        output.push_str(&format!("{}: 0x{:08x} ({})\n", reg_str, val, val as i32));
     }
 
     // Add PC if requested
@@ -64,7 +59,6 @@ pub fn format_specific_registers(cpu: &CPU, registers: &[Register]) -> String {
 
     output
 }
-
 
 /// Get register from index
 fn register_from_index(i: u32) -> Register {
@@ -101,7 +95,7 @@ fn register_from_index(i: u32) -> Register {
         29 => Register::X29,
         30 => Register::X30,
         31 => Register::X31,
-        _ => panic!("Invalid register index: {}", i),
+        _ => panic!("Invalid register index: {i}"),
     }
 }
 

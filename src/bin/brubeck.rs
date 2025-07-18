@@ -185,7 +185,11 @@ fn execute_and_print(
     let result = if is_slash_command {
         repl_commands::handle_repl_command(input, interpreter).map_err(|e| e.to_string())
     } else {
-        interpreter.interpret(input).map_err(|e| e.to_string())
+        // Call interpreter and format the result
+        interpreter
+            .interpret(input)
+            .map(|delta| formatting::state_delta::format_instruction_result(&delta))
+            .map_err(|e| e.to_string())
     };
 
     match result {

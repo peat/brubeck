@@ -82,6 +82,9 @@ fn run_interactive(
 
     // Initialize command history
     let mut history = repl::CommandHistory::new(history_size);
+    
+    // Track last instruction delta for register coloring
+    let mut last_delta: Option<brubeck::rv32_i::StateDelta> = None;
 
     loop {
         // Show PC address prompt
@@ -104,16 +107,59 @@ fn run_interactive(
 
         // Execute the command
         let input = buffer.trim();
+        let is_slash_command = input.starts_with('/');
 
-        // Check if it's a quit command before adding to history
-        if let Err(e) = execute_and_print(interpreter, input, true, quiet, false, tips) {
-            // Check if this is our special quit signal
-            if e.to_string() == "QUIT" {
-                println!(); // Add newline for clean exit
-                return Ok(());
+        // Handle the command
+        let result = if is_slash_command {
+            repl_commands::handle_repl_command_with_delta(input, interpreter, last_delta.as_ref())
+                .map_err(|e| e.to_string())
+        } else {
+            // Execute instruction and capture delta
+            interpreter.interpret(input)
+                .map(|delta| {
+                    let output = formatting::state_delta::format_instruction_result(&delta);
+                    last_delta = Some(delta);
+                    output
+                })
+                .map_err(|e| e.to_string())
+        };
+
+        // Clear last delta on reset
+        if is_slash_command && input.eq_ignore_ascii_case("/reset") && result.as_ref().map(|s| s.contains("CPU state reset")).unwrap_or(false) {
+            last_delta = None;
+        }
+
+        // Display the result
+        match result {
+            Ok(s) => {
+                if quiet && is_slash_command && !matches!(input, "/help" | "/h") {
+                    continue;
+                }
+
+                if !is_slash_command {
+                    let mut stdout = io::stdout();
+                    stdout.execute(SetForegroundColor(Color::Green))?;
+                    stdout.execute(Print("● "))?;
+                    stdout.execute(ResetColor)?;
+                } else {
+                    println!();
+                }
+
+                println!("{s}");
             }
-            // Otherwise propagate the error
-            return Err(e);
+            Err(s) => {
+                if s == "QUIT" {
+                    println!(); // Add newline for clean exit
+                    return Ok(());
+                }
+
+                let formatted_error = format_error(&s, tips);
+                let mut stdout = io::stdout();
+                stdout.execute(SetForegroundColor(Color::Red))?;
+                stdout.execute(Print("● "))?;
+                stdout.execute(ResetColor)?;
+                println!("{formatted_error}");
+            }
         }
 
         // Add to history (all commands, even if they fail - this is what shells do)
@@ -156,6 +202,7 @@ fn format_error(error: &str, with_tips: bool) -> String {
         lines.join("\n")
     }
 }
+
 
 fn execute_and_print(
     interpreter: &mut Interpreter,

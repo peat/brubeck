@@ -149,8 +149,8 @@ impl TestContext<Interpreter> {
         self.inner.cpu.pc
     }
 
-    /// Undo last operation
-    pub fn undo(&mut self) -> &mut Self {
+    /// Navigate to previous state
+    pub fn previous(&mut self) -> &mut Self {
         let ctx = self.context("Previous");
         self.inner
             .previous_state()
@@ -158,9 +158,9 @@ impl TestContext<Interpreter> {
         self
     }
 
-    /// Undo with expected content
-    pub fn undo_expect(&mut self, _expected: &str) -> &mut Self {
-        let ctx = self.context("Undo");
+    /// Navigate to previous state with expected content
+    pub fn previous_expect(&mut self, _expected: &str) -> &mut Self {
+        let ctx = self.context("Navigate back");
         let _delta = self
             .inner
             .previous_state()
@@ -170,8 +170,8 @@ impl TestContext<Interpreter> {
         self
     }
 
-    /// Redo last undone operation
-    pub fn redo(&mut self) -> &mut Self {
+    /// Navigate to next state
+    pub fn next(&mut self) -> &mut Self {
         let ctx = self.context("Next");
         self.inner
             .next_state()
@@ -179,11 +179,11 @@ impl TestContext<Interpreter> {
         self
     }
 
-    /// Check undo should fail
-    pub fn undo_should_fail(&mut self) -> &mut Self {
-        let ctx = self.context("Undo (expecting failure)");
+    /// Check navigation back should fail
+    pub fn previous_should_fail(&mut self) -> &mut Self {
+        let ctx = self.context("Navigate back (expecting failure)");
         if self.inner.previous_state().is_ok() {
-            panic!("{ctx}: Expected undo to fail but it succeeded");
+            panic!("{ctx}: Expected navigation back to fail but it succeeded");
         }
         self
     }

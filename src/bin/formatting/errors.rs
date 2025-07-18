@@ -10,7 +10,7 @@ pub fn format_history_error(error: &HistoryError, tips_enabled: bool) -> String 
     if tips_enabled {
         match error {
             HistoryError::AtBeginning => {
-                output.push_str("\n💡 Tip: You're at the beginning of the undo history. Use --history-limit to increase history size");
+                output.push_str("\n💡 Tip: You're at the beginning of the navigation history. Use --history-limit to increase history size");
             }
             HistoryError::AtEnd => {
                 output.push_str("\n💡 Tip: You're at the most recent state. Execute new instructions to continue");
@@ -95,7 +95,7 @@ mod tests {
     fn test_format_history_error() {
         let error = HistoryError::AtBeginning;
         let result = format_history_error(&error, true);
-        assert!(result.contains("beginning of the undo history"));
+        assert!(result.contains("beginning of the navigation history"));
         assert!(result.contains("💡 Tip:"));
         assert!(result.contains("--history-limit"));
     }

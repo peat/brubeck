@@ -43,9 +43,9 @@ pub fn format_registers_with_colors(
         let abi_name = get_abi_name(reg);
 
         let reg_str = if use_abi_names && abi_name != "----" {
-            format!("x{i:<2} ({abi_name:4})")
+            format!("x{i} ({abi_name})", i = i)
         } else {
-            format!("x{i:<2}      ")
+            format!("x{i}", i = i)
         };
 
         // Format the value with color
@@ -64,7 +64,7 @@ pub fn format_registers_with_colors(
             format!("0x{val:08x} ({val:11})", val = val as i32)
         };
 
-        output.push_str(&format!("{reg_str}: {val_str}  "));
+        output.push_str(&format!("{reg_str:<10}: {val_str}  "));
 
         // Right column (x16-x31)
         let i = row + 16;
@@ -73,9 +73,9 @@ pub fn format_registers_with_colors(
         let abi_name = get_abi_name(reg);
 
         let reg_str = if use_abi_names && abi_name != "----" {
-            format!("x{i:<2} ({abi_name:4})")
+            format!("x{i} ({abi_name})", i = i)
         } else {
-            format!("x{i:<2}      ")
+            format!("x{i}", i = i)
         };
 
         // Format the value with color
@@ -94,7 +94,7 @@ pub fn format_registers_with_colors(
             format!("0x{val:08x} ({val:11})", val = val as i32)
         };
 
-        output.push_str(&format!("{reg_str}: {val_str}\n"));
+        output.push_str(&format!("{reg_str:<10}: {val_str}\n"));
     }
 
     // Add PC with coloring if it changed
@@ -108,7 +108,7 @@ pub fn format_registers_with_colors(
         format!("0x{:08x}", cpu.pc)
     };
 
-    output.push_str(&format!("pc       : {pc_str}\n"));
+    output.push_str(&format!("{:<10}: {pc_str}\n", "pc"));
 
     output
 }

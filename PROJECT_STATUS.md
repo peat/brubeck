@@ -1,6 +1,6 @@
 # Brubeck Project Status & Roadmap
 
-Last Updated: 2025-07-11
+Last Updated: 2025-07-18
 
 ## 🎯 Current Focus: Interpreter Public API Refactoring
 
@@ -87,6 +87,16 @@ impl Interpreter {
 ## 📋 Task List
 
 ### 🔴 High Priority (Architecture)
+
+#### 0. Structured Error Types in Library ⏱️ ~6 hours
+**Status**: Not started  
+**Why**: Library consumers shouldn't have to parse error strings  
+**Specification**:
+- Replace string-based errors with structured types containing all error data
+- Each error type should have specific fields (e.g., InvalidRegister { name, suggestion })
+- Binary formats these into user-friendly messages with colors and tips
+- Other consumers (WASM, embedded) can handle errors appropriately
+- Follows same pattern as StateDelta - data in library, presentation in consumers
 
 #### 1. Rename Undo/Redo Commands ⏱️ ~2 hours
 **Status**: ✅ Completed  
@@ -272,6 +282,21 @@ None currently - all major refactoring tasks completed!
    - Clean implementation using StateDelta tracking
    - No complex wrapper structs needed
 
+4. ✅ Register Display Improvements - Clean, aligned output!
+   - Fixed register display to use sequential columns (x0-x15 left, x16-x31 right)
+   - Removed extra whitespace in register names (x0, not "x 0")
+   - Removed padding from ABI names (x0 (zero), not x0 (zero  ))
+   - Consistent columnar alignment for easy reading
+
+5. ✅ History Navigation Enhancements - Detailed change information!
+   - `/prev` and `/next` now show exactly what changed
+   - Example: "Navigated back: x2: 100 → 0, PC: 0x00000008 → 0x00000004"
+   - Much more useful than generic "Changed: 1 register"
+
 ---
 
-**Next Action**: Review completed work and consider next features from the roadmap (e.g., Instruction History Command, Tab Completion)
+**Next Action**: Refactor library errors to be highly structured instead of strings
+- Library should return structured error types with all relevant data
+- Binary (and other consumers) can format errors appropriately
+- No string parsing needed by consumers
+- Follows same pattern as StateDelta - data in library, presentation in consumers

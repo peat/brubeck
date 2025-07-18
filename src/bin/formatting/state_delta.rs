@@ -53,7 +53,12 @@ pub fn format_instruction_result(delta: &StateDelta) -> String {
             changes.push(format!("PC: 0x{old:08x} → 0x{new:08x}"));
             has_pc_change = true;
         } else {
-            changes.push(format!("{}: {} → {}", format_register_name(*reg), *old as i32, *new as i32));
+            changes.push(format!(
+                "{}: {} → {}",
+                format_register_name(*reg),
+                *old as i32,
+                *new as i32
+            ));
         }
     }
 
@@ -85,40 +90,34 @@ pub fn format_instruction_result(delta: &StateDelta) -> String {
     }
 }
 
-/// Formats a StateDelta in a compact single-line format
-pub fn format_state_delta_compact(delta: &StateDelta) -> String {
-    let mut parts = Vec::new();
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use brubeck::rv32_i::MemoryDelta;
 
-    // Count changes by type
-    let reg_count = delta.register_changes.len();
-    let mem_count = delta.memory_changes.len();
-    let csr_count = delta.csr_changes.len();
+    #[test]
+    fn test_format_instruction_result_basic() {
+        let mut delta = StateDelta::new();
+        delta.pc_change = (0, 4);
+        delta.register_changes.push((Register::X1, 0, 42));
 
-    if reg_count > 0 {
-        parts.push(format!(
-            "{} register{}",
-            reg_count,
-            if reg_count == 1 { "" } else { "s" }
-        ));
-    }
-    if mem_count > 0 {
-        parts.push(format!(
-            "{} memory location{}",
-            mem_count,
-            if mem_count == 1 { "" } else { "s" }
-        ));
-    }
-    if csr_count > 0 {
-        parts.push(format!(
-            "{} CSR{}",
-            csr_count,
-            if csr_count == 1 { "" } else { "s" }
-        ));
+        let result = format_instruction_result(&delta);
+        assert!(result.contains("x1: 0 → 42"));
+        assert!(result.contains("PC: 0x00000000 → 0x00000004"));
     }
 
-    if parts.is_empty() {
-        "No changes".to_string()
-    } else {
-        format!("Changed: {}", parts.join(", "))
+    #[test]
+    fn test_format_instruction_result_memory() {
+        let mut delta = StateDelta::new();
+        delta.pc_change = (0, 4);
+        delta.memory_changes.push(MemoryDelta {
+            addr: 0x100,
+            old_data: vec![0x00],
+            new_data: vec![0x42],
+        });
+
+        let result = format_instruction_result(&delta);
+        assert!(result.contains("memory bytes changed"));
+        assert!(result.contains("PC: 0x00000000 → 0x00000004"));
     }
 }

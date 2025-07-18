@@ -84,3 +84,55 @@ pub fn format_repl_command_error(error: &str, tips_enabled: bool) -> String {
 
     output
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use brubeck::HistoryError;
+    use std::io;
+
+    #[test]
+    fn test_format_history_error() {
+        let error = HistoryError::AtBeginning;
+        let result = format_history_error(&error, true);
+        assert!(result.contains("beginning of the undo history"));
+        assert!(result.contains("💡 Tip:"));
+        assert!(result.contains("--history-limit"));
+    }
+
+    #[test]
+    fn test_format_history_error_no_tips() {
+        let error = HistoryError::AtEnd;
+        let result = format_history_error(&error, false);
+        assert!(result.contains("most recent state"));
+        assert!(!result.contains("💡 Tip:"));
+    }
+
+    #[test]
+    fn test_format_io_error() {
+        let error = io::Error::new(io::ErrorKind::NotFound, "file not found");
+        let result = format_io_error(&error, "Failed to read script", true);
+        assert!(result.contains("Failed to read script"));
+        assert!(result.contains("file not found"));
+        assert!(result.contains("💡 Tip:"));
+        assert!(result.contains("Check that the script file path"));
+    }
+
+    #[test]
+    fn test_format_parse_error() {
+        let result = format_parse_error("Invalid memory size", "memory_size", true);
+        assert!(result.contains("Invalid memory size"));
+        assert!(result.contains("💡 Tip:"));
+        assert!(result.contains("1M"));
+        assert!(result.contains("256k"));
+    }
+
+    #[test]
+    fn test_format_repl_command_error() {
+        let result = format_repl_command_error("Unknown command: /foo", true);
+        assert!(result.contains("Unknown command"));
+        assert!(result.contains("💡 Tip:"));
+        assert!(result.contains("Available commands"));
+        assert!(result.contains("/help"));
+    }
+}

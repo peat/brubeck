@@ -30,3 +30,18 @@ Examples:
   /p               # Go to previous state"#
         .to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_help() {
+        let help = format_help();
+        assert!(help.contains("RISC-V REPL Commands"));
+        assert!(help.contains("/regs"));
+        assert!(help.contains("/memory"));
+        assert!(help.contains("/previous"));
+        assert!(help.contains("/help"));
+    }
+}

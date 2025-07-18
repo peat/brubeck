@@ -43,9 +43,9 @@ pub fn format_registers_with_colors(
         let abi_name = get_abi_name(reg);
 
         let reg_str = if use_abi_names && abi_name != "----" {
-            format!("x{i} ({abi_name})", i = i)
+            format!("x{i} ({abi_name})")
         } else {
-            format!("x{i}", i = i)
+            format!("x{i}")
         };
 
         // Format the value with color
@@ -73,9 +73,9 @@ pub fn format_registers_with_colors(
         let abi_name = get_abi_name(reg);
 
         let reg_str = if use_abi_names && abi_name != "----" {
-            format!("x{i} ({abi_name})", i = i)
+            format!("x{i} ({abi_name})")
         } else {
-            format!("x{i}", i = i)
+            format!("x{i}")
         };
 
         // Format the value with color
@@ -252,5 +252,47 @@ fn get_abi_name(reg: Register) -> &'static str {
         Register::X30 => "t5",
         Register::X31 => "t6",
         Register::PC => "----",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use brubeck::rv32_i::CPU;
+
+    #[test]
+    fn test_format_registers_basic() {
+        let mut cpu = CPU::new(1024);
+        cpu.set_register(Register::X1, 42);
+        cpu.set_register(Register::X2, 0);
+
+        let result = format_registers_with_colors(&cpu, false, None);
+        assert!(result.contains("x0"));
+        assert!(result.contains("x1"));
+        assert!(result.contains("0x0000002a"));
+        assert!(result.contains("42"));
+    }
+
+    #[test]
+    fn test_format_registers_with_abi_names() {
+        let cpu = CPU::new(1024);
+        let result = format_registers_with_colors(&cpu, true, None);
+        assert!(result.contains("x0 (zero)"));
+        assert!(result.contains("x1 (ra)"));
+        assert!(result.contains("x2 (sp)"));
+    }
+
+    #[test]
+    fn test_format_specific_registers() {
+        let mut cpu = CPU::new(1024);
+        cpu.set_register(Register::X1, 100);
+        cpu.set_register(Register::X2, 200);
+
+        let regs = vec![Register::X1, Register::X2];
+        let result = format_specific_registers(&cpu, &regs);
+        assert!(result.contains("x1"));
+        assert!(result.contains("x2"));
+        assert!(result.contains("100"));
+        assert!(result.contains("200"));
     }
 }

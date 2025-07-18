@@ -143,3 +143,35 @@ pub fn format_memory_range_with_colors(
 
     output
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use brubeck::rv32_i::CPU;
+
+    #[test]
+    fn test_format_memory_basic() {
+        let mut cpu = CPU::new(1024);
+        // Write some test data
+        cpu.memory[0x100] = 0x48; // 'H'
+        cpu.memory[0x101] = 0x65; // 'e'
+        cpu.memory[0x102] = 0x6C; // 'l'
+        cpu.memory[0x103] = 0x6C; // 'l'
+        cpu.memory[0x104] = 0x6F; // 'o'
+
+        let result = format_memory_range_with_colors(&cpu, Some(0x100), Some(0x110), None);
+        assert!(result.contains("0x00000100"));
+        assert!(result.contains("48 65 6c 6c 6f")); // "Hello" in hex
+        assert!(result.contains("Hello")); // ASCII representation
+    }
+
+    #[test]
+    fn test_format_memory_with_pc() {
+        let mut cpu = CPU::new(1024);
+        cpu.pc = 0x100;
+
+        let result = format_memory_range_with_colors(&cpu, Some(0x100), Some(0x110), None);
+        // Should highlight the address line containing PC
+        assert!(result.contains("0x00000100"));
+    }
+}

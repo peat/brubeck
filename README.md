@@ -1,162 +1,122 @@
 # Brubeck
 
-Brubeck is a RISC-V assembly language REPL and emulator library designed for learning RISC-V architecture and assembly programming. It includes a parser with validation and helpful error messages.
+A RISC-V assembly REPL for learning and experimentation. Type instructions, see what happens. Step backwards if you mess up.
 
-Feedback and suggestions for this RISC-V assembly playground are welcome.
+Brubeck implements the RV32I base integer instruction set (the 32-bit version of RISC-V). It's written in Rust and can be used as a library or through the interactive REPL.
 
-## Current State
+## Quick Start
 
-### ✅ **Complete RV32I + CSR Implementation**
-* **47 RV32I instructions**: All base integer instructions with comprehensive testing
-* **6 CSR instructions**: CSRRW, CSRRS, CSRRC, CSRRWI, CSRRSI, CSRRCI with standard CSRs
-* **8 pseudo-instructions**: MV, NOT, LI, J, JR, RET, SEQZ, SNEZ for convenience
-* **System instructions**: FENCE, ECALL, EBREAK for system-level operations
-
-### 🎓 **Features**
-* Parser with helpful error messages
-* Standard RISC-V syntax: `LW x1, 4(x2)` with backward compatibility
-* Documentation explaining implementation concepts
-* **Multiple formats**: Hex (0x), binary (0b), and decimal immediates
-* **History navigation** (`/previous`, `/next`): Step back and forward with detailed change info
-* **Enhanced output formatting**:
-  - Color-coded registers: Changed values in green, zeros in gray
-  - Color-coded memory: Changed bytes in green, PC location highlighted
-  - Detailed history navigation shows exact changes (e.g., "x2: 100 → 0")
-  - Consistent columnar alignment for easy reading
-* **Context-aware error messages**: Helpful tips for common mistakes
-* CLI support: Script files, one-liners, and execution traces
-
-### 🧪 **Testing**
-* 350+ tests covering all instructions and edge cases
-* Validation for immediates, registers, and instruction formats
-* Structured test organization
-
-Implementation strictly follows the RISC-V ISA specification (see `riscv-isa-manual/src/rv32.adoc`).
-
-## REPL Commands
-
-* `/regs` or `/r` - Show all registers (changed values in green, zeros in gray)
-* `/regs x1 x2` - Show specific registers
-* `/memory` or `/m` - Show memory around PC (changed bytes in green, PC highlighted)
-* `/memory 0x100` - Show memory starting at address
-* `/memory 0x100 0x200` - Show memory range
-* `/previous` or `/p` - Navigate to previous state (shows what changed)
-* `/next` or `/n` - Navigate to next state (shows what changed)  
-* `/reset` - Reset CPU state (with confirmation)
-* `/help` or `/h` - Show help
-* `/quit` - Exit REPL
-
-## Examples
-
-### Interactive REPL
+```bash
+cargo run
 ```
-$ cargo run
 
+```
 Brubeck: A RISC-V REPL
 Ctrl-C to quit
 
 [0x00000000]> ADDI x1, zero, 100
-● X1: 0 → 100, PC: 0x00000000 → 0x00000004
+x1: 0 → 100, PC: 0x00000000 → 0x00000004
 
-[0x00000004]> ADDI x2, zero, 50
-● X2: 0 → 50, PC: 0x00000004 → 0x00000008
+[0x00000004]> ADD x2, x1, x1
+x2: 0 → 200, PC: 0x00000004 → 0x00000008
 
-[0x00000008]> ADD x3, x1, x2
-● X3: 0 → 150, PC: 0x00000008 → 0x0000000c
+[0x00000008]> /regs x1 x2
+x1 (ra): 0x00000064 (        100)
+x2 (sp): 0x000000c8 (        200)
 
-[0x0000000c]> /regs x3
-● x3 (gp): 0x00000096 (        150)
-
-[0x0000000c]> /p
-● Navigated back: x3: 150 → 0, PC: 0x0000000c → 0x00000008
-
-[0x00000008]> /regs x3
-● x3 (gp): 0x00000000 (          0)
+[0x00000008]> /p
+Navigated back: x2: 200 → 0, PC: 0x00000008 → 0x00000004
 ```
 
-### Command-Line Usage
+## What's Implemented
+
+**47 RV32I instructions** — all the base integer operations: arithmetic, logic, shifts, branches, jumps, loads, stores, and upper immediates.
+
+**6 CSR instructions** — CSRRW, CSRRS, CSRRC and their immediate variants for reading/writing control registers.
+
+**8 pseudo-instructions** — MV, NOT, LI, J, JR, RET, SEQZ, SNEZ. These expand to real instructions but are convenient shortcuts.
+
+The implementation follows the RISC-V ISA specification (included in `riscv-isa-manual/`).
+
+## REPL Commands
+
+| Command | What it does |
+|---------|--------------|
+| `/regs` or `/r` | Show all registers |
+| `/regs x1 x2` | Show specific registers |
+| `/memory` or `/m` | Show memory around PC |
+| `/memory 0x100` | Show memory at address |
+| `/memory 0x100 0x200` | Show memory range |
+| `/previous` or `/p` | Step backward through history |
+| `/next` or `/n` | Step forward through history |
+| `/reset` | Clear everything and start over |
+| `/help` or `/h` | Show help |
+| `/quit` or `/q` | Exit |
+
+## Command Line
+
 ```bash
-# Quick calculations
-$ brubeck -e "ADDI x1, x0, 42; SLLI x2, x1, 2; /r x2"
-x2 (sp): 0x000000a8 (        168)
+# One-liner
+brubeck -e "ADDI x1, x0, 42; SLLI x2, x1, 2; /r x2"
 
-# Run a script file
-$ brubeck -s program.bru
-X3: 500 (0x1f4)
+# Run a script
+brubeck -s program.bru
 
-# Verbose mode for learning
-$ brubeck -s program.bru --verbose
-ADDI x1, x0, 100     # 0x00000000 ADDI: Added 100 to X0 (0) and stored result in X1 (100)
-SLLI x2, x1, 2       # 0x00000004 SLLI: x2 ← x1 << 2 = 400
-ADD x3, x1, x2       # 0x00000008 ADD: x3 ← x1 + x2 = 100 + 400 = 500
-x3 (gp): 0x000001f4 (        500)
+# Verbose mode shows what each instruction does
+brubeck -s program.bru --verbose
 
 # Custom memory size
-$ brubeck -m 64k
+brubeck -m 64k
 
-# Disable state history navigation for minimal overhead
-$ brubeck --no-state-history
+# See all options
+brubeck --help
 ```
 
-### Error Messages
-```
-ADDI x1, zero, 5000     # Out of range immediate
-=> ❌ Immediate value 5000 out of range for ADDI (valid range: -2048 to 2047)
-💡 Tip: I-type immediates are 12-bit signed values. For larger values, use LUI + ADDI pattern
+## Error Messages
 
-SLLI x1, x2, 50         # Invalid shift amount
-=> ❌ Immediate value 50 out of range for SLLI (valid range: 0-31)
-💡 Tip: Shift amounts must be 0-31 since RISC-V registers are 32 bits
+Brubeck tries to be helpful when things go wrong:
+
+```
+[0x00000000]> ADDI x1, zero, 5000
+Immediate value 5000 out of range for ADDI (valid range: -2048 to 2047)
+
+[0x00000000]> ADDD x1, x0, 5
+Unknown instruction 'ADDD'. Did you mean 'ADD or ADDI'?
 ```
 
-## Getting Started
+Run with `--tips` for additional context about RISC-V concepts.
+
+## Using as a Library
+
+The emulator is a separate library with no dependencies, so you can embed it in other projects or compile to WASM.
+
+```rust
+use brubeck::{Interpreter, CPU};
+
+let mut interp = Interpreter::new();
+let delta = interp.interpret("ADDI x1, x0, 42")?;
+// delta contains what changed: registers, PC, memory
+
+let value = interp.cpu.get_register(Register::X1);
+```
+
+## Building
 
 ```bash
-# Clone the repository
-git clone https://github.com/peat/brubeck.git
-cd brubeck
-
-# Run the REPL
-cargo run
-
-# Run with custom memory
-cargo run -- -m 256k
-
-# Execute one-liners
-cargo run -- -e "LI x1, 0x1234; /regs x1"
-
-# Run tests
-cargo test
-
-# Build documentation
-cargo doc --open
+cargo build          # debug build
+cargo build --release
+cargo test           # run the tests
+cargo doc --open     # browse the docs
 ```
 
-## Command-Line Options
+## Not Yet Implemented
 
-```
-Usage: brubeck [OPTIONS]
-
-Options:
-  -m, --memory <SIZE>      Memory size (e.g., 1M, 256k, 1024) [default: 1M]
-      --history-limit <N>  Maximum state history depth [default: 1000]
-      --no-state-history   Disable state history navigation
-  -e, --execute <CMDS>     Execute commands and exit (semicolon-separated)
-  -s, --script <FILE>      Execute script file and exit
-  -q, --quiet              Suppress banner and descriptions (REPL only)
-  -v, --verbose            Show instruction trace (script/execute only)
-  -h, --help               Print help
-  -V, --version            Print version
-```
-
-## Future Enhancements
-
-* **RISC-V Extensions**: Add M (multiplication/division), A (atomic), F/D (floating-point) extensions
-* **Advanced REPL**: Tab completion, syntax highlighting
-* **Debugging Features**: Breakpoints, step execution, execution tracing
-* **Educational Tools**: Instruction encoding display, pipeline visualization
-* **Assembly Features**: Labels, expressions, assembler directives (.text, .data, etc.)
+- M extension (multiply/divide)
+- F/D extensions (floating point)
+- Breakpoints and watchpoints
+- Labels and assembler directives
+- Tab completion
 
 ## Contact
 
-Find me on [Bluesky](https://bsky.app/profile/peat.org), [Mastodon](https://mastodon.social/@peat), [Twitter](https://twitter.com/peat), or via [email](mailto:peat@peat.org).
+[Bluesky](https://bsky.app/profile/peat.org) · [Mastodon](https://mastodon.social/@peat) · [Twitter](https://twitter.com/peat) · [Email](mailto:peat@peat.org)

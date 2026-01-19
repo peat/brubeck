@@ -18,7 +18,7 @@ autobins = false
 
 # Binary-only dependencies for the REPL
 [dependencies.crossterm]
-version = "0.27"
+version = "0.29"
 
 [dependencies.clap]
 version = "4.5"
